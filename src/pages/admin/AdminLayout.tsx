@@ -16,7 +16,8 @@ import {
   X,
   ChevronRight,
   Crown,
-  Megaphone
+  Megaphone,
+  Palette
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -230,6 +231,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     { id: 'admin-users', label: 'Users', icon: Users },
     { id: 'admin-transactions', label: 'Transactions', icon: CreditCard },
     { id: 'admin-genres', label: 'Genres', icon: Tag },
+    { id: 'admin-design', label: 'App Design', icon: Palette },
     { id: 'admin-settings', label: 'Settings', icon: Sliders }
   ];
 

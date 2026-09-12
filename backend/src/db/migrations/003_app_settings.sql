@@ -17,4 +17,5 @@ INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES
   ('default_resolution', '1080p', datetime('now')),
   ('support_email', 'support@flopshow.tv', datetime('now')),
   ('maintenance_mode', 'false', datetime('now')),
-  ('allow_guest_browsing', 'true', datetime('now'));
+  ('allow_guest_browsing', 'true', datetime('now')),
+  ('app_theme', 'flopshow-gold', datetime('now'));

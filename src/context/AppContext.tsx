@@ -21,7 +21,13 @@ interface Toast {
   type: 'success' | 'info' | 'error';
 }
 
+export type AppTheme = 'flopshow-gold' | 'netflix-red';
+
 interface AppContextType {
+  // Theme
+  theme: AppTheme;
+  setTheme: (theme: AppTheme) => void;
+
   // Catalog
   catalog: ContentItem[];
   refreshCatalog: () => Promise<void>;
@@ -82,6 +88,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // State initialization with localStorage persistence
+  const [theme, setThemeState] = useState<AppTheme>(() => loadFromStorage('app_theme', 'flopshow-gold'));
   const [user, setUser] = useState<User>(() => loadFromStorage('user', INITIAL_USER));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => loadFromStorage('is_authenticated', true));
   const [walletBalance, setWalletBalance] = useState<number>(() => loadFromStorage('wallet_balance', INITIAL_WALLET_BALANCE));
@@ -89,6 +96,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => loadFromStorage('purchases', INITIAL_PURCHASES));
   const [myList, setMyList] = useState<string[]>(() => loadFromStorage('my_list', INITIAL_MY_LIST));
   const [watchProgress, setWatchProgress] = useState<WatchProgress[]>(() => loadFromStorage('watch_progress', INITIAL_WATCH_PROGRESS));
+
+  const setTheme = (newTheme: AppTheme) => {
+    setThemeState(newTheme);
+    saveToStorage('app_theme', newTheme);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', newTheme);
+      document.body.setAttribute('data-theme', newTheme);
+    }
+  };
+
+  // Ensure DOM attribute is set immediately on render
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.body.setAttribute('data-theme', theme);
+    }
+  }, [theme]);
 
   // Catalog state from central database (strictly dynamic, no hardcoded fallbacks)
   const [catalog, setCatalog] = useState<ContentItem[]>([]);
@@ -117,6 +141,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     refreshCatalog();
+
+    // Sync theme setting from central backend
+    api.content.getTheme().then(serverTheme => {
+      if (serverTheme === 'netflix-red' || serverTheme === 'flopshow-gold') {
+        setTheme(serverTheme as AppTheme);
+      }
+    }).catch(() => {
+      // Keep local default
+    });
+
     const token = tokenStorage.get();
     if (token) {
       api.auth.me().then(({ user: serverUser }) => {
@@ -414,6 +448,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   return (
     <AppContext.Provider
       value={{
+        theme,
+        setTheme,
         catalog,
         refreshCatalog,
         user,

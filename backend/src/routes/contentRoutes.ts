@@ -81,6 +81,17 @@ contentRouter.get('/ads', (_req, res, next) => {
   }
 });
 
+// GET /api/content/theme (Public App Theme Setting)
+contentRouter.get('/theme', (_req, res, next) => {
+  try {
+    const settings = adminService.getSettings();
+    const theme = settings.app_theme || 'flopshow-gold';
+    res.json({ theme });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/content/:idOrSlug
 contentRouter.get('/:idOrSlug', (req, res, next) => {
   try {

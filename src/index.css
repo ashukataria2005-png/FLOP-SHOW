@@ -52,6 +52,39 @@
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ==========================================================================
+   THEME STYLES
+   - FLOPSHOW Gold (Default): yellow/gold + black
+   - Netflix Red: Netflix-style red + black
+   ========================================================================== */
+
+[data-theme="netflix-red"],
+html[data-theme="netflix-red"],
+body[data-theme="netflix-red"] {
+  --brand-gold: #E50914;
+  --brand-gold-glow: rgba(229, 9, 20, 0.4);
+  --brand-gold-dark: #B80710;
+  --brand-gold-light: #FF2E3B;
+  --border-focus: rgba(229, 9, 20, 0.55);
+  --badge-price-bg: rgba(229, 9, 20, 0.18);
+  --badge-price-border: rgba(229, 9, 20, 0.45);
+}
+
+[data-theme="netflix-red"] .btn-primary {
+  background: var(--brand-gold);
+  color: #FFFFFF;
+  box-shadow: 0 4px 18px rgba(229, 9, 20, 0.4);
+}
+
+[data-theme="netflix-red"] .btn-primary:hover {
+  background: var(--brand-gold-light);
+  box-shadow: 0 6px 22px rgba(229, 9, 20, 0.55);
+}
+
+[data-theme="netflix-red"] .card-hover-play > div {
+  color: #FFFFFF;
+}
+
 /* Reset & Base */
 *, *::before, *::after {
   box-sizing: border-box;

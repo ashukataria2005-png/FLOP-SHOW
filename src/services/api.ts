@@ -252,6 +252,15 @@ export const api = {
       }
     },
 
+    async getTheme(): Promise<string> {
+      try {
+        const data = await request<{ theme: string }>('/content/theme');
+        return data.theme || 'flopshow-gold';
+      } catch {
+        return 'flopshow-gold';
+      }
+    },
+
     async getDetails(idOrSlug: string): Promise<ContentItem> {
       const data = await request<{ item: any }>(`/content/${idOrSlug}`);
       return adaptDbContentToFrontend(data.item);

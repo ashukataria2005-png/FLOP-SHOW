@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
+import { AppThemeSelector } from '../../components/admin/AppThemeSelector';
 import {
   Sliders,
   Save,
@@ -14,7 +15,7 @@ interface AdminSettingsPageProps {
 }
 
 export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = () => {
-  const { showToast } = useApp();
+  const { theme, setTheme, showToast } = useApp();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -39,6 +40,9 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = () => {
         if (res.settings.default_resolution) setDefaultResolution(res.settings.default_resolution);
         if (res.settings.maintenance_mode !== undefined) setMaintenanceMode(res.settings.maintenance_mode === 'true');
         if (res.settings.allow_guest_browsing !== undefined) setAllowGuestBrowsing(res.settings.allow_guest_browsing === 'true');
+        if (res.settings.app_theme && (res.settings.app_theme === 'netflix-red' || res.settings.app_theme === 'flopshow-gold')) {
+          setTheme(res.settings.app_theme as any);
+        }
       }
     } catch (err: any) {
       showToast(err.message || 'Failed to load application settings.', 'error');
@@ -62,7 +66,8 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = () => {
         support_email: supportEmail.trim(),
         default_resolution: defaultResolution,
         maintenance_mode: String(maintenanceMode),
-        allow_guest_browsing: String(allowGuestBrowsing)
+        allow_guest_browsing: String(allowGuestBrowsing),
+        app_theme: theme
       });
       showToast('Application settings saved successfully!', 'success');
     } catch (err: any) {
@@ -94,6 +99,9 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = () => {
       </div>
 
       <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+        {/* App Theme Section */}
+        <AppThemeSelector />
+
         {/* Section 1: Platform Branding */}
         <div
           style={{

@@ -16,6 +16,7 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminTransactionsPage } from './pages/admin/AdminTransactionsPage';
 import { AdminGenresPage } from './pages/admin/AdminGenresPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
+import { AdminDesignPage } from './pages/admin/AdminDesignPage';
 import { AdminQuickAddPage } from './pages/admin/AdminQuickAddPage';
 import { AdminHeroPage } from './pages/admin/AdminHeroPage';
 import { AdminAdsPage } from './pages/admin/AdminAdsPage';
@@ -64,6 +65,9 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   if (cleanPath === '/admin/genres') {
     return { tab: 'admin-genres' };
   }
+  if (cleanPath === '/admin/design') {
+    return { tab: 'admin-design' };
+  }
   if (cleanPath === '/admin/settings') {
     return { tab: 'admin-settings' };
   }
@@ -110,6 +114,8 @@ function tabToPath(tab: string, param?: string): string {
       return '/admin/transactions';
     case 'admin-genres':
       return '/admin/genres';
+    case 'admin-design':
+      return '/admin/design';
     case 'admin-settings':
       return '/admin/settings';
     case 'search':
@@ -228,9 +234,10 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-users' && <AdminUsersPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-transactions' && <AdminTransactionsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-genres' && <AdminGenresPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-design' && <AdminDesignPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-hero', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-transactions', 'admin-genres', 'admin-settings'].includes(currentTab) && (
+          {!['admin-dashboard', 'admin-content', 'admin-hero', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>

@@ -1,0 +1,659 @@
+import { ContentItem, Season, Episode } from '../types/content';
+
+const API_BASE_URL = '/api';
+
+/**
+ * Helper to get and set auth tokens in localStorage
+ */
+const TOKEN_KEY = 'flopshow_auth_token';
+
+export const tokenStorage = {
+  get: (): string | null => {
+    try {
+      return localStorage.getItem(TOKEN_KEY);
+    } catch {
+      return null;
+    }
+  },
+  set: (token: string): void => {
+    try {
+      localStorage.setItem(TOKEN_KEY, token);
+    } catch {
+      // Ignore in non-browser environments
+    }
+  },
+  clear: (): void => {
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      // Ignore
+    }
+  }
+};
+
+/**
+ * Standard HTTP Request Wrapper for FLOPSHOW API
+ */
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const token = tokenStorage.get();
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>)
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const message = data?.error?.message || `Request failed with status ${response.status}`;
+    const error = new Error(message);
+    (error as any).status = response.status;
+    (error as any).code = data?.error?.code;
+    throw error;
+  }
+
+  return data as T;
+}
+
+/**
+ * Adapter mapping backend database content schema to frontend ContentItem interface
+ */
+export function adaptDbContentToFrontend(item: any): ContentItem {
+  let cast: string[] = [];
+  try {
+    cast = typeof item.cast_json === 'string' ? JSON.parse(item.cast_json) : (item.cast || []);
+  } catch {
+    cast = [];
+  }
+
+  const seasons: Season[] = (item.seasons || []).map((s: any) => ({
+    seasonNumber: s.season_number,
+    title: s.title,
+    episodes: (s.episodes || []).map((e: any): Episode => ({
+      id: e.id,
+      seriesId: item.id,
+      seasonNumber: s.season_number,
+      episodeNumber: e.episode_number,
+      title: e.title,
+      duration: e.duration || '45m',
+      durationSeconds: e.duration_seconds || 0,
+      thumbnailUrl: e.thumbnail || item.poster,
+      videoUrl: e.video_url,
+      synopsis: e.description || ''
+    }))
+  }));
+
+  const priceRupees = item.price ? Math.round(item.price / 100) : 0;
+
+  return {
+    id: item.id,
+    title: item.title,
+    type: item.type ? (item.type.toLowerCase() as 'movie' | 'series') : 'movie',
+    backdropUrl: item.backdrop || item.backdropUrl,
+    posterUrl: item.poster || item.posterUrl,
+    tagline: item.tagline,
+    description: item.description,
+    about: item.about || item.description,
+    rating: Number(item.rating || 8.0),
+    releaseYear: Number(item.release_year || item.releaseYear || 2025),
+    runtime: item.duration || undefined,
+    seasonsCount: seasons.length > 0 ? seasons.length : (item.seasonsCount || undefined),
+    language: item.language || 'Hindi',
+    genres: item.genres || [],
+    price: priceRupees,
+    isFree: priceRupees === 0,
+    isFeatured: Boolean(item.featured),
+    director: item.director || undefined,
+    cast,
+    trailerUrl: item.trailer_url || item.trailerUrl,
+    videoUrl: item.video_url || item.videoUrl,
+    trendingPosition: item.trending_position !== null && item.trending_position !== undefined ? Number(item.trending_position) : undefined,
+    displayPriority: item.display_priority !== null && item.display_priority !== undefined ? Number(item.display_priority) : undefined,
+    seasons: seasons.length > 0 ? seasons : undefined
+  };
+}
+
+/**
+ * FLOPSHOW Central API Service Client
+ */
+export const api = {
+  // --------------------------------------------------------------------------
+  // AUTHENTICATION
+  // --------------------------------------------------------------------------
+  auth: {
+    async register(name: string, email: string, password: string) {
+      const data = await request<{ user: any; token: string; wallet: any }>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password })
+      });
+      tokenStorage.set(data.token);
+      return data;
+    },
+
+    async login(email: string, password: string) {
+      const data = await request<{ user: any; token: string; wallet: any }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+      tokenStorage.set(data.token);
+      return data;
+    },
+
+    async adminLogin(adminId: string, adminPassword: string) {
+      const data = await request<{ user: any; token: string }>('/auth/admin-login', {
+        method: 'POST',
+        body: JSON.stringify({ adminId, adminPassword })
+      });
+      tokenStorage.set(data.token);
+      return data;
+    },
+
+    async me() {
+      return request<{ user: any; wallet: any }>('/auth/me');
+    },
+
+    logout() {
+      tokenStorage.clear();
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // CONTENT & CATALOG
+  // --------------------------------------------------------------------------
+  content: {
+    async list(params?: { type?: 'MOVIE' | 'SERIES'; genre?: string; limit?: number }) {
+      const query = new URLSearchParams();
+      if (params?.type) query.append('type', params.type);
+      if (params?.genre && params.genre !== 'All') query.append('genre', params.genre);
+      if (params?.limit) query.append('limit', String(params.limit));
+
+      const qs = query.toString() ? `?${query.toString()}` : '';
+      const data = await request<{ items: any[] }>(`/content${qs}`);
+      return data.items.map(adaptDbContentToFrontend);
+    },
+
+    async featured() {
+      const data = await request<{ items: any[] }>('/content/featured');
+      return data.items.map(adaptDbContentToFrontend);
+    },
+
+    async getDetails(idOrSlug: string): Promise<ContentItem> {
+      const data = await request<{ item: any }>(`/content/${idOrSlug}`);
+      return adaptDbContentToFrontend(data.item);
+    },
+
+    async search(query: string, options?: { type?: 'MOVIE' | 'SERIES'; genre?: string }) {
+      const params = new URLSearchParams({ q: query });
+      if (options?.type) params.append('type', options.type);
+      if (options?.genre && options.genre !== 'All') params.append('genre', options.genre);
+
+      const data = await request<{ items: any[] }>(`/content/search?${params.toString()}`);
+      return data.items.map(adaptDbContentToFrontend);
+    },
+
+    async getGenres(): Promise<{ id: string; name: string; slug: string }[]> {
+      const data = await request<{ genres: any[] }>('/content/genres');
+      return data.genres;
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // PURCHASES
+  // --------------------------------------------------------------------------
+  purchases: {
+    async buy(contentId: string) {
+      return request<{ success: boolean; remainingBalanceRupees: number; message: string }>(
+        '/purchases',
+        {
+          method: 'POST',
+          body: JSON.stringify({ contentId })
+        }
+      );
+    },
+
+    async checkOwnership(contentId: string): Promise<boolean> {
+      try {
+        const data = await request<{ isOwned: boolean }>(`/purchases/check/${contentId}`);
+        return data.isOwned;
+      } catch {
+        return false;
+      }
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // WALLET
+  // --------------------------------------------------------------------------
+  wallet: {
+    async getBalance() {
+      return request<{ balancePaise: number; balanceRupees: number; formattedBalance: string }>('/wallet/balance');
+    },
+
+    async getTransactions(limit = 50) {
+      return request<{ transactions: any[] }>(`/wallet/transactions?limit=${limit}`);
+    },
+
+    async recharge(amountRupees: number) {
+      return request<{ message: string; wallet: any }>('/wallet/recharge', {
+        method: 'POST',
+        body: JSON.stringify({ amount: amountRupees })
+      });
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // USER LIBRARY
+  // --------------------------------------------------------------------------
+  library: {
+    async getPurchases() {
+      const data = await request<{ purchases: any[] }>('/library/purchases');
+      return data.purchases;
+    },
+
+    async getMyList(): Promise<ContentItem[]> {
+      const data = await request<{ items: any[] }>('/library/my-list');
+      return data.items.map(adaptDbContentToFrontend);
+    },
+
+    async toggleMyList(contentId: string): Promise<{ inMyList: boolean; contentId: string }> {
+      return request<{ inMyList: boolean; contentId: string }>(`/library/my-list/${contentId}`, {
+        method: 'POST'
+      });
+    },
+
+    async getProgress(contentId: string, episodeId?: string) {
+      const epParam = episodeId ? `?episodeId=${episodeId}` : '';
+      const data = await request<{ progress: any }>(`/library/progress/${contentId}${epParam}`);
+      return data.progress;
+    },
+
+    async saveProgress(params: {
+      contentId: string;
+      episodeId?: string;
+      progressPercent: number;
+      currentTimeSeconds: number;
+      durationSeconds: number;
+    }) {
+      return request<{ success: boolean }>('/library/progress', {
+        method: 'POST',
+        body: JSON.stringify(params)
+      });
+    },
+
+    async getHistory(limit = 30) {
+      const data = await request<{ history: any[] }>(`/library/history?limit=${limit}`);
+      return data.history;
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // MEDIA & PLAYBACK
+  // --------------------------------------------------------------------------
+  media: {
+    async getContentMedia(contentId: string, mediaType: 'MAIN' | 'TRAILER' = 'MAIN') {
+      return request<{
+        mediaId?: string;
+        mediaType: 'MAIN' | 'TRAILER';
+        sourceType: 'UPLOAD' | 'DIRECT_URL' | 'YOUTUBE';
+        url: string;
+        embedUrl?: string;
+        isYouTube: boolean;
+        title: string;
+        poster?: string;
+        authorized: boolean;
+      }>(`/media/content/${contentId}?type=${mediaType}`);
+    },
+
+    async getEpisodeMedia(episodeId: string, mediaType: 'MAIN' | 'TRAILER' = 'MAIN') {
+      return request<{
+        mediaId?: string;
+        mediaType: 'MAIN' | 'TRAILER';
+        sourceType: 'UPLOAD' | 'DIRECT_URL' | 'YOUTUBE';
+        url: string;
+        embedUrl?: string;
+        isYouTube: boolean;
+        title: string;
+        poster?: string;
+        authorized: boolean;
+      }>(`/media/episode/${episodeId}?type=${mediaType}`);
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // ADMIN MANAGEMENT
+  // --------------------------------------------------------------------------
+  admin: {
+    async getDashboard() {
+      return request<{
+        totalUsers: number;
+        totalMovies: number;
+        totalSeries: number;
+        totalPublished: number;
+        totalUnpublished: number;
+        totalPurchases: number;
+        totalRevenueRupees: number;
+        walletActivity: {
+          totalRechargeRupees: number;
+          totalTransactions: number;
+        };
+        currentTrending1: any | null;
+        recentlyAddedContent: any[];
+        recentPurchases: any[];
+        recentUsers: any[];
+      }>('/admin/dashboard');
+    },
+
+    async listContent(filters: {
+      status?: string;
+      type?: string;
+      genre?: string;
+      featured?: boolean;
+      trending?: boolean;
+      search?: string;
+      sortBy?: string;
+      limit?: number;
+      offset?: number;
+    } = {}) {
+      const params = new URLSearchParams();
+      if (filters.status) params.set('status', filters.status);
+      if (filters.type && filters.type !== 'ALL') params.set('type', filters.type);
+      if (filters.genre && filters.genre !== 'ALL') params.set('genre', filters.genre);
+      if (filters.featured !== undefined) params.set('featured', String(filters.featured));
+      if (filters.trending) params.set('trending', 'true');
+      if (filters.search) params.set('search', filters.search);
+      if (filters.sortBy) params.set('sortBy', filters.sortBy);
+      if (filters.limit) params.set('limit', String(filters.limit));
+      if (filters.offset) params.set('offset', String(filters.offset));
+
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const res = await request<{ count: number; items: any[] }>(`/admin/content${query}`);
+      return res.items.map(adaptDbContentToFrontend);
+    },
+
+    async getUsers() {
+      return request<{ count: number; users: any[] }>('/admin/users');
+    },
+
+    async updateUserStatus(userId: string, status: 'ACTIVE' | 'SUSPENDED') {
+      return request<{ success: boolean; message: string }>(`/admin/users/${userId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status })
+      });
+    },
+
+    async getUserPurchases(userId: string) {
+      return request<{ count: number; purchases: any[] }>(`/admin/users/${userId}/purchases`);
+    },
+
+    async getUserTransactions(userId: string) {
+      return request<{ count: number; transactions: any[] }>(`/admin/users/${userId}/transactions`);
+    },
+
+    async getPurchases(limit = 100, offset = 0) {
+      return request<{ count: number; purchases: any[] }>(`/admin/purchases?limit=${limit}&offset=${offset}`);
+    },
+
+    async getTransactions(limit = 100) {
+      return request<{ count: number; transactions: any[] }>(`/admin/transactions?limit=${limit}`);
+    },
+
+    async uploadFile(file: File) {
+      const formData = new FormData();
+      formData.append('file', file);
+      const token = tokenStorage.get();
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error?.message || 'Upload failed.');
+      }
+      return data as { success: boolean; url: string; filename: string; mimeType: string; size: number };
+    },
+
+    async createContent(contentData: any) {
+      return request<{ success: boolean; contentId: string }>('/admin/content', {
+        method: 'POST',
+        body: JSON.stringify(contentData)
+      });
+    },
+
+    async updateContent(id: string, contentData: any) {
+      return request<{ success: boolean; message: string }>(`/admin/content/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(contentData)
+      });
+    },
+
+    async deleteContent(id: string) {
+      return request<{ success: boolean; message: string }>(`/admin/content/${id}`, {
+        method: 'DELETE'
+      });
+    },
+
+    async updatePrice(contentId: string, priceRupees: number) {
+      return request<{ success: boolean }>(`/admin/content/${contentId}/price`, {
+        method: 'PATCH',
+        body: JSON.stringify({ priceRupees })
+      });
+    },
+
+    async updateStatus(contentId: string, status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED') {
+      return request<{ success: boolean }>(`/admin/content/${contentId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status })
+      });
+    },
+
+    async setTrending(contentId: string, position: number | null) {
+      return request<{ success: boolean; message: string }>(`/admin/content/${contentId}/trending`, {
+        method: 'PATCH',
+        body: JSON.stringify({ position })
+      });
+    },
+
+    async attachMedia(mediaData: {
+      contentId?: string;
+      episodeId?: string;
+      mediaType: 'MAIN' | 'TRAILER';
+      sourceType?: 'UPLOAD' | 'DIRECT_URL' | 'YOUTUBE';
+      url: string;
+      mimeType?: string;
+      duration?: string;
+      thumbnail?: string;
+    }) {
+      return request<{ success: boolean; media: any }>('/admin/media', {
+        method: 'POST',
+        body: JSON.stringify(mediaData)
+      });
+    },
+
+    async getContentMedia(contentId: string) {
+      return request<{ count: number; media: any[] }>(`/admin/content/${contentId}/media`);
+    },
+
+    async getEpisodeMedia(episodeId: string) {
+      return request<{ count: number; media: any[] }>(`/admin/episodes/${episodeId}/media`);
+    },
+
+    async deleteMedia(mediaId: string) {
+      return request<{ success: boolean; message: string }>(`/admin/media/${mediaId}`, {
+        method: 'DELETE'
+      });
+    },
+
+    async getGenres() {
+      return request<{ count: number; genres: Array<{ id: string; name: string; slug: string; contentCount: number }> }>('/admin/genres');
+    },
+
+    async createGenre(name: string, slug?: string) {
+      return request<{ success: boolean; genreId: string }>('/admin/genres', {
+        method: 'POST',
+        body: JSON.stringify({ name, slug })
+      });
+    },
+
+    async updateGenre(id: string, name: string, slug?: string) {
+      return request<{ success: boolean; message: string }>(`/admin/genres/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, slug })
+      });
+    },
+
+    async deleteGenre(id: string) {
+      return request<{ success: boolean; message: string }>(`/admin/genres/${id}`, {
+        method: 'DELETE'
+      });
+    },
+
+    async getSettings() {
+      return request<{ success: boolean; settings: Record<string, string> }>('/admin/settings');
+    },
+
+    async updateSettings(settings: Record<string, string>) {
+      return request<{ success: boolean; message: string; settings: Record<string, string> }>('/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ settings })
+      });
+    },
+
+    async createSeason(contentId: string, seasonNumber: number, title: string) {
+      return request<{ success: boolean; seasonId: string }>(`/admin/content/${contentId}/seasons`, {
+        method: 'POST',
+        body: JSON.stringify({ seasonNumber, title })
+      });
+    },
+
+    async updateSeason(seasonId: string, title: string, seasonNumber?: number) {
+      return request<{ success: boolean }>(`/admin/seasons/${seasonId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ title, seasonNumber })
+      });
+    },
+
+    async deleteSeason(seasonId: string) {
+      return request<{ success: boolean }>(`/admin/seasons/${seasonId}`, {
+        method: 'DELETE'
+      });
+    },
+
+    async createEpisode(seasonId: string, episodeData: any) {
+      return request<{ success: boolean; episodeId: string }>(`/admin/seasons/${seasonId}/episodes`, {
+        method: 'POST',
+        body: JSON.stringify(episodeData)
+      });
+    },
+
+    async updateEpisode(episodeId: string, episodeData: any) {
+      return request<{ success: boolean }>(`/admin/episodes/${episodeId}`, {
+        method: 'PUT',
+        body: JSON.stringify(episodeData)
+      });
+    },
+
+    async deleteEpisode(episodeId: string) {
+      return request<{ success: boolean }>(`/admin/episodes/${episodeId}`, {
+        method: 'DELETE'
+      });
+    },
+
+    // ------------------------------------------------------------------------
+    // QUICK ADD & AUTO IMPORT
+    // ------------------------------------------------------------------------
+    async searchMetadata(query: string, year?: number, type: 'MOVIE' | 'SERIES' = 'MOVIE') {
+      const params = new URLSearchParams({ query, type });
+      if (year) params.append('year', String(year));
+      return request<{
+        success: boolean;
+        count: number;
+        results: Array<{
+          providerId: string;
+          title: string;
+          year: number;
+          type: 'MOVIE' | 'SERIES';
+          poster: string;
+          backdrop?: string;
+          rating?: number;
+          overview?: string;
+          alreadyInFlopshow: boolean;
+          existingContentId?: string;
+        }>;
+      }>(`/admin/auto-import/search?${params.toString()}`);
+    },
+
+    async getMetadataDetails(providerId: string, type: 'MOVIE' | 'SERIES') {
+      const params = new URLSearchParams({ providerId, type });
+      return request<{
+        success: boolean;
+        details: {
+          providerId: string;
+          title: string;
+          slug: string;
+          type: 'MOVIE' | 'SERIES';
+          releaseYear: number;
+          description: string;
+          tagline: string;
+          about?: string;
+          poster: string;
+          backdrop: string;
+          trailerUrl: string;
+          language: string;
+          genres: string[];
+          runtime: string;
+          rating: number;
+          director: string;
+          cast: string[];
+          ageRating: string;
+          suggestedPriceRupees: number;
+          status: 'DRAFT';
+          featured: boolean;
+          trending: boolean;
+          alreadyExists: boolean;
+          existingContentId?: string;
+          seasons?: Array<{
+            seasonNumber: number;
+            title: string;
+            episodes: Array<{
+              episodeNumber: number;
+              title: string;
+              description: string;
+              thumbnail: string;
+              duration: string;
+              durationSeconds: number;
+            }>;
+          }>;
+        };
+      }>(`/admin/auto-import/details?${params.toString()}`);
+    },
+
+    async importContent(payload: any) {
+      return request<{
+        success: boolean;
+        message: string;
+        result: {
+          success: boolean;
+          contentId: string;
+          title: string;
+          type: 'MOVIE' | 'SERIES';
+          seasonsCount: number;
+          episodesCount: number;
+        };
+      }>('/admin/auto-import/import', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    }
+  }
+};

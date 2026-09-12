@@ -1,0 +1,244 @@
+import React, { useState, useMemo } from 'react';
+import { DEMO_CATALOG, GENRE_LIST } from '../data/catalog';
+import { ContentItem } from '../types/content';
+import { ContentCard } from '../components/cards/ContentCard';
+import { Search as SearchIcon, X, Film, Tv } from 'lucide-react';
+
+interface SearchPageProps {
+  onSelectItem: (item: ContentItem) => void;
+}
+
+export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem }) => {
+  const [query, setQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'movie' | 'series'>('all');
+  const [selectedGenre, setSelectedGenre] = useState<string>('All');
+
+  // Filter logic
+  const filteredItems = useMemo(() => {
+    return DEMO_CATALOG.filter(item => {
+      // Query match (title, cast, director, description)
+      const matchesQuery =
+        query.trim() === '' ||
+        item.title.toLowerCase().includes(query.toLowerCase()) ||
+        (item.cast && item.cast.some(c => c.toLowerCase().includes(query.toLowerCase()))) ||
+        (item.director && item.director.toLowerCase().includes(query.toLowerCase()));
+
+      // Type match
+      const matchesType = typeFilter === 'all' || item.type === typeFilter;
+
+      // Genre match
+      const matchesGenre = selectedGenre === 'All' || item.genres.includes(selectedGenre);
+
+      return matchesQuery && matchesType && matchesGenre;
+    });
+  }, [query, typeFilter, selectedGenre]);
+
+  return (
+    <div style={{ padding: '24px 20px', maxWidth: 'var(--max-width)', margin: '0 auto' }}>
+      {/* Title */}
+      <h1
+        style={{
+          fontSize: 'clamp(26px, 4vw, 36px)',
+          fontWeight: 800,
+          color: '#FFFFFF',
+          marginBottom: '20px',
+          letterSpacing: '-0.02em'
+        }}
+      >
+        Search FLOPSHOW
+      </h1>
+
+      {/* Search Input Bar */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          backgroundColor: 'var(--bg-surface)',
+          border: '1.5px solid rgba(255, 255, 255, 0.12)',
+          borderRadius: '16px',
+          padding: '0 18px',
+          height: '56px',
+          marginBottom: '20px',
+          boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4)',
+          transition: 'border-color var(--transition-fast)'
+        }}
+        className="search-input-wrapper"
+      >
+        <SearchIcon size={22} color="var(--brand-gold)" style={{ marginRight: '14px', flexShrink: 0 }} />
+        <input
+          type="text"
+          placeholder="Search by movie, series, actor, or genre..."
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          style={{
+            flex: 1,
+            fontSize: '16px',
+            color: '#FFFFFF',
+            outline: 'none',
+            border: 'none',
+            background: 'transparent'
+          }}
+        />
+        {query && (
+          <button
+            onClick={() => setQuery('')}
+            style={{ color: 'var(--text-muted)', padding: '4px', cursor: 'pointer' }}
+            aria-label="Clear search"
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
+
+      {/* Type Filter Pills: All / Movies / Series */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', overflowX: 'auto', paddingBottom: '4px' }}>
+        <button
+          onClick={() => setTypeFilter('all')}
+          className={`btn btn-sm ${typeFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+        >
+          All Content
+        </button>
+
+        <button
+          onClick={() => setTypeFilter('movie')}
+          className={`btn btn-sm ${typeFilter === 'movie' ? 'btn-primary' : 'btn-secondary'}`}
+        >
+          <Film size={15} />
+          <span>Movies</span>
+        </button>
+
+        <button
+          onClick={() => setTypeFilter('series')}
+          className={`btn btn-sm ${typeFilter === 'series' ? 'btn-primary' : 'btn-secondary'}`}
+        >
+          <Tv size={15} />
+          <span>Webseries</span>
+        </button>
+      </div>
+
+      {/* Genre Filter Pills */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '8px',
+          overflowX: 'auto',
+          paddingBottom: '12px',
+          marginBottom: '24px',
+          scrollbarWidth: 'none'
+        }}
+      >
+        {GENRE_LIST.map(genre => {
+          const isSelected = selectedGenre === genre;
+          return (
+            <button
+              key={genre}
+              onClick={() => setSelectedGenre(genre)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-pill)',
+                fontSize: '13px',
+                fontWeight: isSelected ? 700 : 500,
+                backgroundColor: isSelected ? 'rgba(245, 166, 35, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                color: isSelected ? 'var(--brand-gold)' : 'var(--text-secondary)',
+                border: `1px solid ${isSelected ? 'var(--brand-gold)' : 'rgba(255, 255, 255, 0.08)'}`,
+                whiteSpace: 'nowrap',
+                transition: 'all var(--transition-fast)'
+              }}
+            >
+              {genre}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Result Count Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '18px',
+          paddingBottom: '10px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
+        }}
+      >
+        <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+          Found <strong style={{ color: '#FFFFFF' }}>{filteredItems.length}</strong> title
+          {filteredItems.length === 1 ? '' : 's'}
+        </span>
+
+        {(query || typeFilter !== 'all' || selectedGenre !== 'All') && (
+          <button
+            onClick={() => {
+              setQuery('');
+              setTypeFilter('all');
+              setSelectedGenre('All');
+            }}
+            style={{ fontSize: '13px', color: 'var(--brand-gold)', fontWeight: 600 }}
+          >
+            Reset Filters
+          </button>
+        )}
+      </div>
+
+      {/* Results Grid */}
+      {filteredItems.length > 0 ? (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+            gap: '20px'
+          }}
+        >
+          {filteredItems.map(item => (
+            <ContentCard key={item.id} item={item} onSelect={onSelectItem} />
+          ))}
+        </div>
+      ) : (
+        /* No-results empty state */
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '60px 20px',
+            backgroundColor: 'rgba(22, 22, 34, 0.3)',
+            borderRadius: '20px',
+            border: '1px dashed rgba(255, 255, 255, 0.1)',
+            marginTop: '20px'
+          }}
+        >
+          <div
+            style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+              color: 'var(--text-muted)'
+            }}
+          >
+            <SearchIcon size={28} />
+          </div>
+          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF', marginBottom: '8px' }}>
+            No stories found matching your search
+          </h3>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto 20px' }}>
+            Try searching for another keyword, adjusting your genre filter, or explore our curated collections on the Discover page.
+          </p>
+          <button
+            onClick={() => {
+              setQuery('');
+              setTypeFilter('all');
+              setSelectedGenre('All');
+            }}
+            className="btn btn-secondary"
+          >
+            Clear Search
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};

@@ -31,6 +31,11 @@ export function createServer(): Express {
         return callback(null, true);
       }
 
+      // Allow production Netlify frontend and previews (*.netlify.app)
+      if (/^https:\/\/([a-zA-Z0-9_-]+\.)?netlify\.app$/.test(cleanOrigin)) {
+        return callback(null, true);
+      }
+
       // Always allow local development origins (localhost / 127.0.0.1 on any port)
       if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
         return callback(null, true);

@@ -14,7 +14,9 @@ import {
   Sparkles,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  Crown,
+  Megaphone
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -222,6 +224,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const navItems = [
     { id: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'admin-content', label: 'Content & Media / Catalog', icon: Film },
+    { id: 'admin-hero', label: 'Home Hero Control', icon: Crown },
+    { id: 'admin-ads', label: 'Advertisement / Ads', icon: Megaphone },
     { id: 'admin-quick-add', label: 'Quick Add / Auto Import', icon: Sparkles },
     { id: 'admin-users', label: 'Users', icon: Users },
     { id: 'admin-transactions', label: 'Transactions', icon: CreditCard },

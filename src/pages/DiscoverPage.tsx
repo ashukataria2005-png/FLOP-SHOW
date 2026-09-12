@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { HeroBanner } from '../components/home/HeroBanner';
 import { ContentSection } from '../components/home/ContentSection';
 import { BrandPromoCard } from '../components/home/BrandPromoCard';
 import { ContentItem } from '../types/content';
-import { DEMO_CATALOG } from '../data/catalog';
 import { useApp } from '../context/AppContext';
+import { api } from '../services/api';
 
 interface DiscoverPageProps {
   onSelectItem: (item: ContentItem) => void;
@@ -13,12 +13,19 @@ interface DiscoverPageProps {
 
 export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavigate }) => {
   const { watchProgress, catalog } = useApp();
-  const activeCatalog = catalog && catalog.length > 0 ? catalog : DEMO_CATALOG;
+  const activeCatalog = catalog || [];
+  const [dedicatedHero, setDedicatedHero] = useState<ContentItem | null>(null);
 
-  // Find featured hero item (isFeatured or Trending #1 or default)
-  const heroItem = activeCatalog.find(item => item.isFeatured) ||
-                   activeCatalog.find(item => item.trendingPosition === 1) ||
-                   activeCatalog[0];
+  useEffect(() => {
+    let mounted = true;
+    api.content.getHero().then(h => {
+      if (mounted) setDedicatedHero(h);
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, [catalog]);
+
+  // Home Hero must strictly and solely be the title selected through the dedicated Hero control
+  const heroItem = activeCatalog.find(item => item.isHero) || dedicatedHero || undefined;
 
   // In-progress items from active user watch progress
   const inProgressItems = watchProgress
@@ -27,25 +34,16 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
 
   // Trending items: dynamically place Trending #1 title first!
   const trending1 = activeCatalog.find(c => c.trendingPosition === 1);
-  const otherTrending = activeCatalog.filter(c => c.id !== trending1?.id && (
-    c.id === 'afterglow-2025' ||
-    c.id === 'monsoon-files-2024' ||
-    c.id === 'city-of-dreams-2023' ||
-    c.id === 'midnight-express-2024' ||
-    c.id === 'dhurandhar-2025' ||
-    c.rating >= 8.5
-  )).slice(0, 4);
+  const otherTrending = activeCatalog
+    .filter(c => c.id !== trending1?.id)
+    .slice(0, 4);
 
   const trendingItems = trending1 ? [trending1, ...otherTrending] : otherTrending;
 
-  // Curated for you / Made for your night items
-  const curatedItems = activeCatalog.filter(c =>
-    c.id === 'winter-signal-2024' ||
-    c.id === 'red-earth-2025' ||
-    c.id === 'chronicles-kashi-2025' ||
-    c.id === 'the-last-ghazal-2025' ||
-    c.id === 'inception-2010'
-  ).slice(0, 4);
+  // Curated for you / Made for your night items (independent of hero)
+  const curatedItems = activeCatalog
+    .filter(c => c.id !== trending1?.id)
+    .slice(0, 4);
 
   // Popular Series
   const seriesItems = activeCatalog.filter(c => c.type === 'series');
@@ -55,8 +53,8 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
 
   return (
     <div className="discover-page-container">
-      {/* Featured Premiere Hero Banner (Screenshot 1) */}
-      <HeroBanner item={heroItem} onViewDetails={onSelectItem} />
+      {/* Featured Premiere Hero Banner */}
+      {heroItem && <HeroBanner item={heroItem} onViewDetails={onSelectItem} />}
 
       {/* Row 1: Pick up where you left off (Screenshot 2) */}
       {inProgressItems.length > 0 && (

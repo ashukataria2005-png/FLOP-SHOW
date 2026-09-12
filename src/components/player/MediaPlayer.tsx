@@ -3,6 +3,7 @@ import { formatSeconds } from '../../utils/formatters';
 import { parseYouTubeUrl } from '../../utils/mediaUrl';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
+import { AdPreroll, AdConfig } from './AdPreroll';
 import {
   Play,
   Pause,
@@ -59,7 +60,45 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Advertisement Pre-roll State
+  const [adConfig, setAdConfig] = useState<AdConfig | null>(null);
+  const [adFinished, setAdFinished] = useState<boolean>(source?.mediaType !== 'MAIN');
+
+  useEffect(() => {
+    let active = true;
+    if (source?.mediaType === 'MAIN') {
+      api.content.getAdsConfig()
+        .then(cfg => {
+          if (active) {
+            if (cfg && cfg.enabled && cfg.mediaUrl && cfg.mediaUrl.trim() !== '') {
+              setAdConfig(cfg);
+              setAdFinished(false);
+            } else {
+              setAdFinished(true);
+            }
+          }
+        })
+        .catch(() => {
+          if (active) setAdFinished(true);
+        });
+    } else {
+      setAdFinished(true);
+    }
+    return () => { active = false; };
+  }, [source?.contentId, source?.episodeId, source?.mediaType]);
+
   if (!source) return null;
+
+  // Render Pre-roll Advertisement if active and not yet finished
+  if (!adFinished && adConfig && adConfig.enabled && adConfig.mediaUrl) {
+    return (
+      <AdPreroll
+        adConfig={adConfig}
+        onComplete={() => setAdFinished(true)}
+        onClose={onClose}
+      />
+    );
+  }
 
   // Determine if source is YouTube
   const youtubeInfo = parseYouTubeUrl(source.url);

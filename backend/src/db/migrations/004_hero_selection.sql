@@ -13,7 +13,5 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_content_hero_unique_1
 
 -- 3. ENSURE APP_SETTINGS HAS HOME_HERO_ID ENTRY
 INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES
-  ('home_hero_id', 'dhurandhar-2025', datetime('now'));
+  ('home_hero_id', '', datetime('now'));
 
--- 4. SET INITIAL DEFAULT HERO TITLE
-UPDATE content SET is_hero = 1 WHERE id = 'dhurandhar-2025';

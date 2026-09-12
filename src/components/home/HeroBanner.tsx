@@ -9,6 +9,7 @@ interface HeroBannerProps {
 }
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({ item, onViewDetails }) => {
+  if (!item) return null;
   const { isOwned, startPlaying, openPurchaseModal, playTrailer } = useApp();
   const owned = isOwned(item.id);
 

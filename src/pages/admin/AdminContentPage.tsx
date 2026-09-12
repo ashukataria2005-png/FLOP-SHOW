@@ -20,7 +20,8 @@ import {
   X,
   AlertTriangle,
   Sparkles,
-  MoreVertical
+  MoreVertical,
+  Crown
 } from 'lucide-react';
 
 interface AdminContentPageProps {
@@ -231,7 +232,28 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => onNavigateTab('admin-hero')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 18px',
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              color: '#FFFFFF',
+              border: '1px solid rgba(255, 255, 255, 0.16)',
+              fontWeight: 700,
+              fontSize: '14px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Crown size={18} color="var(--brand-gold, #F5C518)" />
+            <span>Home Hero</span>
+          </button>
+
           <button
             onClick={() => onNavigateTab('admin-quick-add')}
             style={{

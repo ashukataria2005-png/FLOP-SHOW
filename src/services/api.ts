@@ -141,6 +141,7 @@ export function adaptDbContentToFrontend(item: any): ContentItem {
     price: priceRupees,
     isFree: priceRupees === 0,
     isFeatured: Boolean(item.featured),
+    isHero: Boolean(item.is_hero),
     director: item.director || undefined,
     cast,
     trailerUrl: item.trailer_url || item.trailerUrl,
@@ -213,6 +214,42 @@ export const api = {
     async featured() {
       const data = await request<{ items: any[] }>('/content/featured');
       return data.items.map(adaptDbContentToFrontend);
+    },
+
+    async getHero(): Promise<ContentItem | null> {
+      try {
+        const data = await request<{ hero: any | null }>('/content/hero');
+        return data.hero ? adaptDbContentToFrontend(data.hero) : null;
+      } catch {
+        return null;
+      }
+    },
+
+    async getAdsConfig(): Promise<{
+      enabled: boolean;
+      type: 'IMAGE' | 'VIDEO';
+      mediaUrl: string;
+      durationSeconds: number;
+      skipEnabled: boolean;
+      skipAfterSeconds: number;
+      title: string;
+      clickUrl: string;
+    }> {
+      try {
+        const data = await request<{ ads: any }>('/content/ads');
+        return data.ads;
+      } catch {
+        return {
+          enabled: false,
+          type: 'IMAGE',
+          mediaUrl: '',
+          durationSeconds: 10,
+          skipEnabled: true,
+          skipAfterSeconds: 5,
+          title: 'Advertisement',
+          clickUrl: ''
+        };
+      }
     },
 
     async getDetails(idOrSlug: string): Promise<ContentItem> {
@@ -555,6 +592,58 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ settings })
       });
+    },
+
+    async getHero(): Promise<ContentItem | null> {
+      try {
+        const data = await request<{ success: boolean; hero: any | null }>('/admin/hero');
+        return data.hero ? adaptDbContentToFrontend(data.hero) : null;
+      } catch {
+        return null;
+      }
+    },
+
+    async setHero(contentId: string | null): Promise<{ success: boolean; message: string; hero: ContentItem | null }> {
+      const data = await request<{ success: boolean; message: string; hero: any | null }>('/admin/hero', {
+        method: 'PUT',
+        body: JSON.stringify({ contentId })
+      });
+      return {
+        success: data.success,
+        message: data.message,
+        hero: data.hero ? adaptDbContentToFrontend(data.hero) : null
+      };
+    },
+
+    async getAdsConfig(): Promise<{
+      enabled: boolean;
+      type: 'IMAGE' | 'VIDEO';
+      mediaUrl: string;
+      durationSeconds: number;
+      skipEnabled: boolean;
+      skipAfterSeconds: number;
+      title: string;
+      clickUrl: string;
+    }> {
+      const data = await request<{ success: boolean; ads: any }>('/admin/ads');
+      return data.ads;
+    },
+
+    async updateAdsConfig(payload: {
+      enabled?: boolean;
+      type?: 'IMAGE' | 'VIDEO';
+      mediaUrl?: string;
+      durationSeconds?: number;
+      skipEnabled?: boolean;
+      skipAfterSeconds?: number;
+      title?: string;
+      clickUrl?: string;
+    }) {
+      const data = await request<{ success: boolean; message: string; ads: any }>('/admin/ads', {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      return data;
     },
 
     async createSeason(contentId: string, seasonNumber: number, title: string) {

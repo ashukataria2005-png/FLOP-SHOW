@@ -1038,30 +1038,6 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
               </span>
             </label>
           </div>
-
-          <hr style={{ border: 'none', borderTop: '1px solid rgba(255, 255, 255, 0.08)', margin: '4px 0' }} />
-
-          {/* Featured Hero Banner */}
-          <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', marginBottom: '8px' }}>
-              Hero Banner Showcase
-            </h3>
-            <p style={{ fontSize: '13px', color: '#9CA3AF', marginBottom: '14px' }}>
-              Highlighted as the premier title on the Discover home screen banner.
-            </p>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={isFeatured}
-                onChange={e => setIsFeatured(e.target.checked)}
-                style={{ width: '18px', height: '18px', accentColor: '#EF4444' }}
-              />
-              <span style={{ fontSize: '14px', fontWeight: 700, color: isFeatured ? '#EF4444' : '#9CA3AF' }}>
-                Featured in Hero Premiere
-              </span>
-            </label>
-          </div>
         </div>
       )}
 

@@ -509,3 +509,56 @@ adminRouter.put('/settings', (req, res, next) => {
     next(err);
   }
 });
+
+// ----------------------------------------------------------------------------
+// 7. DEDICATED HOME HERO CONTROL
+// ----------------------------------------------------------------------------
+adminRouter.get('/hero', (_req, res, next) => {
+  try {
+    const hero = adminService.getHero();
+    res.json({ success: true, hero });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.put('/hero', (req, res, next) => {
+  try {
+    const { contentId } = req.body;
+    adminService.setHero(contentId ?? null);
+    const hero = adminService.getHero();
+    res.json({
+      success: true,
+      message: contentId ? 'Home Hero updated successfully.' : 'Home Hero cleared successfully.',
+      hero
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ----------------------------------------------------------------------------
+// 8. ADVERTISEMENT CONFIGURATION
+// ----------------------------------------------------------------------------
+adminRouter.get('/ads', (_req, res, next) => {
+  try {
+    const ads = adminService.getAdsConfig();
+    res.json({ success: true, ads });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.put('/ads', (req, res, next) => {
+  try {
+    const ads = adminService.updateAdsConfig(req.body);
+    res.json({
+      success: true,
+      message: 'Advertisement configuration saved successfully.',
+      ads
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+

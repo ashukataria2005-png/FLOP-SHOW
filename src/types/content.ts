@@ -37,7 +37,8 @@ export interface ContentItem {
   price: number; // in INR e.g. 10 or 20, 0 = free
   isNow?: boolean; // displays "NOW" badge
   isFree?: boolean; // displays "FREE" badge
-  isFeatured?: boolean; // shown in hero
+  isFeatured?: boolean; // featured spotlight
+  isHero?: boolean; // designated Home Hero
   categoryLabel?: string; // e.g. "FEATURED PREMIERE", "SERIES • MYSTERY"
   director?: string; // e.g. "S. Banerjee"
   cast?: string[]; // e.g. ["Actor 1", "Actor 2"]

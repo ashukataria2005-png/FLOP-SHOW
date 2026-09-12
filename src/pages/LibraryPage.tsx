@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { DEMO_CATALOG } from '../data/catalog';
 import { ContentItem } from '../types/content';
 import { ContentCard } from '../components/cards/ContentCard';
 import { Bookmark, Film, PlayCircle, History, Compass } from 'lucide-react';
@@ -11,28 +10,29 @@ interface LibraryPageProps {
 }
 
 export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNavigate }) => {
-  const { purchases, myList, watchProgress } = useApp();
+  const { purchases, myList, watchProgress, catalog } = useApp();
+  const activeCatalog = catalog || [];
   const [activeTab, setActiveTab] = useState<'owned' | 'saved' | 'progress' | 'history'>('owned');
 
   // Purchased / Owned items
   const ownedItems = purchases
-    .map(p => DEMO_CATALOG.find(c => c.id === p.contentId))
+    .map(p => activeCatalog.find(c => c.id === p.contentId))
     .filter((c): c is ContentItem => c !== undefined);
 
   // My List saved items
   const savedItems = myList
-    .map(id => DEMO_CATALOG.find(c => c.id === id))
+    .map(id => activeCatalog.find(c => c.id === id))
     .filter((c): c is ContentItem => c !== undefined);
 
   // Continue Watching items
   const inProgressItems = watchProgress
     .filter(wp => wp.percent > 0 && wp.percent < 95)
-    .map(wp => DEMO_CATALOG.find(c => c.id === wp.contentId))
+    .map(wp => activeCatalog.find(c => c.id === wp.contentId))
     .filter((c): c is ContentItem => c !== undefined);
 
   // Watch History (all watched items)
   const historyItems = watchProgress
-    .map(wp => DEMO_CATALOG.find(c => c.id === wp.contentId))
+    .map(wp => activeCatalog.find(c => c.id === wp.contentId))
     .filter((c): c is ContentItem => c !== undefined);
 
   const tabs = [

@@ -50,5 +50,10 @@ export const contentService = {
 
   getGenres(): GenreRecord[] {
     return contentRepository.getAllGenres();
+  },
+
+  getHero(): ContentRecord | null {
+    return contentRepository.getHero();
   }
 };
+

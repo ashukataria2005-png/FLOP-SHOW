@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { ContentItem, Episode } from '../types/content';
-import { DEMO_CATALOG } from '../data/catalog';
 import { useApp } from '../context/AppContext';
 import { EpisodeCard } from '../components/cards/EpisodeCard';
 import { ContentCard } from '../components/cards/ContentCard';
@@ -41,7 +40,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
   const activeSeason = item.seasons?.find(s => s.seasonNumber === selectedSeasonNumber) || item.seasons?.[0];
 
   // Recommendations (same genre or other titles) from central catalog
-  const recommendations = (catalog || DEMO_CATALOG).filter(
+  const recommendations = (catalog || []).filter(
     c => c.id !== item.id && c.genres.some(g => item.genres.includes(g))
   ).slice(0, 4);
 

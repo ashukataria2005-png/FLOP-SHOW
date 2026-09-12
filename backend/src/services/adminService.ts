@@ -574,5 +574,52 @@ export const adminService = {
     for (const [key, value] of Object.entries(settings)) {
       stmt.run(key, String(value), now);
     }
+  },
+
+  getHero(): ContentRecord | null {
+    return contentRepository.getHero();
+  },
+
+  setHero(contentId: string | null): void {
+    contentRepository.setHero(contentId);
+  },
+
+  getAdsConfig() {
+    const settings = this.getSettings();
+    return {
+      enabled: settings.ad_enabled === 'true',
+      type: ((settings.ad_type || 'IMAGE').toUpperCase() === 'VIDEO' ? 'VIDEO' : 'IMAGE') as 'IMAGE' | 'VIDEO',
+      mediaUrl: settings.ad_media_url || '',
+      durationSeconds: parseInt(settings.ad_duration_seconds || '10', 10) || 10,
+      skipEnabled: settings.ad_skip_enabled !== 'false',
+      skipAfterSeconds: parseInt(settings.ad_skip_after_seconds || '5', 10) || 5,
+      title: settings.ad_title || 'Advertisement',
+      clickUrl: settings.ad_click_url || ''
+    };
+  },
+
+  updateAdsConfig(config: {
+    enabled?: boolean;
+    type?: 'IMAGE' | 'VIDEO';
+    mediaUrl?: string;
+    durationSeconds?: number;
+    skipEnabled?: boolean;
+    skipAfterSeconds?: number;
+    title?: string;
+    clickUrl?: string;
+  }) {
+    const toUpdate: Record<string, string> = {};
+    if (config.enabled !== undefined) toUpdate.ad_enabled = String(config.enabled);
+    if (config.type !== undefined) toUpdate.ad_type = String(config.type);
+    if (config.mediaUrl !== undefined) toUpdate.ad_media_url = String(config.mediaUrl);
+    if (config.durationSeconds !== undefined) toUpdate.ad_duration_seconds = String(config.durationSeconds);
+    if (config.skipEnabled !== undefined) toUpdate.ad_skip_enabled = String(config.skipEnabled);
+    if (config.skipAfterSeconds !== undefined) toUpdate.ad_skip_after_seconds = String(config.skipAfterSeconds);
+    if (config.title !== undefined) toUpdate.ad_title = String(config.title);
+    if (config.clickUrl !== undefined) toUpdate.ad_click_url = String(config.clickUrl);
+
+    this.updateSettings(toUpdate);
+    return this.getAdsConfig();
   }
 };
+

@@ -27,6 +27,7 @@ export interface ContentRecord {
   cast_json: string;
   created_at: string;
   updated_at: string;
+  is_hero?: number;
   genres?: string[]; // array of genre names
 }
 
@@ -525,6 +526,69 @@ export const contentRepository = {
       for (const gid of genreIds) {
         linkStmt.run(contentId, gid);
       }
+    }
+  },
+
+  getHero(): ContentRecord | null {
+    const db = getDatabase();
+    try {
+      // Check app_settings for home_hero_id
+      const settingRow = db.prepare('SELECT value FROM app_settings WHERE key = ?;').get('home_hero_id') as { value: string } | undefined;
+      const heroId = settingRow?.value?.trim();
+      if (heroId) {
+        const item = contentRepository.findByIdOrSlug(heroId);
+        if (item && item.status === 'PUBLISHED') {
+          return item;
+        }
+      }
+
+      // Fallback check for is_hero = 1 in content table
+      const row = db.prepare('SELECT * FROM content WHERE is_hero = 1 AND status = ? LIMIT 1;').get('PUBLISHED') as ContentRecord | undefined;
+      if (row) {
+        return {
+          ...row,
+          genres: contentRepository.getGenresForContent(row.id)
+        };
+      }
+    } catch {
+      // Return null on missing tables or columns
+    }
+
+    return null;
+  },
+
+  setHero(contentId: string | null): void {
+    const db = getDatabase();
+    const now = new Date().toISOString();
+
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      // Reset is_hero on all records
+      db.prepare('UPDATE content SET is_hero = 0 WHERE is_hero = 1;').run();
+
+      if (contentId && contentId.trim() !== '') {
+        const cleanId = contentId.trim();
+        // Set is_hero = 1 on targeted content
+        db.prepare('UPDATE content SET is_hero = 1, updated_at = ? WHERE id = ? OR slug = ? COLLATE NOCASE;').run(now, cleanId, cleanId);
+
+        // Update app_settings
+        db.prepare(`
+          INSERT INTO app_settings (key, value, updated_at)
+          VALUES ('home_hero_id', ?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
+        `).run(cleanId, now);
+      } else {
+        // Clear hero in app_settings
+        db.prepare(`
+          INSERT INTO app_settings (key, value, updated_at)
+          VALUES ('home_hero_id', '', ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
+        `).run(now);
+      }
+      db.exec('COMMIT;');
+    } catch (err) {
+      db.exec('ROLLBACK;');
+      throw err;
     }
   }
 };

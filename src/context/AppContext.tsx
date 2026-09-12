@@ -10,7 +10,6 @@ import {
   INITIAL_WATCH_PROGRESS,
   INITIAL_TRANSACTIONS
 } from '../data/initialData';
-import { DEMO_CATALOG } from '../data/catalog';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { formatCurrentDate } from '../utils/formatters';
 import { MediaPlayerSource } from '../components/player/MediaPlayer';
@@ -91,8 +90,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [myList, setMyList] = useState<string[]>(() => loadFromStorage('my_list', INITIAL_MY_LIST));
   const [watchProgress, setWatchProgress] = useState<WatchProgress[]>(() => loadFromStorage('watch_progress', INITIAL_WATCH_PROGRESS));
 
-  // Catalog state from central database
-  const [catalog, setCatalog] = useState<ContentItem[]>(DEMO_CATALOG);
+  // Catalog state from central database (strictly dynamic, no hardcoded fallbacks)
+  const [catalog, setCatalog] = useState<ContentItem[]>([]);
 
   // Modal states
   const [activeModal, setActiveModal] = useState<'purchase' | 'recharge' | 'auth' | null>(null);
@@ -110,11 +109,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshCatalog = async () => {
     try {
       const items = await api.content.list();
-      if (items && items.length > 0) {
-        setCatalog(items);
-      }
+      setCatalog(items || []);
     } catch {
-      // Offline fallback: keep DEMO_CATALOG
+      // Offline: keep current state
     }
   };
 
@@ -211,7 +208,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Purchases & Library
   const isOwned = (contentId: string): boolean => {
-    const catalogItem = DEMO_CATALOG.find(c => c.id === contentId);
+    const catalogItem = catalog.find(c => c.id === contentId);
     if (catalogItem && catalogItem.price === 0) return true; // Free items are always owned
     return purchases.some(p => p.contentId === contentId);
   };
@@ -265,7 +262,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const toggleMyList = (contentId: string) => {
-    const item = DEMO_CATALOG.find(c => c.id === contentId);
+    const item = catalog.find(c => c.id === contentId);
     const title = item ? `"${item.title}"` : 'Title';
 
     if (inMyList(contentId)) {

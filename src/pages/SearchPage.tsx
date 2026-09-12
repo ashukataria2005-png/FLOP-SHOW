@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { DEMO_CATALOG, GENRE_LIST } from '../data/catalog';
+import { GENRE_LIST } from '../data/catalog';
 import { ContentItem } from '../types/content';
 import { ContentCard } from '../components/cards/ContentCard';
+import { useApp } from '../context/AppContext';
 import { Search as SearchIcon, X, Film, Tv } from 'lucide-react';
 
 interface SearchPageProps {
@@ -9,13 +10,15 @@ interface SearchPageProps {
 }
 
 export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem }) => {
+  const { catalog } = useApp();
+  const activeCatalog = catalog || [];
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'movie' | 'series'>('all');
   const [selectedGenre, setSelectedGenre] = useState<string>('All');
 
   // Filter logic
   const filteredItems = useMemo(() => {
-    return DEMO_CATALOG.filter(item => {
+    return activeCatalog.filter(item => {
       // Query match (title, cast, director, description)
       const matchesQuery =
         query.trim() === '' ||

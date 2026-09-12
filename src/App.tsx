@@ -17,6 +17,8 @@ import { AdminTransactionsPage } from './pages/admin/AdminTransactionsPage';
 import { AdminGenresPage } from './pages/admin/AdminGenresPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { AdminQuickAddPage } from './pages/admin/AdminQuickAddPage';
+import { AdminHeroPage } from './pages/admin/AdminHeroPage';
+import { AdminAdsPage } from './pages/admin/AdminAdsPage';
 import { PurchaseModal } from './components/purchase/PurchaseModal';
 import { RechargeModal } from './components/wallet/RechargeModal';
 import { AuthModal } from './components/auth/AuthModal';
@@ -38,6 +40,12 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   }
   if (cleanPath === '/admin/content') {
     return { tab: 'admin-content' };
+  }
+  if (cleanPath === '/admin/hero') {
+    return { tab: 'admin-hero' };
+  }
+  if (cleanPath === '/admin/ads') {
+    return { tab: 'admin-ads' };
   }
   if (cleanPath === '/admin/quick-add') {
     return { tab: 'admin-quick-add' };
@@ -88,6 +96,10 @@ function tabToPath(tab: string, param?: string): string {
       return '/admin/dashboard';
     case 'admin-content':
       return '/admin/content';
+    case 'admin-hero':
+      return '/admin/hero';
+    case 'admin-ads':
+      return '/admin/ads';
     case 'admin-quick-add':
       return '/admin/quick-add';
     case 'admin-editor':
@@ -208,6 +220,8 @@ const AppContent: React.FC = () => {
         >
           {currentTab === 'admin-dashboard' && <AdminDashboardPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-content' && <AdminContentPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-hero' && <AdminHeroPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-ads' && <AdminAdsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-editor' && (
             <AdminContentEditorPage contentId={adminParam} onNavigateTab={handleNavigate} />
           )}
@@ -216,7 +230,7 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-genres' && <AdminGenresPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-transactions', 'admin-genres', 'admin-settings'].includes(currentTab) && (
+          {!['admin-dashboard', 'admin-content', 'admin-hero', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-transactions', 'admin-genres', 'admin-settings'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>

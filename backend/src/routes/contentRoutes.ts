@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { contentService } from '../services/contentService.js';
+import { adminService } from '../services/adminService.js';
 
 export const contentRouter = Router();
 
@@ -55,6 +56,26 @@ contentRouter.get('/', (req, res, next) => {
     });
 
     res.json({ count: items.length, items });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/content/hero (Dedicated Home Hero)
+contentRouter.get('/hero', (_req, res, next) => {
+  try {
+    const hero = contentService.getHero();
+    res.json({ hero });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/content/ads (Public Pre-roll Advertisement Configuration)
+contentRouter.get('/ads', (_req, res, next) => {
+  try {
+    const ads = adminService.getAdsConfig();
+    res.json({ ads });
   } catch (err) {
     next(err);
   }

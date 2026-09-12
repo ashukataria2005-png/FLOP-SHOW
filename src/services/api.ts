@@ -1,6 +1,34 @@
+/// <reference types="vite/client" />
 import { ContentItem, Season, Episode } from '../types/content';
 
-const API_BASE_URL = '/api';
+/**
+ * Backend API Base URL Configuration:
+ * - Uses VITE_API_BASE_URL for the backend base URL.
+ * - In production, defaults to the live backend (https://flop-show.onrender.com).
+ * - Local development continues working with the existing local API/proxy setup ('/api')
+ *   unless VITE_API_BASE_URL is explicitly set.
+ */
+function resolveApiBaseUrl(): string {
+  const envUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  if (envUrl) {
+    const cleanUrl = envUrl.replace(/\/+$/, '');
+    return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+  }
+  // If in production environment or deployed remotely
+  if (
+    import.meta.env.PROD ||
+    import.meta.env.MODE === 'production' ||
+    (typeof window !== 'undefined' &&
+      window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1')
+  ) {
+    return 'https://flop-show.onrender.com/api';
+  }
+  // Local development fallback to Vite proxy setup
+  return '/api';
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 /**
  * Helper to get and set auth tokens in localStorage
@@ -411,7 +439,7 @@ export const api = {
       const formData = new FormData();
       formData.append('file', file);
       const token = tokenStorage.get();
-      const res = await fetch('/api/admin/upload', {
+      const res = await fetch(`${API_BASE_URL}/admin/upload`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData

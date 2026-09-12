@@ -100,6 +100,7 @@ export const authService = {
 
     // Direct Admin credentials check
     if (
+      config.adminPassword &&
       (cleanEmail.toLowerCase() === config.adminId.toLowerCase() ||
        cleanEmail.toLowerCase() === (config.devAdminEmail || 'admin@flopshow.tv').toLowerCase()) &&
       params.password === config.adminPassword
@@ -153,6 +154,12 @@ export const authService = {
     if (!cleanId || !cleanPassword) {
       const err = new Error('Admin ID and Admin Password are required.');
       (err as any).statusCode = 400;
+      throw err;
+    }
+
+    if (!config.adminPassword) {
+      const err = new Error('Admin credentials are not configured on this server.');
+      (err as any).statusCode = 503;
       throw err;
     }
 

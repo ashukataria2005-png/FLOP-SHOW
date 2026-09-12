@@ -3,11 +3,10 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { Request } from 'express';
+import { config } from '../config/env.js';
 
 // Ensure upload directories exist
-const uploadBaseDir = fs.existsSync(path.resolve(process.cwd(), 'backend', 'uploads'))
-  ? path.resolve(process.cwd(), 'backend', 'uploads')
-  : path.resolve(process.cwd(), 'uploads');
+const uploadBaseDir = config.uploadDir;
 const videosDir = path.join(uploadBaseDir, 'videos');
 const imagesDir = path.join(uploadBaseDir, 'images');
 

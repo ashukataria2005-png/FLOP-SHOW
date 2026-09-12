@@ -16,10 +16,12 @@ async function start() {
 
     const app = createServer();
 
-    const server = app.listen(config.port, () => {
-      console.log(`✓ FLOPSHOW API Server running at http://localhost:${config.port}`);
-      console.log(`  Health check: http://localhost:${config.port}/api/health`);
-      console.log(`  Content catalog: http://localhost:${config.port}/api/content`);
+    const host = config.host || '0.0.0.0';
+    const server = app.listen(config.port, host, () => {
+      const displayHost = host === '0.0.0.0' ? 'localhost' : host;
+      console.log(`✓ FLOPSHOW API Server running at http://${displayHost}:${config.port} (bound to ${host}:${config.port})`);
+      console.log(`  Health check: http://${displayHost}:${config.port}/api/health`);
+      console.log(`  Content catalog: http://${displayHost}:${config.port}/api/content`);
       console.log('------------------------------------------------------------');
     });
 

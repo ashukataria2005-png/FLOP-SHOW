@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { config } from '../config/env.js';
 
 export function errorHandler(
   err: any,
@@ -6,8 +7,19 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'An unexpected server error occurred.';
+  const statusCode = typeof err.statusCode === 'number' && err.statusCode >= 400 && err.statusCode < 600
+    ? err.statusCode
+    : 500;
+
+  // Server-side error logging (keeps useful diagnostics on server)
+  if (statusCode >= 500) {
+    console.error(`[SERVER ERROR] ${err.name || 'Error'}: ${err.message || 'Internal error'}`);
+    if (err.stack) {
+      console.error(err.stack);
+    }
+  } else {
+    console.warn(`[CLIENT ERROR ${statusCode}] ${err.message}`);
+  }
 
   // Map common HTTP status codes to clean error codes
   let code = 'INTERNAL_ERROR';
@@ -17,7 +29,11 @@ export function errorHandler(
   else if (statusCode === 404) code = 'NOT_FOUND';
   else if (statusCode === 409) code = 'CONFLICT';
 
-  // Do not expose sensitive internal error stacks to clients
+  // Do not expose stack traces, db queries, or internal details in public responses
+  const message = (statusCode >= 500 && config.isProd)
+    ? 'An unexpected server error occurred.'
+    : (err.message || 'An unexpected server error occurred.');
+
   res.status(statusCode).json({
     error: {
       code,

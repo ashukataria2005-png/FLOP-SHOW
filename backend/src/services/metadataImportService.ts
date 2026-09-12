@@ -159,17 +159,18 @@ export const metadataImportService = {
     }
 
     // 2. Search OMDb API (works for both movies and series, returns IMDb IDs)
-    const omdbApiKey = config.omdbApiKey || 'trilogy';
-    try {
-      const omdbType = type === 'SERIES' ? 'series' : 'movie';
-      let omdbUrl = `https://www.omdbapi.com/?s=${encodeURIComponent(trimmedQuery)}&type=${omdbType}&apikey=${omdbApiKey}`;
-      if (year) {
-        omdbUrl += `&y=${year}`;
-      }
+    if (config.omdbApiKey) {
+      const omdbApiKey = config.omdbApiKey;
+      try {
+        const omdbType = type === 'SERIES' ? 'series' : 'movie';
+        let omdbUrl = `https://www.omdbapi.com/?s=${encodeURIComponent(trimmedQuery)}&type=${omdbType}&apikey=${omdbApiKey}`;
+        if (year) {
+          omdbUrl += `&y=${year}`;
+        }
 
-      const omdbRes = await fetch(omdbUrl, { signal: AbortSignal.timeout(5000) });
-      if (omdbRes.ok) {
-        const omdbData = await omdbRes.json();
+        const omdbRes = await fetch(omdbUrl, { signal: AbortSignal.timeout(5000) });
+        if (omdbRes.ok) {
+          const omdbData = await omdbRes.json();
         if (omdbData.Search && Array.isArray(omdbData.Search)) {
           for (const item of omdbData.Search) {
             const providerId = `imdb:${item.imdbID}`;
@@ -195,6 +196,7 @@ export const metadataImportService = {
       }
     } catch (err) {
       console.warn('OMDb search skipped or failed:', (err as any).message);
+    }
     }
 
     // 3. If TMDB API key is configured, query TMDB
@@ -381,13 +383,14 @@ export const metadataImportService = {
       }
 
       // 2. Fetch OMDb for additional details (synopsis, high-res poster, age rating, language, director)
-      const omdbApiKey = config.omdbApiKey || 'trilogy';
-      try {
-        const omdbRes = await fetch(`https://www.omdbapi.com/?i=${imdbId}&plot=full&apikey=${omdbApiKey}`, {
-          signal: AbortSignal.timeout(5000)
-        });
-        if (omdbRes.ok) {
-          const omdb = await omdbRes.json();
+      if (config.omdbApiKey) {
+        const omdbApiKey = config.omdbApiKey;
+        try {
+          const omdbRes = await fetch(`https://www.omdbapi.com/?i=${imdbId}&plot=full&apikey=${omdbApiKey}`, {
+            signal: AbortSignal.timeout(5000)
+          });
+          if (omdbRes.ok) {
+            const omdb = await omdbRes.json();
           if (omdb.Response === 'True') {
             if (!title) title = omdb.Title;
             if (omdb.Year && !releaseYear) releaseYear = parseInt(omdb.Year.split('–')[0], 10);
@@ -423,6 +426,7 @@ export const metadataImportService = {
         }
       } catch (err) {
         console.warn('OMDb details fetch warning:', (err as any).message);
+      }
       }
     }
 

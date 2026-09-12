@@ -77,6 +77,7 @@ export interface ImportPayload {
   cast?: string[];
   ageRating?: string;
   priceRupees?: number;
+  status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   seasons?: SeasonDraft[];
   overwrite?: boolean;
 }
@@ -652,8 +653,8 @@ export const metadataImportService = {
     const finalPriceRupees = payload.priceRupees !== undefined ? Number(payload.priceRupees) : defaultPriceRupees;
     const pricePaise = Math.round(finalPriceRupees * 100);
 
-    // Ensure safe defaults:
-    // Status: DRAFT (Unpublished)
+    // Default safe defaults:
+    // Status: PUBLISHED (Immediately active in FLOPSHOW catalog)
     // Featured: 0 (OFF)
     // Trending: null (OFF)
     // Main video / Episode video: null / blank (Main Video left blank for admin manual upload/configuration)
@@ -699,7 +700,7 @@ export const metadataImportService = {
       release_year: releaseYear,
       duration: payload.duration || (type === 'MOVIE' ? '2h 00m' : '1 Season'),
       age_rating: payload.ageRating || 'U/A 13+',
-      status: 'DRAFT', // DRAFT / UNPUBLISHED
+      status: payload.status || 'PUBLISHED', // PUBLISHED (Auto-published to catalog)
       featured: 0,     // FEATURED OFF
       trending_position: null, // TRENDING OFF
       display_priority: 0,

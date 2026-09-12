@@ -57,7 +57,7 @@ interface ContentDetailsPreview {
   cast: string[];
   ageRating: string;
   suggestedPriceRupees: number;
-  status: 'DRAFT';
+  status: 'PUBLISHED' | 'DRAFT';
   featured: boolean;
   trending: boolean;
   alreadyExists: boolean;
@@ -184,6 +184,7 @@ export const AdminQuickAddPage: React.FC<AdminQuickAddPageProps> = ({ onNavigate
         ageRating: previewDetails.ageRating,
         priceRupees: Number(customPriceRupees) >= 0 ? Number(customPriceRupees) : previewDetails.suggestedPriceRupees,
         seasons: previewDetails.seasons,
+        status: 'PUBLISHED',
         overwrite: allowOverwrite
       };
 
@@ -301,7 +302,7 @@ export const AdminQuickAddPage: React.FC<AdminQuickAddPageProps> = ({ onNavigate
                 Successfully Imported into FLOPSHOW Catalog!
               </h2>
               <p style={{ fontSize: '14px', color: '#D1FAE5', margin: '4px 0 0' }}>
-                <strong>"{importSuccessResult.title}"</strong> has been safely created as a <strong>DRAFT</strong> in your central database.
+                <strong>"{importSuccessResult.title}"</strong> has been successfully imported and <strong>PUBLISHED</strong> in your central database.
               </p>
             </div>
           </div>
@@ -327,7 +328,7 @@ export const AdminQuickAddPage: React.FC<AdminQuickAddPageProps> = ({ onNavigate
                 <div>Episodes: <strong style={{ color: '#FFFFFF' }}>{importSuccessResult.episodesCount}</strong></div>
               </>
             )}
-            <div>Initial Status: <strong style={{ color: 'var(--brand-gold, #F5C518)' }}>DRAFT (Unpublished)</strong></div>
+            <div>Initial Status: <strong style={{ color: '#10B981' }}>PUBLISHED (Active in Catalog)</strong></div>
           </div>
 
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '16px' }}>
@@ -1015,7 +1016,7 @@ export const AdminQuickAddPage: React.FC<AdminQuickAddPageProps> = ({ onNavigate
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                       <span style={{ color: '#9CA3AF' }}>Published Status:</span>
-                      <span style={{ color: '#F5C518', fontWeight: 700 }}>DRAFT (Initially OFF)</span>
+                      <span style={{ color: '#10B981', fontWeight: 700 }}>PUBLISHED (Active upon Import)</span>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>

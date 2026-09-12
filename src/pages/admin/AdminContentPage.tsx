@@ -19,7 +19,8 @@ import {
   ArrowUpDown,
   X,
   AlertTriangle,
-  Sparkles
+  Sparkles,
+  MoreVertical
 } from 'lucide-react';
 
 interface AdminContentPageProps {
@@ -49,6 +50,23 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
   // Preview Modal state
   const [previewItem, setPreviewItem] = useState<ContentItem | null>(null);
   const [activePreviewPlayer, setActivePreviewPlayer] = useState<MediaPlayerSource | null>(null);
+
+  // 3-Dot Action Menu State
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+
+  // Close 3-dot dropdown on window click or Escape key
+  useEffect(() => {
+    const handleClickOutside = () => setOpenActionMenuId(null);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenActionMenuId(null);
+    };
+    window.addEventListener('click', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   // Fetch all content from backend (admin endpoint includes drafts and unpublished)
   const fetchContent = async () => {
@@ -134,6 +152,24 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
       refreshCatalog();
     } catch (err: any) {
       showToast(err.message || 'Failed to update status.', 'error');
+    }
+  };
+
+  // Handle Quick Featured ON/OFF Toggle
+  const handleToggleFeatured = async (item: ContentItem) => {
+    const newFeatured = !item.isFeatured;
+    try {
+      await api.admin.updateContent(item.id, { isFeatured: newFeatured });
+      showToast(
+        newFeatured
+          ? `"${item.title}" is now set as FEATURED on homepage!`
+          : `Removed "${item.title}" from Featured.`,
+        'success'
+      );
+      fetchContent();
+      refreshCatalog();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update Featured status.', 'error');
     }
   };
 
@@ -481,7 +517,7 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
             overflow: 'hidden'
           }}
         >
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', minHeight: '340px', paddingBottom: openActionMenuId ? '120px' : '20px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
@@ -494,9 +530,10 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
                 </tr>
               </thead>
               <tbody>
-                {contentList.map(item => {
+                {contentList.map((item, index) => {
                   const isTrending1 = item.trendingPosition === 1;
                   const isPublished = (item as any).status === 'PUBLISHED' || !(item as any).status || (item as any).status === undefined;
+                  const isLastRows = index >= contentList.length - 2 && contentList.length > 2;
 
                   return (
                     <tr
@@ -562,123 +599,306 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
                         </span>
                       </td>
 
-                      {/* Publish / Unpublish Status Toggle */}
+                      {/* Status Badge */}
                       <td style={{ padding: '16px 20px' }}>
-                        <button
-                          onClick={() => handleTogglePublishStatus(item)}
-                          title="Click to toggle publish status"
+                        <span
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            border: isPublished ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
-                            backgroundColor: isPublished ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                            color: isPublished ? '#10B981' : '#F87171'
-                          }}
-                        >
-                          {isPublished ? <Eye size={13} /> : <EyeOff size={13} />}
-                          <span>{isPublished ? 'PUBLISHED' : 'DRAFT'}</span>
-                        </button>
-                      </td>
-
-                      {/* Spotlight / Trending #1 */}
-                      <td style={{ padding: '16px 20px' }}>
-                        <button
-                          onClick={() => handleToggleTrending(item)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '6px 10px',
+                            padding: '4px 10px',
                             borderRadius: '6px',
                             fontSize: '11px',
                             fontWeight: 800,
+                            border: isPublished ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+                            backgroundColor: isPublished ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                            color: isPublished ? '#10B981' : '#F59E0B'
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: isPublished ? '#10B981' : '#F59E0B'
+                            }}
+                          />
+                          <span>{isPublished ? 'PUBLISHED' : 'DRAFT'}</span>
+                        </span>
+                      </td>
+
+                      {/* Spotlight Badges */}
+                      <td style={{ padding: '16px 20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          {isTrending1 && (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '10px',
+                                fontWeight: 800,
+                                backgroundColor: 'var(--brand-gold, #F5C518)',
+                                color: '#0E0E12'
+                              }}
+                            >
+                              <TrendingUp size={12} />
+                              <span>#1 TRENDING</span>
+                            </span>
+                          )}
+                          {item.isFeatured && (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontSize: '10px',
+                                fontWeight: 800,
+                                backgroundColor: 'rgba(245, 197, 24, 0.18)',
+                                color: 'var(--brand-gold, #F5C518)',
+                                border: '1px solid rgba(245, 197, 24, 0.35)'
+                              }}
+                            >
+                              <Star size={11} fill="currentColor" />
+                              <span>FEATURED</span>
+                            </span>
+                          )}
+                          {!isTrending1 && !item.isFeatured && (
+                            <span style={{ fontSize: '13px', color: '#6B7280' }}>—</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 3-DOT ACTION MENU */}
+                      <td style={{ padding: '16px 20px', textAlign: 'right', position: 'relative' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionMenuId(prev => prev === item.id ? null : item.id);
+                          }}
+                          title={`Action menu for "${item.title}"`}
+                          aria-label={`Action menu for ${item.title}`}
+                          style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '8px',
+                            backgroundColor: openActionMenuId === item.id ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+                            border: openActionMenuId === item.id ? '1px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.12)',
+                            color: openActionMenuId === item.id ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
                             cursor: 'pointer',
-                            backgroundColor: isTrending1 ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.06)',
-                            color: isTrending1 ? '#0E0E12' : '#9CA3AF',
-                            border: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             transition: 'all 0.15s ease'
                           }}
                         >
-                          <TrendingUp size={13} />
-                          <span>{isTrending1 ? '#1 TRENDING' : 'Set #1'}</span>
+                          <MoreVertical size={18} />
                         </button>
-                      </td>
 
-                      {/* Actions */}
-                      <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: '8px' }}>
-                          {/* Preview Details & Media */}
-                          <button
-                            onClick={() => setPreviewItem(item)}
-                            title="Preview artwork, trailer, and main playback"
+                        {/* 3-Dot Action Dropdown Menu */}
+                        {openActionMenuId === item.id && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
                             style={{
-                              padding: '8px 12px',
-                              borderRadius: '6px',
-                              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                              border: '1px solid rgba(255, 255, 255, 0.12)',
-                              color: '#FFFFFF',
-                              fontSize: '13px',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px'
+                              position: 'absolute',
+                              right: '20px',
+                              ...(isLastRows ? { bottom: 'calc(100% - 4px)' } : { top: 'calc(100% - 4px)' }),
+                              minWidth: '220px',
+                              backgroundColor: '#161622',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              borderRadius: '12px',
+                              padding: '6px',
+                              boxShadow: '0 14px 40px rgba(0, 0, 0, 0.85)',
+                              zIndex: 100,
+                              textAlign: 'left',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '2px'
                             }}
                           >
-                            <Play size={14} />
-                            <span>Preview</span>
-                          </button>
+                            {/* Action: Edit */}
+                            <button
+                              onClick={() => {
+                                setOpenActionMenuId(null);
+                                onNavigateTab('admin-editor', item.id);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                width: '100%',
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#FFFFFF',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                transition: 'background 0.15s ease'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                              <Edit3 size={15} color="var(--brand-gold, #F5C518)" />
+                              <span>Edit Content</span>
+                            </button>
 
-                          {/* Edit */}
-                          <button
-                            onClick={() => onNavigateTab('admin-editor', item.id)}
-                            title="Edit metadata, artwork, videos, or pricing"
-                            style={{
-                              padding: '8px 12px',
-                              borderRadius: '6px',
-                              backgroundColor: 'rgba(245, 197, 24, 0.12)',
-                              border: '1px solid rgba(245, 197, 24, 0.25)',
-                              color: 'var(--brand-gold, #F5C518)',
-                              fontSize: '13px',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <Edit3 size={14} />
-                            <span>Edit</span>
-                          </button>
+                            {/* Action: Preview / View */}
+                            <button
+                              onClick={() => {
+                                setOpenActionMenuId(null);
+                                setPreviewItem(item);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                width: '100%',
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#FFFFFF',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                transition: 'background 0.15s ease'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                              <Play size={15} color="#60A5FA" />
+                              <span>Preview / Play</span>
+                            </button>
 
-                          {/* Delete */}
-                          <button
-                            onClick={() => {
-                              setSelectedDeleteId(item.id);
-                              setDeleteItemTitle(item.title);
-                            }}
-                            title="Delete title from catalog"
-                            style={{
-                              padding: '8px 12px',
-                              borderRadius: '6px',
-                              backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                              border: '1px solid rgba(239, 68, 68, 0.25)',
-                              color: '#F87171',
-                              fontSize: '13px',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+                            {/* Action: Publish / Unpublish */}
+                            <button
+                              onClick={() => {
+                                setOpenActionMenuId(null);
+                                handleTogglePublishStatus(item);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                width: '100%',
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#FFFFFF',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                transition: 'background 0.15s ease'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                              {isPublished ? <EyeOff size={15} color="#F87171" /> : <Eye size={15} color="#10B981" />}
+                              <span>{isPublished ? 'Unpublish (Draft)' : 'Publish (Make Live)'}</span>
+                            </button>
+
+                            {/* Action: Featured ON / OFF */}
+                            <button
+                              onClick={() => {
+                                setOpenActionMenuId(null);
+                                handleToggleFeatured(item);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                width: '100%',
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#FFFFFF',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                transition: 'background 0.15s ease'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                              <Star size={15} color={item.isFeatured ? '#9CA3AF' : 'var(--brand-gold, #F5C518)'} fill={item.isFeatured ? 'none' : 'currentColor'} />
+                              <span>{item.isFeatured ? 'Remove from Featured' : 'Feature on Hero'}</span>
+                            </button>
+
+                            {/* Action: Trending #1 ON / OFF */}
+                            <button
+                              onClick={() => {
+                                setOpenActionMenuId(null);
+                                handleToggleTrending(item);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                width: '100%',
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#FFFFFF',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                transition: 'background 0.15s ease'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                              <TrendingUp size={15} color={isTrending1 ? '#9CA3AF' : '#F59E0B'} />
+                              <span>{isTrending1 ? 'Remove Trending #1' : 'Set as Trending #1'}</span>
+                            </button>
+
+                            <div style={{ height: '1px', backgroundColor: 'rgba(255, 255, 255, 0.08)', margin: '4px 0' }} />
+
+                            {/* Action: Delete */}
+                            <button
+                              onClick={() => {
+                                setOpenActionMenuId(null);
+                                setSelectedDeleteId(item.id);
+                                setDeleteItemTitle(item.title);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                width: '100%',
+                                padding: '10px 12px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#F87171',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                transition: 'background 0.15s ease'
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.12)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                              <Trash2 size={15} color="#EF4444" />
+                              <span>Delete Title</span>
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

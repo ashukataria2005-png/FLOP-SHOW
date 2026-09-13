@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { purchaseRepository, PurchaseRecord } from '../repositories/purchaseRepository.js';
 import { contentRepository } from '../repositories/contentRepository.js';
 import { walletRepository } from '../repositories/walletRepository.js';
-import { runTransaction } from '../db/connection.js';
+import { getAdapter } from '../db/adapter.js';
 
 export interface PurchaseResult {
   success: boolean;
@@ -21,9 +21,9 @@ export const purchaseService = {
    * 5. If price > 0, verify wallet balance >= price in an atomic transaction
    * 6. Deduct balance, insert purchase record, insert transaction audit ledger atomically
    */
-  purchaseContent(userId: string, contentId: string): PurchaseResult {
+  async purchaseContent(userId: string, contentId: string): Promise<PurchaseResult> {
     // 1. Fetch content from database
-    const content = contentRepository.findByIdOrSlug(contentId);
+    const content = await contentRepository.findByIdOrSlug(contentId);
     if (!content) {
       const err = new Error('Content not found.');
       (err as any).statusCode = 404;
@@ -37,7 +37,7 @@ export const purchaseService = {
     }
 
     // 2. Check ownership
-    const alreadyOwned = purchaseRepository.isOwned(userId, content.id);
+    const alreadyOwned = await purchaseRepository.isOwned(userId, content.id);
     if (alreadyOwned) {
       const err = new Error('You already own this title.');
       (err as any).statusCode = 409;
@@ -49,16 +49,17 @@ export const purchaseService = {
     const realPriceRupees = realPricePaise / 100;
     const now = new Date().toISOString();
     const purchaseId = `pur-${crypto.randomUUID()}`;
+    const db = getAdapter();
 
-    return runTransaction(txDb => {
+    return db.transaction(async txAdapter => {
       // Re-verify inside atomic lock to prevent race conditions
-      if (purchaseRepository.isOwned(userId, content.id, txDb)) {
+      if (await purchaseRepository.isOwned(userId, content.id, txAdapter)) {
         const err = new Error('You already own this title.');
         (err as any).statusCode = 409;
         throw err;
       }
 
-      const currentBalance = walletRepository.getBalance(userId, txDb);
+      const currentBalance = await walletRepository.getBalance(userId, txAdapter);
 
       if (currentBalance < realPricePaise) {
         const balanceRupees = currentBalance / 100;
@@ -71,24 +72,24 @@ export const purchaseService = {
 
       // Deduct balance
       const newBalance = currentBalance - realPricePaise;
-      walletRepository.updateBalance(userId, newBalance, now, txDb);
+      await walletRepository.updateBalance(userId, newBalance, now, txAdapter);
 
       // Create purchase record
-      purchaseRepository.createPurchase(
+      await purchaseRepository.createPurchase(
         {
           id: purchaseId,
           userId,
           contentId: content.id,
           amountPaid: realPricePaise,
           status: 'COMPLETED',
-          purchasedAt: now
+          purchasedAt: now,
         },
-        txDb
+        txAdapter
       );
 
       // Create wallet transaction ledger entry if not free
       if (realPricePaise > 0) {
-        walletRepository.addTransaction(
+        await walletRepository.addTransaction(
           {
             id: `tx-${crypto.randomUUID()}`,
             userId,
@@ -97,9 +98,9 @@ export const purchaseService = {
             balanceAfter: newBalance,
             description: `Purchased: ${content.title}`,
             referenceId: content.id,
-            createdAt: now
+            createdAt: now,
           },
-          txDb
+          txAdapter
         );
       }
 
@@ -112,25 +113,25 @@ export const purchaseService = {
         purchased_at: now,
         title: content.title,
         poster: content.poster,
-        type: content.type
+        type: content.type,
       };
 
       return {
         success: true,
         purchase: purchaseRecord,
         remainingBalanceRupees: newBalance / 100,
-        message: `Successfully purchased "${content.title}".`
+        message: `Successfully purchased "${content.title}".`,
       };
     });
   },
 
-  checkOwnership(userId: string, contentId: string): boolean {
-    const content = contentRepository.findByIdOrSlug(contentId);
+  async checkOwnership(userId: string, contentId: string): Promise<boolean> {
+    const content = await contentRepository.findByIdOrSlug(contentId);
     if (!content) return false;
 
     // Free content is accessible to all authenticated users
     if (content.price === 0) return true;
 
     return purchaseRepository.isOwned(userId, content.id);
-  }
+  },
 };

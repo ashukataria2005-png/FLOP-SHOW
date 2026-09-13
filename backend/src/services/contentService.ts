@@ -5,55 +5,53 @@ export interface ContentDetailsResponse extends ContentRecord {
 }
 
 export const contentService = {
-  listPublished(filters: {
-    type?: 'MOVIE' | 'SERIES';
-    genreSlug?: string;
-    featured?: boolean;
-    limit?: number;
-    offset?: number;
-  } = {}): ContentRecord[] {
+  async listPublished(
+    filters: {
+      type?: 'MOVIE' | 'SERIES';
+      genreSlug?: string;
+      featured?: boolean;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<ContentRecord[]> {
     return contentRepository.list({
       ...filters,
-      status: 'PUBLISHED'
+      status: 'PUBLISHED',
     });
   },
 
-  getFeatured(): ContentRecord[] {
+  async getFeatured(): Promise<ContentRecord[]> {
     return contentRepository.list({
       status: 'PUBLISHED',
       featured: true,
-      limit: 5
+      limit: 5,
     });
   },
 
-  getDetails(idOrSlug: string): ContentDetailsResponse | null {
-    const item = contentRepository.findByIdOrSlug(idOrSlug);
+  async getDetails(idOrSlug: string): Promise<ContentDetailsResponse | null> {
+    const item = await contentRepository.findByIdOrSlug(idOrSlug);
     if (!item) return null;
 
     if (item.type === 'SERIES') {
-      const seasons = contentRepository.getSeasonsWithEpisodes(item.id);
-      return {
-        ...item,
-        seasons
-      };
+      const seasons = await contentRepository.getSeasonsWithEpisodes(item.id);
+      return { ...item, seasons };
     }
 
     return item;
   },
 
-  search(
+  async search(
     query: string,
     options: { type?: 'MOVIE' | 'SERIES'; genreSlug?: string } = {}
-  ): ContentRecord[] {
+  ): Promise<ContentRecord[]> {
     return contentRepository.search(query, options);
   },
 
-  getGenres(): GenreRecord[] {
+  async getGenres(): Promise<GenreRecord[]> {
     return contentRepository.getAllGenres();
   },
 
-  getHero(): ContentRecord | null {
+  async getHero(): Promise<ContentRecord | null> {
     return contentRepository.getHero();
-  }
+  },
 };
-

@@ -68,6 +68,7 @@ export function createServer(): Express {
       status: 'ok',
       service: 'FLOPSHOW Backend',
       version: '1.0.0',
+      database: config.databaseType,
       timestamp: new Date().toISOString()
     });
   };

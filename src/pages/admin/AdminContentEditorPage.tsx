@@ -72,6 +72,8 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
   const [trailerUrl, setTrailerUrl] = useState('');
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [uploadingTrailer, setUploadingTrailer] = useState(false);
+  const [uploadProgressVideo, setUploadProgressVideo] = useState<number>(0);
+  const [uploadProgressTrailer, setUploadProgressTrailer] = useState<number>(0);
 
   // Seasons & Episodes (Series)
   const [seasons, setSeasons] = useState<any[]>([]);
@@ -87,6 +89,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
   const [episodeVideoUrl, setEpisodeVideoUrl] = useState('');
   const [episodeThumbnailUrl, setEpisodeThumbnailUrl] = useState('');
   const [uploadingEpisodeVideo, setUploadingEpisodeVideo] = useState(false);
+  const [uploadProgressEpisodeVideo, setUploadProgressEpisodeVideo] = useState<number>(0);
   const [uploadingEpisodeThumb, setUploadingEpisodeThumb] = useState(false);
 
   // Preview Player State
@@ -150,6 +153,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
       showToast(err.message || 'Upload failed.', 'error');
     } finally {
       setUploadingPoster(false);
+      e.target.value = '';
     }
   };
 
@@ -165,6 +169,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
       showToast(err.message || 'Upload failed.', 'error');
     } finally {
       setUploadingBackdrop(false);
+      e.target.value = '';
     }
   };
 
@@ -173,13 +178,16 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
     if (!file) return;
     try {
       setUploadingTrailer(true);
-      const res = await api.admin.uploadFile(file);
+      setUploadProgressTrailer(0);
+      const res = await api.admin.uploadFile(file, pct => setUploadProgressTrailer(pct));
       setTrailerUrl(res.url);
       showToast('Trailer uploaded successfully!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Trailer upload failed.', 'error');
     } finally {
       setUploadingTrailer(false);
+      setUploadProgressTrailer(0);
+      e.target.value = '';
     }
   };
 
@@ -188,13 +196,16 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
     if (!file) return;
     try {
       setUploadingVideo(true);
-      const res = await api.admin.uploadFile(file);
+      setUploadProgressVideo(0);
+      const res = await api.admin.uploadFile(file, pct => setUploadProgressVideo(pct));
       setMainVideoUrl(res.url);
       showToast('Main video file uploaded successfully!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Video upload failed.', 'error');
     } finally {
       setUploadingVideo(false);
+      setUploadProgressVideo(0);
+      e.target.value = '';
     }
   };
 
@@ -203,13 +214,16 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
     if (!file) return;
     try {
       setUploadingEpisodeVideo(true);
-      const res = await api.admin.uploadFile(file);
+      setUploadProgressEpisodeVideo(0);
+      const res = await api.admin.uploadFile(file, pct => setUploadProgressEpisodeVideo(pct));
       setEpisodeVideoUrl(res.url);
       showToast('Episode video uploaded!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Episode upload failed.', 'error');
     } finally {
       setUploadingEpisodeVideo(false);
+      setUploadProgressEpisodeVideo(0);
+      e.target.value = '';
     }
   };
 
@@ -225,6 +239,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
       showToast(err.message || 'Thumbnail upload failed.', 'error');
     } finally {
       setUploadingEpisodeThumb(false);
+      e.target.value = '';
     }
   };
 
@@ -1262,18 +1277,19 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                       color: '#FFFFFF',
                       fontSize: '13px',
                       fontWeight: 700,
-                      cursor: 'pointer',
+                      cursor: uploadingTrailer ? 'wait' : 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px'
                     }}
                   >
                     {uploadingTrailer ? <Loader2 className="animate-spin" size={15} /> : <Upload size={15} />}
-                    <span>Upload Trailer</span>
+                    <span>{uploadingTrailer ? `Uploading ${uploadProgressTrailer > 0 ? `${uploadProgressTrailer}%` : '...'}` : 'Upload Trailer'}</span>
                     <input
                       type="file"
                       accept="video/*"
                       onChange={handleUploadTrailer}
+                      disabled={uploadingTrailer}
                       style={{ display: 'none' }}
                     />
                   </label>
@@ -1377,18 +1393,25 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                         color: '#FFFFFF',
                         fontSize: '13px',
                         fontWeight: 700,
-                        cursor: 'pointer',
+                        cursor: uploadingVideo ? 'wait' : 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px'
                       }}
                     >
                       {uploadingVideo ? <Loader2 className="animate-spin" size={15} /> : <Upload size={15} />}
-                      <span>{mainVideoUrl ? 'Replace Movie Video' : 'Upload Movie Video'}</span>
+                      <span>
+                        {uploadingVideo
+                          ? `Uploading ${uploadProgressVideo > 0 ? `${uploadProgressVideo}%` : '...'}`
+                          : mainVideoUrl
+                          ? 'Replace Movie Video'
+                          : 'Upload Movie Video'}
+                      </span>
                       <input
                         type="file"
-                        accept="video/mp4,video/webm,video/ogg"
+                        accept="video/*"
                         onChange={handleUploadMainVideo}
+                        disabled={uploadingVideo}
                         style={{ display: 'none' }}
                       />
                     </label>
@@ -1838,15 +1861,27 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                       color: '#FFFFFF',
                       fontSize: '13px',
                       fontWeight: 700,
-                      cursor: 'pointer',
+                      cursor: uploadingEpisodeVideo ? 'wait' : 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px'
                     }}
                   >
                     {uploadingEpisodeVideo ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
-                    <span>{episodeVideoUrl ? 'Replace Video' : 'Upload Video'}</span>
-                    <input type="file" accept="video/mp4,video/webm,video/ogg" onChange={handleUploadEpisodeVideo} style={{ display: 'none' }} />
+                    <span>
+                      {uploadingEpisodeVideo
+                        ? `Uploading ${uploadProgressEpisodeVideo > 0 ? `${uploadProgressEpisodeVideo}%` : '...'}`
+                        : episodeVideoUrl
+                        ? 'Replace Video'
+                        : 'Upload Video'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleUploadEpisodeVideo}
+                      disabled={uploadingEpisodeVideo}
+                      style={{ display: 'none' }}
+                    />
                   </label>
                   {episodeVideoUrl && (
                     <>

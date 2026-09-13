@@ -1,5 +1,4 @@
-import { getDatabase } from '../db/connection.js';
-import { DatabaseSync } from 'node:sqlite';
+import { getAdapter, DbAdapter } from '../db/adapter.js';
 
 export interface WalletRecord {
   user_id: string;
@@ -19,35 +18,34 @@ export interface WalletTransactionRecord {
 }
 
 export const walletRepository = {
-  createWallet(userId: string, initialBalance: number = 0, now: string, customDb?: DatabaseSync): void {
-    const db = customDb || getDatabase();
-    const stmt = db.prepare(`
-      INSERT OR IGNORE INTO wallets (user_id, balance, updated_at)
-      VALUES (?, ?, ?);
-    `);
-    stmt.run(userId, initialBalance, now);
+  async createWallet(userId: string, initialBalance = 0, now: string, adapter?: DbAdapter): Promise<void> {
+    const db = adapter || getAdapter();
+    await db.run(
+      `INSERT INTO wallets (user_id, balance, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT (user_id) DO NOTHING;`,
+      [userId, initialBalance, now]
+    );
   },
 
-  getBalance(userId: string, customDb?: DatabaseSync): number {
-    const db = customDb || getDatabase();
-    const stmt = db.prepare(`
-      SELECT balance FROM wallets WHERE user_id = ?;
-    `);
-    const row = stmt.get(userId) as { balance: number } | undefined;
-    return row ? row.balance : 0;
+  async getBalance(userId: string, adapter?: DbAdapter): Promise<number> {
+    const db = adapter || getAdapter();
+    const { rows } = await db.query(
+      `SELECT balance FROM wallets WHERE user_id = ?;`,
+      [userId]
+    );
+    return rows[0] ? (rows[0] as { balance: number }).balance : 0;
   },
 
-  updateBalance(userId: string, newBalance: number, now: string, customDb?: DatabaseSync): void {
-    const db = customDb || getDatabase();
-    const stmt = db.prepare(`
-      UPDATE wallets
-      SET balance = ?, updated_at = ?
-      WHERE user_id = ?;
-    `);
-    stmt.run(newBalance, now, userId);
+  async updateBalance(userId: string, newBalance: number, now: string, adapter?: DbAdapter): Promise<void> {
+    const db = adapter || getAdapter();
+    await db.run(
+      `UPDATE wallets SET balance = ?, updated_at = ? WHERE user_id = ?;`,
+      [newBalance, now, userId]
+    );
   },
 
-  addTransaction(
+  async addTransaction(
     tx: {
       id: string;
       userId: string;
@@ -58,34 +56,32 @@ export const walletRepository = {
       referenceId?: string | null;
       createdAt: string;
     },
-    customDb?: DatabaseSync
-  ): void {
-    const db = customDb || getDatabase();
-    const stmt = db.prepare(`
-      INSERT INTO wallet_transactions (
-        id, user_id, type, amount, balance_after, description, reference_id, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-    `);
-    stmt.run(
-      tx.id,
-      tx.userId,
-      tx.type,
-      tx.amount,
-      tx.balanceAfter,
-      tx.description,
-      tx.referenceId || null,
-      tx.createdAt
+    adapter?: DbAdapter
+  ): Promise<void> {
+    const db = adapter || getAdapter();
+    await db.run(
+      `INSERT INTO wallet_transactions
+         (id, user_id, type, amount, balance_after, description, reference_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      [
+        tx.id,
+        tx.userId,
+        tx.type,
+        tx.amount,
+        tx.balanceAfter,
+        tx.description,
+        tx.referenceId || null,
+        tx.createdAt,
+      ]
     );
   },
 
-  getTransactions(userId: string, limit: number = 50): WalletTransactionRecord[] {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      SELECT * FROM wallet_transactions
-      WHERE user_id = ?
-      ORDER BY created_at DESC
-      LIMIT ?;
-    `);
-    return stmt.all(userId, limit) as WalletTransactionRecord[];
-  }
+  async getTransactions(userId: string, limit = 50): Promise<WalletTransactionRecord[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?;`,
+      [userId, limit]
+    );
+    return rows as WalletTransactionRecord[];
+  },
 };

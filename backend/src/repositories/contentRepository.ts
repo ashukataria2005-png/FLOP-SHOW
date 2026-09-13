@@ -1,4 +1,4 @@
-import { getDatabase } from '../db/connection.js';
+import { getAdapter } from '../db/adapter.js';
 
 export interface ContentRecord {
   id: string;
@@ -61,18 +61,20 @@ export interface EpisodeRecord {
 }
 
 export const contentRepository = {
-  list(filters: {
-    status?: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'ALL';
-    type?: 'MOVIE' | 'SERIES';
-    genreSlug?: string;
-    featured?: boolean;
-    trendingOnly?: boolean;
-    search?: string;
-    sortBy?: 'newest' | 'oldest' | 'title' | 'price_asc' | 'price_desc' | 'featured' | 'priority';
-    limit?: number;
-    offset?: number;
-  } = {}): ContentRecord[] {
-    const db = getDatabase();
+  async list(
+    filters: {
+      status?: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'ALL';
+      type?: 'MOVIE' | 'SERIES';
+      genreSlug?: string;
+      featured?: boolean;
+      trendingOnly?: boolean;
+      search?: string;
+      sortBy?: 'newest' | 'oldest' | 'title' | 'price_asc' | 'price_desc' | 'featured' | 'priority';
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<ContentRecord[]> {
+    const db = getAdapter();
     const joinParams: (string | number)[] = [];
     const whereConditions: string[] = [];
     const whereParams: (string | number)[] = [];
@@ -133,7 +135,9 @@ export const contentRepository = {
     const offset = filters.offset || 0;
 
     const sql = `
-      SELECT DISTINCT c.*
+      SELECT DISTINCT c.*,
+             COALESCE((SELECT url FROM media WHERE content_id = c.id AND media_type = 'MAIN' AND is_active = 1 ORDER BY created_at DESC LIMIT 1), c.video_url) as video_url,
+             COALESCE((SELECT url FROM media WHERE content_id = c.id AND media_type = 'TRAILER' AND is_active = 1 ORDER BY created_at DESC LIMIT 1), c.trailer_url) as trailer_url
       FROM content c
       ${genreJoin}
       ${whereClause}
@@ -142,32 +146,38 @@ export const contentRepository = {
     `;
 
     const allParams = [...joinParams, ...whereParams, limit, offset];
-    const rows = db.prepare(sql).all(...allParams) as ContentRecord[];
-    return rows.map(r => ({
+    const { rows } = await db.query(sql, allParams);
+
+    const records = rows as ContentRecord[];
+    // Attach genres for each content item
+    return Promise.all(records.map(async r => ({
       ...r,
-      genres: contentRepository.getGenresForContent(r.id)
-    }));
+      genres: await contentRepository.getGenresForContent(r.id),
+    })));
   },
 
-  findByIdOrSlug(idOrSlug: string): ContentRecord | null {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      SELECT * FROM content WHERE id = ? OR slug = ? COLLATE NOCASE;
-    `);
-    const row = stmt.get(idOrSlug, idOrSlug) as ContentRecord | undefined;
-    if (!row) return null;
-
+  async findByIdOrSlug(idOrSlug: string): Promise<ContentRecord | null> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT c.*,
+              COALESCE((SELECT url FROM media WHERE content_id = c.id AND media_type = 'MAIN' AND is_active = 1 ORDER BY created_at DESC LIMIT 1), c.video_url) as video_url,
+              COALESCE((SELECT url FROM media WHERE content_id = c.id AND media_type = 'TRAILER' AND is_active = 1 ORDER BY created_at DESC LIMIT 1), c.trailer_url) as trailer_url
+       FROM content c WHERE c.id = ? OR c.slug = ?;`,
+      [idOrSlug, idOrSlug]
+    );
+    if (!rows[0]) return null;
+    const row = rows[0] as ContentRecord;
     return {
       ...row,
-      genres: contentRepository.getGenresForContent(row.id)
+      genres: await contentRepository.getGenresForContent(row.id),
     };
   },
 
-  search(
+  async search(
     query: string,
     options: { type?: 'MOVIE' | 'SERIES'; genreSlug?: string } = {}
-  ): ContentRecord[] {
-    const db = getDatabase();
+  ): Promise<ContentRecord[]> {
+    const db = getAdapter();
     const joinParams: (string | number)[] = [];
     const whereConditions: string[] = ["c.status = 'PUBLISHED'"];
     const whereParams: (string | number)[] = [];
@@ -207,108 +217,107 @@ export const contentRepository = {
     `;
 
     const allParams = [...joinParams, ...whereParams];
-    const rows = db.prepare(sql).all(...allParams) as ContentRecord[];
-    return rows.map(r => ({
+    const { rows } = await db.query(sql, allParams);
+    const records = rows as ContentRecord[];
+    return Promise.all(records.map(async r => ({
       ...r,
-      genres: contentRepository.getGenresForContent(r.id)
-    }));
+      genres: await contentRepository.getGenresForContent(r.id),
+    })));
   },
 
-  getGenresForContent(contentId: string): string[] {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      SELECT g.name
-      FROM genres g
-      JOIN content_genres cg ON g.id = cg.genre_id
-      WHERE cg.content_id = ?
-      ORDER BY g.name ASC;
-    `);
-    const rows = stmt.all(contentId) as { name: string }[];
-    return rows.map(r => r.name);
+  async getGenresForContent(contentId: string): Promise<string[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT g.name
+       FROM genres g
+       JOIN content_genres cg ON g.id = cg.genre_id
+       WHERE cg.content_id = ?
+       ORDER BY g.name ASC;`,
+      [contentId]
+    );
+    return (rows as { name: string }[]).map(r => r.name);
   },
 
-  getAllGenres(): GenreRecord[] {
-    const db = getDatabase();
-    const stmt = db.prepare(`SELECT * FROM genres ORDER BY name ASC;`);
-    return stmt.all() as GenreRecord[];
+  async getAllGenres(): Promise<GenreRecord[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(`SELECT * FROM genres ORDER BY name ASC;`);
+    return rows as GenreRecord[];
   },
 
-  getSeasonsWithEpisodes(contentId: string): SeasonRecord[] {
-    const db = getDatabase();
-    const seasonsStmt = db.prepare(`
-      SELECT * FROM seasons WHERE content_id = ? ORDER BY season_number ASC;
-    `);
-    const seasons = seasonsStmt.all(contentId) as SeasonRecord[];
-
-    const episodesStmt = db.prepare(`
-      SELECT * FROM episodes WHERE season_id = ? ORDER BY episode_number ASC;
-    `);
+  async getSeasonsWithEpisodes(contentId: string): Promise<SeasonRecord[]> {
+    const db = getAdapter();
+    const { rows: seasonRows } = await db.query(
+      `SELECT * FROM seasons WHERE content_id = ? ORDER BY season_number ASC;`,
+      [contentId]
+    );
+    const seasons = seasonRows as SeasonRecord[];
 
     for (const s of seasons) {
-      s.episodes = episodesStmt.all(s.id) as EpisodeRecord[];
+      const { rows: episodeRows } = await db.query(
+        `SELECT e.*,
+                COALESCE((SELECT url FROM media WHERE episode_id = e.id AND media_type = 'MAIN' AND is_active = 1 ORDER BY created_at DESC LIMIT 1), e.video_url) as video_url
+         FROM episodes e WHERE season_id = ? ORDER BY episode_number ASC;`,
+        [s.id]
+      );
+      s.episodes = episodeRows as EpisodeRecord[];
     }
 
     return seasons;
   },
 
-  createContent(item: Omit<ContentRecord, 'created_at' | 'updated_at'>, genreIds: string[] = []): void {
-    const db = getDatabase();
+  async createContent(
+    item: Omit<ContentRecord, 'created_at' | 'updated_at'>,
+    genreIds: string[] = []
+  ): Promise<void> {
+    const db = getAdapter();
     const now = new Date().toISOString();
-    const stmt = db.prepare(`
-      INSERT INTO content (
-        id, type, title, slug, description, poster, backdrop,
-        trailer_url, video_url, price, language, release_year,
-        duration, age_rating, status, featured, category_label,
-        tagline, about, rating, director, cast_json, created_at, updated_at
-      ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?
-      );
-    `);
-
-    stmt.run(
-      item.id,
-      item.type,
-      item.title,
-      item.slug,
-      item.description,
-      item.poster,
-      item.backdrop,
-      item.trailer_url || null,
-      item.video_url || null,
-      item.price,
-      item.language || 'Hindi',
-      item.release_year,
-      item.duration || null,
-      item.age_rating || 'U/A 13+',
-      item.status || 'PUBLISHED',
-      item.featured || 0,
-      item.category_label || null,
-      item.tagline || null,
-      item.about || null,
-      item.rating || 8.0,
-      item.director || null,
-      item.cast_json || '[]',
-      now,
-      now
+    await db.run(
+      `INSERT INTO content (
+         id, type, title, slug, description, poster, backdrop,
+         trailer_url, video_url, price, language, release_year,
+         duration, age_rating, status, featured, category_label,
+         tagline, about, rating, director, cast_json, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [
+        item.id,
+        item.type,
+        item.title,
+        item.slug,
+        item.description,
+        item.poster,
+        item.backdrop,
+        item.trailer_url || null,
+        item.video_url || null,
+        item.price,
+        item.language || 'Hindi',
+        item.release_year,
+        item.duration || null,
+        item.age_rating || 'U/A 13+',
+        item.status || 'PUBLISHED',
+        item.featured || 0,
+        item.category_label || null,
+        item.tagline || null,
+        item.about || null,
+        item.rating || 8.0,
+        item.director || null,
+        item.cast_json || '[]',
+        now,
+        now,
+      ]
     );
 
-    if (genreIds.length > 0) {
-      const linkStmt = db.prepare(`
-        INSERT OR IGNORE INTO content_genres (content_id, genre_id) VALUES (?, ?);
-      `);
-      for (const gid of genreIds) {
-        linkStmt.run(item.id, gid);
-      }
+    for (const gid of genreIds) {
+      await db.run(
+        `INSERT INTO content_genres (content_id, genre_id) VALUES (?, ?) ON CONFLICT DO NOTHING;`,
+        [item.id, gid]
+      );
     }
   },
 
-  updateContent(id: string, updates: Partial<ContentRecord> & Record<string, any>): void {
-    const db = getDatabase();
+  async updateContent(id: string, updates: Partial<ContentRecord> & Record<string, any>): Promise<void> {
+    const db = getAdapter();
 
-    // Fallback normalization for poster and backdrop artwork
+    // Fallback normalisation for poster/backdrop artwork
     if (updates.poster === undefined) {
       if (updates.posterUrl !== undefined) updates.poster = updates.posterUrl;
       else if (updates.poster_url !== undefined) updates.poster = updates.poster_url;
@@ -322,7 +331,7 @@ export const contentRepository = {
       'title', 'slug', 'description', 'poster', 'backdrop',
       'trailer_url', 'video_url', 'price', 'language', 'release_year',
       'duration', 'age_rating', 'status', 'featured', 'category_label',
-      'tagline', 'about', 'rating', 'director', 'cast_json'
+      'tagline', 'about', 'rating', 'director', 'cast_json',
     ];
 
     const setClauses: string[] = [];
@@ -338,79 +347,87 @@ export const contentRepository = {
     if (setClauses.length === 0) return;
 
     setClauses.push('updated_at = ?');
-    params.push(new Date().toISOString());
-    params.push(id);
+    params.push(new Date().toISOString(), id);
 
-    const sql = `UPDATE content SET ${setClauses.join(', ')} WHERE id = ?;`;
-    db.prepare(sql).run(...params);
+    await db.run(`UPDATE content SET ${setClauses.join(', ')} WHERE id = ?;`, params);
   },
 
-  updateStatus(id: string, status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'): void {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      UPDATE content SET status = ?, updated_at = ? WHERE id = ?;
-    `);
-    stmt.run(status, new Date().toISOString(), id);
+  async updateStatus(id: string, status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'): Promise<void> {
+    const db = getAdapter();
+    await db.run(
+      `UPDATE content SET status = ?, updated_at = ? WHERE id = ?;`,
+      [status, new Date().toISOString(), id]
+    );
   },
 
-  updatePrice(id: string, pricePaise: number): void {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      UPDATE content SET price = ?, updated_at = ? WHERE id = ?;
-    `);
-    stmt.run(pricePaise, new Date().toISOString(), id);
+  async updatePrice(id: string, pricePaise: number): Promise<void> {
+    const db = getAdapter();
+    await db.run(
+      `UPDATE content SET price = ?, updated_at = ? WHERE id = ?;`,
+      [pricePaise, new Date().toISOString(), id]
+    );
   },
 
-  createGenre(id: string, name: string, slug: string): void {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      INSERT OR IGNORE INTO genres (id, name, slug) VALUES (?, ?, ?);
-    `);
-    stmt.run(id, name, slug);
+  async createGenre(id: string, name: string, slug: string): Promise<void> {
+    const db = getAdapter();
+    await db.run(
+      `INSERT INTO genres (id, name, slug) VALUES (?, ?, ?) ON CONFLICT DO NOTHING;`,
+      [id, name, slug]
+    );
   },
 
-  getGenresWithCounts(): Array<GenreRecord & { contentCount: number }> {
-    const db = getDatabase();
-    const rows = db.prepare(`
-      SELECT g.id, g.name, g.slug, COUNT(cg.content_id) as contentCount
-      FROM genres g
-      LEFT JOIN content_genres cg ON g.id = cg.genre_id
-      GROUP BY g.id, g.name, g.slug
-      ORDER BY g.name ASC;
-    `).all() as any[];
-    return rows.map(r => ({
+  async getGenresWithCounts(): Promise<Array<GenreRecord & { contentCount: number }>> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT g.id, g.name, g.slug, COUNT(cg.content_id) as contentCount
+       FROM genres g
+       LEFT JOIN content_genres cg ON g.id = cg.genre_id
+       GROUP BY g.id, g.name, g.slug
+       ORDER BY g.name ASC;`
+    );
+    return (rows as any[]).map(r => ({
       id: r.id,
       name: r.name,
       slug: r.slug,
-      contentCount: Number(r.contentCount || 0)
+      contentCount: Number(r.contentcount ?? r.contentCount ?? 0),
     }));
   },
 
-  updateGenre(id: string, name: string, slug?: string): void {
-    const db = getDatabase();
+  async updateGenre(id: string, name: string, slug?: string): Promise<void> {
+    const db = getAdapter();
     const cleanName = name.trim();
-    const cleanSlug = (slug || cleanName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    db.prepare('UPDATE genres SET name = ?, slug = ? WHERE id = ?;').run(cleanName, cleanSlug, id);
+    const cleanSlug = (slug || cleanName)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    await db.run(
+      `UPDATE genres SET name = ?, slug = ? WHERE id = ?;`,
+      [cleanName, cleanSlug, id]
+    );
   },
 
-  deleteGenre(id: string): void {
-    const db = getDatabase();
-    // Safely remove relations first, then delete genre
-    db.prepare('DELETE FROM content_genres WHERE genre_id = ?;').run(id);
-    db.prepare('DELETE FROM genres WHERE id = ?;').run(id);
+  async deleteGenre(id: string): Promise<void> {
+    const db = getAdapter();
+    await db.run(`DELETE FROM content_genres WHERE genre_id = ?;`, [id]);
+    await db.run(`DELETE FROM genres WHERE id = ?;`, [id]);
   },
 
-  createSeason(season: { id: string; contentId: string; seasonNumber: number; title: string }): void {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      INSERT INTO seasons (id, content_id, season_number, title, created_at)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET title = excluded.title;
-    `);
-    stmt.run(season.id, season.contentId, season.seasonNumber, season.title, new Date().toISOString());
+  async createSeason(season: {
+    id: string;
+    contentId: string;
+    seasonNumber: number;
+    title: string;
+  }): Promise<void> {
+    const db = getAdapter();
+    await db.run(
+      `INSERT INTO seasons (id, content_id, season_number, title, created_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title;`,
+      [season.id, season.contentId, season.seasonNumber, season.title, new Date().toISOString()]
+    );
   },
 
-  createEpisode(ep: {
+  async createEpisode(ep: {
     id: string;
     seasonId: string;
     episodeNumber: number;
@@ -420,84 +437,85 @@ export const contentRepository = {
     duration?: string;
     durationSeconds?: number;
     videoUrl: string;
-  }): void {
-    const db = getDatabase();
+  }): Promise<void> {
+    const db = getAdapter();
     const now = new Date().toISOString();
-    const stmt = db.prepare(`
-      INSERT INTO episodes (
-        id, season_id, episode_number, title, description,
-        thumbnail, duration, duration_seconds, video_url, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        title = excluded.title,
-        description = excluded.description,
-        thumbnail = excluded.thumbnail,
-        duration = excluded.duration,
-        duration_seconds = excluded.duration_seconds,
-        video_url = excluded.video_url,
-        updated_at = excluded.updated_at;
-    `);
-    stmt.run(
-      ep.id,
-      ep.seasonId,
-      ep.episodeNumber,
-      ep.title,
-      ep.description || null,
-      ep.thumbnail || null,
-      ep.duration || null,
-      ep.durationSeconds || 0,
-      ep.videoUrl,
-      now,
-      now
+    await db.run(
+      `INSERT INTO episodes
+         (id, season_id, episode_number, title, description,
+          thumbnail, duration, duration_seconds, video_url, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (id) DO UPDATE SET
+         title = EXCLUDED.title,
+         description = EXCLUDED.description,
+         thumbnail = EXCLUDED.thumbnail,
+         duration = EXCLUDED.duration,
+         duration_seconds = EXCLUDED.duration_seconds,
+         video_url = EXCLUDED.video_url,
+         updated_at = EXCLUDED.updated_at;`,
+      [
+        ep.id,
+        ep.seasonId,
+        ep.episodeNumber,
+        ep.title,
+        ep.description || null,
+        ep.thumbnail || null,
+        ep.duration || null,
+        ep.durationSeconds || 0,
+        ep.videoUrl,
+        now,
+        now,
+      ]
     );
   },
 
-  setTrendingPosition(contentId: string, position: number | null): void {
-    const db = getDatabase();
+  async setTrendingPosition(contentId: string, position: number | null): Promise<void> {
+    const db = getAdapter();
     const now = new Date().toISOString();
 
-    // If setting position = 1, atomically clear position 1 from any previous title
     if (position === 1) {
-      db.prepare('UPDATE content SET trending_position = NULL WHERE trending_position = 1;').run();
+      await db.run(
+        `UPDATE content SET trending_position = NULL WHERE trending_position = 1;`
+      );
     }
 
-    db.prepare(`
-      UPDATE content 
-      SET trending_position = ?, updated_at = ? 
-      WHERE id = ?;
-    `).run(position, now, contentId);
+    await db.run(
+      `UPDATE content SET trending_position = ?, updated_at = ? WHERE id = ?;`,
+      [position, now, contentId]
+    );
   },
 
-  deleteContent(id: string): void {
-    const db = getDatabase();
-    db.prepare('DELETE FROM content WHERE id = ?;').run(id);
+  async deleteContent(id: string): Promise<void> {
+    const db = getAdapter();
+    await db.run(`DELETE FROM content WHERE id = ?;`, [id]);
   },
 
-  deleteSeason(seasonId: string): void {
-    const db = getDatabase();
-    db.prepare('DELETE FROM seasons WHERE id = ?;').run(seasonId);
+  async deleteSeason(seasonId: string): Promise<void> {
+    const db = getAdapter();
+    await db.run(`DELETE FROM seasons WHERE id = ?;`, [seasonId]);
   },
 
-  deleteEpisode(episodeId: string): void {
-    const db = getDatabase();
-    db.prepare('DELETE FROM episodes WHERE id = ?;').run(episodeId);
+  async deleteEpisode(episodeId: string): Promise<void> {
+    const db = getAdapter();
+    await db.run(`DELETE FROM episodes WHERE id = ?;`, [episodeId]);
   },
 
-  updateSeason(seasonId: string, title: string, seasonNumber?: number): void {
-    const db = getDatabase();
+  async updateSeason(seasonId: string, title: string, seasonNumber?: number): Promise<void> {
+    const db = getAdapter();
     if (seasonNumber !== undefined) {
-      db.prepare('UPDATE seasons SET title = ?, season_number = ? WHERE id = ?;')
-        .run(title, seasonNumber, seasonId);
+      await db.run(
+        `UPDATE seasons SET title = ?, season_number = ? WHERE id = ?;`,
+        [title, seasonNumber, seasonId]
+      );
     } else {
-      db.prepare('UPDATE seasons SET title = ? WHERE id = ?;')
-        .run(title, seasonId);
+      await db.run(`UPDATE seasons SET title = ? WHERE id = ?;`, [title, seasonId]);
     }
   },
 
-  updateEpisode(episodeId: string, updates: Partial<EpisodeRecord>): void {
-    const db = getDatabase();
+  async updateEpisode(episodeId: string, updates: Partial<EpisodeRecord>): Promise<void> {
+    const db = getAdapter();
     const allowedKeys: (keyof EpisodeRecord)[] = [
-      'title', 'description', 'thumbnail', 'duration', 'duration_seconds', 'video_url', 'episode_number'
+      'title', 'description', 'thumbnail', 'duration', 'duration_seconds', 'video_url', 'episode_number',
     ];
     const setClauses: string[] = [];
     const params: (string | number | null)[] = [];
@@ -511,43 +529,48 @@ export const contentRepository = {
 
     if (setClauses.length === 0) return;
     setClauses.push('updated_at = ?');
-    params.push(new Date().toISOString());
-    params.push(episodeId);
+    params.push(new Date().toISOString(), episodeId);
 
-    const sql = `UPDATE episodes SET ${setClauses.join(', ')} WHERE id = ?;`;
-    db.prepare(sql).run(...params);
+    await db.run(
+      `UPDATE episodes SET ${setClauses.join(', ')} WHERE id = ?;`,
+      params
+    );
   },
 
-  syncGenres(contentId: string, genreIds: string[]): void {
-    const db = getDatabase();
-    db.prepare('DELETE FROM content_genres WHERE content_id = ?;').run(contentId);
-    if (genreIds.length > 0) {
-      const linkStmt = db.prepare('INSERT OR IGNORE INTO content_genres (content_id, genre_id) VALUES (?, ?);');
-      for (const gid of genreIds) {
-        linkStmt.run(contentId, gid);
-      }
+  async syncGenres(contentId: string, genreIds: string[]): Promise<void> {
+    const db = getAdapter();
+    await db.run(`DELETE FROM content_genres WHERE content_id = ?;`, [contentId]);
+    for (const gid of genreIds) {
+      await db.run(
+        `INSERT INTO content_genres (content_id, genre_id) VALUES (?, ?) ON CONFLICT DO NOTHING;`,
+        [contentId, gid]
+      );
     }
   },
 
-  getHero(): ContentRecord | null {
-    const db = getDatabase();
+  async getHero(): Promise<ContentRecord | null> {
+    const db = getAdapter();
     try {
-      // Check app_settings for home_hero_id
-      const settingRow = db.prepare('SELECT value FROM app_settings WHERE key = ?;').get('home_hero_id') as { value: string } | undefined;
-      const heroId = settingRow?.value?.trim();
+      const { rows: settingRows } = await db.query(
+        `SELECT value FROM app_settings WHERE key = 'home_hero_id';`
+      );
+      const heroId = (settingRows[0] as { value: string } | undefined)?.value?.trim();
       if (heroId) {
-        const item = contentRepository.findByIdOrSlug(heroId);
+        const item = await contentRepository.findByIdOrSlug(heroId);
         if (item && item.status === 'PUBLISHED') {
           return item;
         }
       }
 
-      // Fallback check for is_hero = 1 in content table
-      const row = db.prepare('SELECT * FROM content WHERE is_hero = 1 AND status = ? LIMIT 1;').get('PUBLISHED') as ContentRecord | undefined;
-      if (row) {
+      // Fallback: is_hero = 1
+      const { rows } = await db.query(
+        `SELECT * FROM content WHERE is_hero = 1 AND status = 'PUBLISHED' LIMIT 1;`
+      );
+      if (rows[0]) {
+        const row = rows[0] as ContentRecord;
         return {
           ...row,
-          genres: contentRepository.getGenresForContent(row.id)
+          genres: await contentRepository.getGenresForContent(row.id),
         };
       }
     } catch {
@@ -557,38 +580,35 @@ export const contentRepository = {
     return null;
   },
 
-  setHero(contentId: string | null): void {
-    const db = getDatabase();
+  async setHero(contentId: string | null): Promise<void> {
+    const db = getAdapter();
     const now = new Date().toISOString();
 
-    db.exec('BEGIN IMMEDIATE;');
-    try {
-      // Reset is_hero on all records
-      db.prepare('UPDATE content SET is_hero = 0 WHERE is_hero = 1;').run();
+    await db.transaction(async txAdapter => {
+      await txAdapter.run(
+        `UPDATE content SET is_hero = 0 WHERE is_hero = 1;`
+      );
 
       if (contentId && contentId.trim() !== '') {
         const cleanId = contentId.trim();
-        // Set is_hero = 1 on targeted content
-        db.prepare('UPDATE content SET is_hero = 1, updated_at = ? WHERE id = ? OR slug = ? COLLATE NOCASE;').run(now, cleanId, cleanId);
-
-        // Update app_settings
-        db.prepare(`
-          INSERT INTO app_settings (key, value, updated_at)
-          VALUES ('home_hero_id', ?, ?)
-          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
-        `).run(cleanId, now);
+        await txAdapter.run(
+          `UPDATE content SET is_hero = 1, updated_at = ? WHERE id = ? OR slug = ?;`,
+          [now, cleanId, cleanId]
+        );
+        await txAdapter.run(
+          `INSERT INTO app_settings (key, value, updated_at)
+           VALUES ('home_hero_id', ?, ?)
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
+          [cleanId, now]
+        );
       } else {
-        // Clear hero in app_settings
-        db.prepare(`
-          INSERT INTO app_settings (key, value, updated_at)
-          VALUES ('home_hero_id', '', ?)
-          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
-        `).run(now);
+        await txAdapter.run(
+          `INSERT INTO app_settings (key, value, updated_at)
+           VALUES ('home_hero_id', '', ?)
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
+          [now]
+        );
       }
-      db.exec('COMMIT;');
-    } catch (err) {
-      db.exec('ROLLBACK;');
-      throw err;
-    }
-  }
+    });
+  },
 };

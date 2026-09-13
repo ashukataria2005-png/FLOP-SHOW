@@ -1,5 +1,5 @@
 import { contentRepository, ContentRecord } from '../repositories/contentRepository.js';
-import { getDatabase } from '../db/connection.js';
+import { getAdapter } from '../db/adapter.js';
 
 export interface DashboardStats {
   totalUsers: number;
@@ -51,29 +51,51 @@ export interface DashboardStats {
 }
 
 export const adminService = {
-  getDashboardStats(): DashboardStats {
-    const db = getDatabase();
+  async getDashboardStats(): Promise<DashboardStats> {
+    const db = getAdapter();
 
-    const totalUsers = (db.prepare("SELECT COUNT(*) as c FROM users WHERE role = 'USER'").get() as any).c;
-    const totalMovies = (db.prepare("SELECT COUNT(*) as c FROM content WHERE type = 'MOVIE'").get() as any).c;
-    const totalSeries = (db.prepare("SELECT COUNT(*) as c FROM content WHERE type = 'SERIES'").get() as any).c;
-    const totalPublished = (db.prepare("SELECT COUNT(*) as c FROM content WHERE status = 'PUBLISHED'").get() as any).c;
-    const totalUnpublished = (db.prepare("SELECT COUNT(*) as c FROM content WHERE status != 'PUBLISHED'").get() as any).c;
-    const totalPurchases = (db.prepare("SELECT COUNT(*) as c FROM purchases WHERE status = 'COMPLETED'").get() as any).c;
-    const revenueRow = db.prepare("SELECT COALESCE(SUM(amount_paid), 0) as s FROM purchases WHERE status = 'COMPLETED'").get() as any;
-    const totalRevenueRupees = Math.round((revenueRow.s || 0) / 100);
+    const [
+      { rows: [userCountRow] },
+      { rows: [movieCountRow] },
+      { rows: [seriesCountRow] },
+      { rows: [publishedRow] },
+      { rows: [unpublishedRow] },
+      { rows: [purchasesRow] },
+      { rows: [revenueRow] },
+      { rows: [rechargeRow] },
+      { rows: [txCountRow] },
+      { rows: trending1Rows },
+      { rows: recentlyAddedRows },
+      { rows: recentPurchasesRaw },
+      { rows: recentUsersRaw },
+    ] = await Promise.all([
+      db.query("SELECT COUNT(*) as c FROM users WHERE role = 'USER'"),
+      db.query("SELECT COUNT(*) as c FROM content WHERE type = 'MOVIE'"),
+      db.query("SELECT COUNT(*) as c FROM content WHERE type = 'SERIES'"),
+      db.query("SELECT COUNT(*) as c FROM content WHERE status = 'PUBLISHED'"),
+      db.query("SELECT COUNT(*) as c FROM content WHERE status != 'PUBLISHED'"),
+      db.query("SELECT COUNT(*) as c FROM purchases WHERE status = 'COMPLETED'"),
+      db.query("SELECT COALESCE(SUM(amount_paid), 0) as s FROM purchases WHERE status = 'COMPLETED'"),
+      db.query("SELECT COALESCE(SUM(amount), 0) as s FROM wallet_transactions WHERE type = 'RECHARGE'"),
+      db.query("SELECT COUNT(*) as c FROM wallet_transactions"),
+      db.query("SELECT id, title, type, poster, backdrop, price, release_year FROM content WHERE trending_position = 1 LIMIT 1"),
+      db.query("SELECT id, title, type, status, poster, price, release_year, created_at FROM content ORDER BY created_at DESC LIMIT 6"),
+      db.query(`
+        SELECT p.id, p.amount_paid, p.purchased_at, u.name as user_name, u.email as user_email, c.title as content_title
+        FROM purchases p
+        JOIN users u ON p.user_id = u.id
+        JOIN content c ON p.content_id = c.id
+        WHERE p.status = 'COMPLETED'
+        ORDER BY p.purchased_at DESC
+        LIMIT 6
+      `),
+      db.query("SELECT id, name, email, role, status, created_at FROM users ORDER BY created_at DESC LIMIT 6"),
+    ]);
 
-    const rechargeRow = db.prepare("SELECT COALESCE(SUM(amount), 0) as s, COUNT(*) as c FROM wallet_transactions WHERE type = 'RECHARGE'").get() as any;
-    const totalRechargeRupees = Math.round((rechargeRow.s || 0) / 100);
-    const totalTransactions = (db.prepare("SELECT COUNT(*) as c FROM wallet_transactions").get() as any).c;
+    const getCount = (row: any) => Number(row?.c ?? row?.count ?? 0);
+    const getSum = (row: any) => Number(row?.s ?? row?.sum ?? 0);
 
-    const trending1Row = db.prepare(`
-      SELECT id, title, type, poster, backdrop, price, release_year
-      FROM content
-      WHERE trending_position = 1
-      LIMIT 1;
-    `).get() as any;
-
+    const trending1Row = trending1Rows[0] as any;
     const currentTrending1 = trending1Row
       ? {
           id: trending1Row.id,
@@ -82,147 +104,113 @@ export const adminService = {
           poster: trending1Row.poster,
           backdrop: trending1Row.backdrop,
           priceRupees: Math.round(trending1Row.price / 100),
-          releaseYear: trending1Row.release_year
+          releaseYear: trending1Row.release_year,
         }
       : null;
 
-    const recentlyAddedRows = db.prepare(`
-      SELECT id, title, type, status, poster, price, release_year, created_at
-      FROM content
-      ORDER BY created_at DESC
-      LIMIT 6;
-    `).all() as any[];
-
-    const recentlyAddedContent = recentlyAddedRows.map(r => ({
-      id: r.id,
-      title: r.title,
-      type: r.type,
-      status: r.status,
-      poster: r.poster,
-      priceRupees: Math.round(r.price / 100),
-      releaseYear: r.release_year,
-      createdAt: r.created_at
-    }));
-
-    const recentPurchasesRaw = db.prepare(`
-      SELECT p.id, p.amount_paid, p.purchased_at, u.name as user_name, u.email as user_email, c.title as content_title
-      FROM purchases p
-      JOIN users u ON p.user_id = u.id
-      JOIN content c ON p.content_id = c.id
-      WHERE p.status = 'COMPLETED'
-      ORDER BY p.purchased_at DESC
-      LIMIT 6;
-    `).all() as any[];
-
-    const recentPurchases = recentPurchasesRaw.map(r => ({
-      id: r.id,
-      userName: r.user_name,
-      userEmail: r.user_email,
-      contentTitle: r.content_title,
-      amountRupees: Math.round(r.amount_paid / 100),
-      purchasedAt: r.purchased_at
-    }));
-
-    const recentUsersRaw = db.prepare(`
-      SELECT id, name, email, role, status, created_at
-      FROM users
-      ORDER BY created_at DESC
-      LIMIT 6;
-    `).all() as any[];
-
-    const recentUsers = recentUsersRaw.map(u => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      status: u.status,
-      createdAt: u.created_at
-    }));
-
     return {
-      totalUsers,
-      totalMovies,
-      totalSeries,
-      totalPublished,
-      totalUnpublished,
-      totalPurchases,
-      totalRevenueRupees,
+      totalUsers: getCount(userCountRow),
+      totalMovies: getCount(movieCountRow),
+      totalSeries: getCount(seriesCountRow),
+      totalPublished: getCount(publishedRow),
+      totalUnpublished: getCount(unpublishedRow),
+      totalPurchases: getCount(purchasesRow),
+      totalRevenueRupees: Math.round(getSum(revenueRow) / 100),
       walletActivity: {
-        totalRechargeRupees,
-        totalTransactions
+        totalRechargeRupees: Math.round(getSum(rechargeRow) / 100),
+        totalTransactions: getCount(txCountRow),
       },
       currentTrending1,
-      recentlyAddedContent,
-      recentPurchases,
-      recentUsers
+      recentlyAddedContent: (recentlyAddedRows as any[]).map(r => ({
+        id: r.id,
+        title: r.title,
+        type: r.type,
+        status: r.status,
+        poster: r.poster,
+        priceRupees: Math.round(r.price / 100),
+        releaseYear: r.release_year,
+        createdAt: r.created_at,
+      })),
+      recentPurchases: (recentPurchasesRaw as any[]).map(r => ({
+        id: r.id,
+        userName: r.user_name,
+        userEmail: r.user_email,
+        contentTitle: r.content_title,
+        amountRupees: Math.round(r.amount_paid / 100),
+        purchasedAt: r.purchased_at,
+      })),
+      recentUsers: (recentUsersRaw as any[]).map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        status: u.status,
+        createdAt: u.created_at,
+      })),
     };
   },
 
-  getAllUsers(): any[] {
-    const db = getDatabase();
-    return db.prepare(`
+  async getAllUsers(): Promise<any[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(`
       SELECT 
-        u.id, 
-        u.name, 
-        u.email, 
-        u.role, 
-        u.status, 
-        u.created_at, 
+        u.id, u.name, u.email, u.role, u.status, u.created_at,
         w.balance,
         (SELECT COUNT(*) FROM purchases p WHERE p.user_id = u.id AND p.status = 'COMPLETED') as purchase_count
       FROM users u
       LEFT JOIN wallets w ON u.id = w.user_id
       ORDER BY u.created_at DESC;
-    `).all().map((u: any) => ({
+    `);
+    return (rows as any[]).map(u => ({
       ...u,
       balanceRupees: u.balance ? Math.round(u.balance / 100) : 0,
-      purchaseCount: Number(u.purchase_count || 0)
+      purchaseCount: Number(u.purchase_count ?? 0),
     }));
   },
 
-  getAllTransactions(limit: number = 100): any[] {
-    const db = getDatabase();
-    return db.prepare(`
-      SELECT wt.*, u.name as user_name, u.email as user_email
-      FROM wallet_transactions wt
-      JOIN users u ON wt.user_id = u.id
-      ORDER BY wt.created_at DESC
-      LIMIT ?;
-    `).all(limit).map((tx: any) => ({
+  async getAllTransactions(limit = 100): Promise<any[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT wt.*, u.name as user_name, u.email as user_email
+       FROM wallet_transactions wt
+       JOIN users u ON wt.user_id = u.id
+       ORDER BY wt.created_at DESC
+       LIMIT ?;`,
+      [limit]
+    );
+    return (rows as any[]).map(tx => ({
       ...tx,
       amountRupees: Math.round(tx.amount / 100),
-      balanceAfterRupees: Math.round(tx.balance_after / 100)
+      balanceAfterRupees: Math.round(tx.balance_after / 100),
     }));
   },
 
-  createContent(
-    data: {
-      type: 'MOVIE' | 'SERIES';
-      title: string;
-      slug?: string;
-      description: string;
-      poster: string;
-      backdrop: string;
-      trailerUrl?: string;
-      videoUrl?: string;
-      priceRupees: number;
-      language?: string;
-      releaseYear: number;
-      duration?: string;
-      ageRating?: string;
-      status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-      featured?: boolean;
-      trendingPosition?: number | null;
-      displayPriority?: number;
-      categoryLabel?: string;
-      tagline?: string;
-      about?: string;
-      rating?: number;
-      director?: string;
-      cast?: string[];
-      genreIds?: string[];
-    }
-  ): string {
+  async createContent(data: {
+    type: 'MOVIE' | 'SERIES';
+    title: string;
+    slug?: string;
+    description: string;
+    poster: string;
+    backdrop: string;
+    trailerUrl?: string;
+    videoUrl?: string;
+    priceRupees: number;
+    language?: string;
+    releaseYear: number;
+    duration?: string;
+    ageRating?: string;
+    status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+    featured?: boolean;
+    trendingPosition?: number | null;
+    displayPriority?: number;
+    categoryLabel?: string;
+    tagline?: string;
+    about?: string;
+    rating?: number;
+    director?: string;
+    cast?: string[];
+    genreIds?: string[];
+  }): Promise<string> {
     const slug = data.slug || data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const id = slug;
     const pricePaise = Math.round(data.priceRupees * 100);
@@ -251,20 +239,23 @@ export const adminService = {
       about: data.about || null,
       rating: data.rating || 8.0,
       director: data.director || null,
-      cast_json: JSON.stringify(data.cast || [])
+      cast_json: JSON.stringify(data.cast || []),
     };
 
-    contentRepository.createContent(record, data.genreIds || []);
+    await contentRepository.createContent(record, data.genreIds || []);
 
     if (data.trendingPosition) {
-      contentRepository.setTrendingPosition(id, data.trendingPosition);
+      await contentRepository.setTrendingPosition(id, data.trendingPosition);
     }
 
     return id;
   },
 
-  updateContent(id: string, updates: Partial<ContentRecord> & { genreIds?: string[]; priceRupees?: number } & Record<string, any>): void {
-    const existing = contentRepository.findByIdOrSlug(id);
+  async updateContent(
+    id: string,
+    updates: Partial<ContentRecord> & { genreIds?: string[]; priceRupees?: number } & Record<string, any>
+  ): Promise<void> {
+    const existing = await contentRepository.findByIdOrSlug(id);
     if (!existing) {
       const err = new Error('Content not found.');
       (err as any).statusCode = 404;
@@ -273,7 +264,7 @@ export const adminService = {
 
     const anyUpdates = updates as Record<string, any>;
 
-    // Map Poster & Backdrop (supports posterUrl, poster_url, backdropUrl, backdrop_url)
+    // Map Poster & Backdrop field aliases
     if (updates.poster === undefined) {
       if (anyUpdates.posterUrl !== undefined) updates.poster = anyUpdates.posterUrl;
       else if (anyUpdates.poster_url !== undefined) updates.poster = anyUpdates.poster_url;
@@ -283,7 +274,6 @@ export const adminService = {
       else if (anyUpdates.backdrop_url !== undefined) updates.backdrop = anyUpdates.backdrop_url;
     }
 
-    // Map other frontend field aliases if present
     if (updates.trailer_url === undefined && anyUpdates.trailerUrl !== undefined) {
       updates.trailer_url = anyUpdates.trailerUrl;
     }
@@ -310,103 +300,91 @@ export const adminService = {
       updates.price = Math.round(updates.priceRupees * 100);
     }
 
-    contentRepository.updateContent(existing.id, updates);
+    await contentRepository.updateContent(existing.id, updates);
 
     if (updates.trending_position !== undefined) {
-      contentRepository.setTrendingPosition(existing.id, updates.trending_position);
+      await contentRepository.setTrendingPosition(existing.id, updates.trending_position);
     }
 
     if (updates.genreIds && Array.isArray(updates.genreIds)) {
-      contentRepository.syncGenres(existing.id, updates.genreIds);
+      await contentRepository.syncGenres(existing.id, updates.genreIds);
     }
   },
 
-  setTrendingPosition(id: string, position: number | null): void {
-    const existing = contentRepository.findByIdOrSlug(id);
+  async setTrendingPosition(id: string, position: number | null): Promise<void> {
+    const existing = await contentRepository.findByIdOrSlug(id);
     if (!existing) {
       const err = new Error('Content not found.');
       (err as any).statusCode = 404;
       throw err;
     }
-
-    contentRepository.setTrendingPosition(existing.id, position);
+    await contentRepository.setTrendingPosition(existing.id, position);
   },
 
-  deleteContent(id: string): void {
-    const existing = contentRepository.findByIdOrSlug(id);
+  async deleteContent(id: string): Promise<void> {
+    const existing = await contentRepository.findByIdOrSlug(id);
     if (!existing) {
       const err = new Error('Content not found.');
       (err as any).statusCode = 404;
       throw err;
     }
-
-    contentRepository.deleteContent(existing.id);
+    await contentRepository.deleteContent(existing.id);
   },
 
-  updateStatus(id: string, status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'): void {
-    const existing = contentRepository.findByIdOrSlug(id);
+  async updateStatus(id: string, status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'): Promise<void> {
+    const existing = await contentRepository.findByIdOrSlug(id);
     if (!existing) {
       const err = new Error('Content not found.');
       (err as any).statusCode = 404;
       throw err;
     }
-
-    contentRepository.updateStatus(existing.id, status);
+    await contentRepository.updateStatus(existing.id, status);
   },
 
-  updatePrice(id: string, priceRupees: number): void {
-    const existing = contentRepository.findByIdOrSlug(id);
+  async updatePrice(id: string, priceRupees: number): Promise<void> {
+    const existing = await contentRepository.findByIdOrSlug(id);
     if (!existing) {
       const err = new Error('Content not found.');
       (err as any).statusCode = 404;
       throw err;
     }
-
     if (priceRupees < 0) {
       const err = new Error('Price cannot be negative.');
       (err as any).statusCode = 400;
       throw err;
     }
-
-    const pricePaise = Math.round(priceRupees * 100);
-    contentRepository.updatePrice(existing.id, pricePaise);
+    await contentRepository.updatePrice(existing.id, Math.round(priceRupees * 100));
   },
 
-  createGenre(name: string, slug?: string): string {
+  async createGenre(name: string, slug?: string): Promise<string> {
     const cleanName = name.trim();
     const cleanSlug = (slug || cleanName).toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const id = `genre-${cleanSlug}`;
-    contentRepository.createGenre(id, cleanName, cleanSlug);
+    await contentRepository.createGenre(id, cleanName, cleanSlug);
     return id;
   },
 
-  createSeason(contentId: string, seasonNumber: number, title: string): string {
-    const existing = contentRepository.findByIdOrSlug(contentId);
+  async createSeason(contentId: string, seasonNumber: number, title: string): Promise<string> {
+    const existing = await contentRepository.findByIdOrSlug(contentId);
     if (!existing) {
       const err = new Error('Content not found.');
       (err as any).statusCode = 404;
       throw err;
     }
-
     const seasonId = `${existing.id}-s${seasonNumber}`;
-    contentRepository.createSeason({
-      id: seasonId,
-      contentId: existing.id,
-      seasonNumber,
-      title
-    });
+    await contentRepository.createSeason({ id: seasonId, contentId: existing.id, seasonNumber, title });
     return seasonId;
   },
 
-  updateSeason(seasonId: string, title: string, seasonNumber?: number): void {
-    contentRepository.updateSeason(seasonId, title, seasonNumber);
+  async updateSeason(seasonId: string, title: string, seasonNumber?: number): Promise<void> {
+    await contentRepository.updateSeason(seasonId, title, seasonNumber);
   },
 
-  deleteSeason(seasonId: string): void {
-    contentRepository.deleteSeason(seasonId);
+  async deleteSeason(seasonId: string): Promise<void> {
+    await contentRepository.deleteSeason(seasonId);
   },
 
-  createEpisode(
+  async createEpisode(
     seasonId: string,
     episode: {
       episodeNumber: number;
@@ -417,9 +395,9 @@ export const adminService = {
       durationSeconds?: number;
       videoUrl: string;
     }
-  ): string {
+  ): Promise<string> {
     const id = `${seasonId}-e${episode.episodeNumber}`;
-    contentRepository.createEpisode({
+    await contentRepository.createEpisode({
       id,
       seasonId,
       episodeNumber: episode.episodeNumber,
@@ -428,31 +406,33 @@ export const adminService = {
       thumbnail: episode.thumbnail,
       duration: episode.duration,
       durationSeconds: episode.durationSeconds,
-      videoUrl: episode.videoUrl
+      videoUrl: episode.videoUrl,
     });
     return id;
   },
 
-  updateEpisode(episodeId: string, updates: any): void {
-    contentRepository.updateEpisode(episodeId, updates);
+  async updateEpisode(episodeId: string, updates: any): Promise<void> {
+    await contentRepository.updateEpisode(episodeId, updates);
   },
 
-  deleteEpisode(episodeId: string): void {
-    contentRepository.deleteEpisode(episodeId);
+  async deleteEpisode(episodeId: string): Promise<void> {
+    await contentRepository.deleteEpisode(episodeId);
   },
 
-  listAllContent(filters: {
-    status?: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'ALL';
-    type?: 'MOVIE' | 'SERIES';
-    genreSlug?: string;
-    featured?: boolean;
-    trendingOnly?: boolean;
-    search?: string;
-    sortBy?: 'newest' | 'oldest' | 'title' | 'price_asc' | 'price_desc' | 'featured' | 'priority';
-    limit?: number;
-    offset?: number;
-  } = {}): any[] {
-    const rawItems = contentRepository.list(filters);
+  async listAllContent(
+    filters: {
+      status?: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'ALL';
+      type?: 'MOVIE' | 'SERIES';
+      genreSlug?: string;
+      featured?: boolean;
+      trendingOnly?: boolean;
+      search?: string;
+      sortBy?: 'newest' | 'oldest' | 'title' | 'price_asc' | 'price_desc' | 'featured' | 'priority';
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<any[]> {
+    const rawItems = await contentRepository.list(filters);
     return rawItems.map(item => ({
       ...item,
       priceRupees: Math.round(item.price / 100),
@@ -462,130 +442,113 @@ export const adminService = {
       posterUrl: item.poster,
       backdropUrl: item.backdrop,
       trailerUrl: item.trailer_url,
-      videoUrl: item.video_url
+      videoUrl: item.video_url,
     }));
   },
 
-  updateUserStatus(userId: string, status: 'ACTIVE' | 'SUSPENDED'): void {
-    const db = getDatabase();
-    const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
-    if (!existing) {
+  async updateUserStatus(userId: string, status: 'ACTIVE' | 'SUSPENDED'): Promise<void> {
+    const db = getAdapter();
+    const { rows } = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
+    if (!rows[0]) {
       const err = new Error('User not found.');
       (err as any).statusCode = 404;
       throw err;
     }
-    db.prepare('UPDATE users SET status = ?, updated_at = ? WHERE id = ?')
-      .run(status, new Date().toISOString(), userId);
+    await db.run('UPDATE users SET status = ?, updated_at = ? WHERE id = ?', [
+      status,
+      new Date().toISOString(),
+      userId,
+    ]);
   },
 
-  getUserPurchases(userId: string): any[] {
-    const db = getDatabase();
-    return db.prepare(`
-      SELECT 
-        p.id, 
-        p.amount_paid, 
-        p.status, 
-        p.purchased_at, 
-        c.id as content_id, 
-        c.title as content_title, 
-        c.type as content_type, 
-        c.poster as content_poster
-      FROM purchases p
-      JOIN content c ON p.content_id = c.id
-      WHERE p.user_id = ?
-      ORDER BY p.purchased_at DESC;
-    `).all(userId).map((r: any) => ({
-      ...r,
-      amountRupees: Math.round(r.amount_paid / 100)
-    }));
+  async getUserPurchases(userId: string): Promise<any[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT p.id, p.amount_paid, p.status, p.purchased_at,
+              c.id as content_id, c.title as content_title, c.type as content_type, c.poster as content_poster
+       FROM purchases p
+       JOIN content c ON p.content_id = c.id
+       WHERE p.user_id = ?
+       ORDER BY p.purchased_at DESC;`,
+      [userId]
+    );
+    return (rows as any[]).map(r => ({ ...r, amountRupees: Math.round(r.amount_paid / 100) }));
   },
 
-  getUserTransactions(userId: string): any[] {
-    const db = getDatabase();
-    return db.prepare(`
-      SELECT *
-      FROM wallet_transactions
-      WHERE user_id = ?
-      ORDER BY created_at DESC;
-    `).all(userId).map((tx: any) => ({
+  async getUserTransactions(userId: string): Promise<any[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC;`,
+      [userId]
+    );
+    return (rows as any[]).map(tx => ({
       ...tx,
       amountRupees: Math.round(tx.amount / 100),
-      balanceAfterRupees: Math.round(tx.balance_after / 100)
+      balanceAfterRupees: Math.round(tx.balance_after / 100),
     }));
   },
 
-  getAllPurchases(limit: number = 100, offset: number = 0): any[] {
-    const db = getDatabase();
-    return db.prepare(`
-      SELECT 
-        p.id,
-        p.user_id,
-        p.content_id,
-        p.amount_paid,
-        p.status,
-        p.purchased_at,
-        u.name as user_name,
-        u.email as user_email,
-        c.title as content_title,
-        c.type as content_type,
-        c.poster as content_poster
-      FROM purchases p
-      JOIN users u ON p.user_id = u.id
-      JOIN content c ON p.content_id = c.id
-      ORDER BY p.purchased_at DESC
-      LIMIT ? OFFSET ?;
-    `).all(limit, offset).map((r: any) => ({
-      ...r,
-      amountRupees: Math.round(r.amount_paid / 100)
-    }));
+  async getAllPurchases(limit = 100, offset = 0): Promise<any[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT p.id, p.user_id, p.content_id, p.amount_paid, p.status, p.purchased_at,
+              u.name as user_name, u.email as user_email,
+              c.title as content_title, c.type as content_type, c.poster as content_poster
+       FROM purchases p
+       JOIN users u ON p.user_id = u.id
+       JOIN content c ON p.content_id = c.id
+       ORDER BY p.purchased_at DESC
+       LIMIT ? OFFSET ?;`,
+      [limit, offset]
+    );
+    return (rows as any[]).map(r => ({ ...r, amountRupees: Math.round(r.amount_paid / 100) }));
   },
 
-  getAllGenresWithCounts(): any[] {
+  async getAllGenresWithCounts(): Promise<any[]> {
     return contentRepository.getGenresWithCounts();
   },
 
-  updateGenre(id: string, name: string, slug?: string): void {
-    contentRepository.updateGenre(id, name, slug);
+  async updateGenre(id: string, name: string, slug?: string): Promise<void> {
+    await contentRepository.updateGenre(id, name, slug);
   },
 
-  deleteGenre(id: string): void {
-    contentRepository.deleteGenre(id);
+  async deleteGenre(id: string): Promise<void> {
+    await contentRepository.deleteGenre(id);
   },
 
-  getSettings(): Record<string, string> {
-    const db = getDatabase();
-    const rows = db.prepare('SELECT key, value FROM app_settings;').all() as Array<{ key: string; value: string }>;
+  async getSettings(): Promise<Record<string, string>> {
+    const db = getAdapter();
+    const { rows } = await db.query('SELECT key, value FROM app_settings;');
     const result: Record<string, string> = {};
-    for (const r of rows) {
+    for (const r of rows as { key: string; value: string }[]) {
       result[r.key] = r.value;
     }
     return result;
   },
 
-  updateSettings(settings: Record<string, string>): void {
-    const db = getDatabase();
+  async updateSettings(settings: Record<string, string>): Promise<void> {
+    const db = getAdapter();
     const now = new Date().toISOString();
-    const stmt = db.prepare(`
-      INSERT INTO app_settings (key, value, updated_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
-    `);
-
     for (const [key, value] of Object.entries(settings)) {
-      stmt.run(key, String(value), now);
+      await db.run(
+        `INSERT INTO app_settings (key, value, updated_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
+        [key, String(value), now]
+      );
     }
   },
 
-  getHero(): ContentRecord | null {
+  async getHero(): Promise<ContentRecord | null> {
     return contentRepository.getHero();
   },
 
-  setHero(contentId: string | null): void {
-    contentRepository.setHero(contentId);
+  async setHero(contentId: string | null): Promise<void> {
+    await contentRepository.setHero(contentId);
   },
 
-  getAdsConfig() {
-    const settings = this.getSettings();
+  async getAdsConfig() {
+    const settings = await this.getSettings();
     return {
       enabled: settings.ad_enabled === 'true',
       type: ((settings.ad_type || 'IMAGE').toUpperCase() === 'VIDEO' ? 'VIDEO' : 'IMAGE') as 'IMAGE' | 'VIDEO',
@@ -594,11 +557,11 @@ export const adminService = {
       skipEnabled: settings.ad_skip_enabled !== 'false',
       skipAfterSeconds: parseInt(settings.ad_skip_after_seconds || '5', 10) || 5,
       title: settings.ad_title || 'Advertisement',
-      clickUrl: settings.ad_click_url || ''
+      clickUrl: settings.ad_click_url || '',
     };
   },
 
-  updateAdsConfig(config: {
+  async updateAdsConfig(cfg: {
     enabled?: boolean;
     type?: 'IMAGE' | 'VIDEO';
     mediaUrl?: string;
@@ -609,17 +572,16 @@ export const adminService = {
     clickUrl?: string;
   }) {
     const toUpdate: Record<string, string> = {};
-    if (config.enabled !== undefined) toUpdate.ad_enabled = String(config.enabled);
-    if (config.type !== undefined) toUpdate.ad_type = String(config.type);
-    if (config.mediaUrl !== undefined) toUpdate.ad_media_url = String(config.mediaUrl);
-    if (config.durationSeconds !== undefined) toUpdate.ad_duration_seconds = String(config.durationSeconds);
-    if (config.skipEnabled !== undefined) toUpdate.ad_skip_enabled = String(config.skipEnabled);
-    if (config.skipAfterSeconds !== undefined) toUpdate.ad_skip_after_seconds = String(config.skipAfterSeconds);
-    if (config.title !== undefined) toUpdate.ad_title = String(config.title);
-    if (config.clickUrl !== undefined) toUpdate.ad_click_url = String(config.clickUrl);
+    if (cfg.enabled !== undefined) toUpdate.ad_enabled = String(cfg.enabled);
+    if (cfg.type !== undefined) toUpdate.ad_type = String(cfg.type);
+    if (cfg.mediaUrl !== undefined) toUpdate.ad_media_url = String(cfg.mediaUrl);
+    if (cfg.durationSeconds !== undefined) toUpdate.ad_duration_seconds = String(cfg.durationSeconds);
+    if (cfg.skipEnabled !== undefined) toUpdate.ad_skip_enabled = String(cfg.skipEnabled);
+    if (cfg.skipAfterSeconds !== undefined) toUpdate.ad_skip_after_seconds = String(cfg.skipAfterSeconds);
+    if (cfg.title !== undefined) toUpdate.ad_title = String(cfg.title);
+    if (cfg.clickUrl !== undefined) toUpdate.ad_click_url = String(cfg.clickUrl);
 
-    this.updateSettings(toUpdate);
+    await this.updateSettings(toUpdate);
     return this.getAdsConfig();
-  }
+  },
 };
-

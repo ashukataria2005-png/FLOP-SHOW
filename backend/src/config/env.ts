@@ -34,6 +34,14 @@ const defaultUploadDir = fs.existsSync(path.resolve(process.cwd(), 'backend', 'u
   ? path.resolve(process.cwd(), 'backend', 'uploads')
   : path.resolve(process.cwd(), 'uploads');
 
+// Database configuration
+// Local: SQLite file path (default)
+// Production: PostgreSQL connection URL (e.g. Supabase, Neon, Render Postgres)
+const rawDatabaseUrl = process.env.DATABASE_URL?.trim() || '';
+const isPostgres = Boolean(
+  rawDatabaseUrl && (rawDatabaseUrl.startsWith('postgres://') || rawDatabaseUrl.startsWith('postgresql://'))
+);
+
 export const config = {
   port,
   host: process.env.HOST || '0.0.0.0',
@@ -41,6 +49,10 @@ export const config = {
   isProd,
   frontendUrl: process.env.FRONTEND_URL || process.env.CLIENT_ORIGIN || 'https://flop-show.netlify.app',
   allowedOrigins,
+  // Database configuration
+  databaseUrl: rawDatabaseUrl,
+  isPostgres,
+  databaseType: isPostgres ? ('postgres' as const) : ('sqlite' as const),
   databasePath: process.env.DATABASE_PATH
     ? path.resolve(process.cwd(), process.env.DATABASE_PATH)
     : path.resolve(process.cwd(), 'backend', 'data', 'flopshow.db'),

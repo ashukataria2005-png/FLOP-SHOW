@@ -1,5 +1,5 @@
 import { createServer } from './server.js';
-import { runMigrations } from './db/migrator.js';
+import { runMigrationsAsync } from './db/migrator.js';
 import { config } from './config/env.js';
 
 async function start() {
@@ -7,11 +7,12 @@ async function start() {
     console.log('------------------------------------------------------------');
     console.log('Starting FLOPSHOW Backend Services...');
     console.log(`Environment: ${config.nodeEnv}`);
-    console.log(`Database: ${config.databasePath}`);
+    console.log(`Database Mode: ${config.databaseType.toUpperCase()}${config.isPostgres ? ' (PostgreSQL via DATABASE_URL)' : ' (Local SQLite active)'}`);
+    if (!config.isPostgres) console.log(`SQLite Path: ${config.databasePath}`);
     console.log('------------------------------------------------------------');
 
-    // Run schema migrations automatically on startup
-    const migrationResult = runMigrations();
+    // Run schema migrations automatically on startup (async for both SQLite and PostgreSQL)
+    const migrationResult = await runMigrationsAsync();
     console.log(`Migrations check: ${migrationResult.applied.length} applied (${migrationResult.total} total)`);
 
     const app = createServer();

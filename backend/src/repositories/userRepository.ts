@@ -1,4 +1,4 @@
-import { getDatabase } from '../db/connection.js';
+import { getAdapter } from '../db/adapter.js';
 
 export interface UserRecord {
   id: string;
@@ -12,7 +12,7 @@ export interface UserRecord {
 }
 
 export const userRepository = {
-  create(user: {
+  async create(user: {
     id: string;
     name: string;
     email: string;
@@ -20,50 +20,45 @@ export const userRepository = {
     role?: 'USER' | 'ADMIN';
     status?: 'ACTIVE' | 'SUSPENDED' | 'PENDING';
     now: string;
-  }): void {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      INSERT INTO users (
-        id, name, email, password_hash, role, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-    `);
-    stmt.run(
-      user.id,
-      user.name,
-      user.email.toLowerCase().trim(),
-      user.passwordHash,
-      user.role || 'USER',
-      user.status || 'ACTIVE',
-      user.now,
-      user.now
+  }): Promise<void> {
+    const db = getAdapter();
+    await db.run(
+      `INSERT INTO users (id, name, email, password_hash, role, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      [
+        user.id,
+        user.name,
+        user.email.toLowerCase().trim(),
+        user.passwordHash,
+        user.role || 'USER',
+        user.status || 'ACTIVE',
+        user.now,
+        user.now,
+      ]
     );
   },
 
-  findByEmail(email: string): UserRecord | null {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      SELECT * FROM users WHERE email = ? COLLATE NOCASE;
-    `);
-    const row = stmt.get(email.toLowerCase().trim()) as UserRecord | undefined;
-    return row || null;
+  async findByEmail(email: string): Promise<UserRecord | null> {
+    const db = getAdapter();
+    // COLLATE NOCASE is SQLite-specific; on PostgreSQL, email is CITEXT (case-insensitive already)
+    const { rows } = await db.query(
+      `SELECT * FROM users WHERE email = ?;`,
+      [email.toLowerCase().trim()]
+    );
+    return (rows[0] as UserRecord) || null;
   },
 
-  findById(id: string): UserRecord | null {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      SELECT * FROM users WHERE id = ?;
-    `);
-    const row = stmt.get(id) as UserRecord | undefined;
-    return row || null;
+  async findById(id: string): Promise<UserRecord | null> {
+    const db = getAdapter();
+    const { rows } = await db.query(`SELECT * FROM users WHERE id = ?;`, [id]);
+    return (rows[0] as UserRecord) || null;
   },
 
-  updateProfile(id: string, name: string, now: string): void {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      UPDATE users
-      SET name = ?, updated_at = ?
-      WHERE id = ?;
-    `);
-    stmt.run(name, now, id);
-  }
+  async updateProfile(id: string, name: string, now: string): Promise<void> {
+    const db = getAdapter();
+    await db.run(
+      `UPDATE users SET name = ?, updated_at = ? WHERE id = ?;`,
+      [name, now, id]
+    );
+  },
 };

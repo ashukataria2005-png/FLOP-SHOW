@@ -16,39 +16,57 @@ for (const dir of [uploadBaseDir, videosDir, imagesDir]) {
   }
 }
 
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm', '.mov', '.mkv', '.ogg', '.ogv', '.3gp', '.3g2', '.avi', '.ts', '.flv']);
+const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif', '.svg', '.bmp']);
+
+export function isVideoFile(file: Express.Multer.File): boolean {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const rawMime = (file.mimetype || '').toLowerCase().split(';')[0].trim();
+  return (
+    rawMime.startsWith('video/') ||
+    VIDEO_EXTENSIONS.has(ext) ||
+    rawMime === 'application/x-mpegurl' ||
+    rawMime === 'application/vnd.apple.mpegurl'
+  );
+}
+
+export function isImageFile(file: Express.Multer.File): boolean {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const rawMime = (file.mimetype || '').toLowerCase().split(';')[0].trim();
+  return (
+    rawMime.startsWith('image/') ||
+    IMAGE_EXTENSIONS.has(ext)
+  );
+}
+
 // Storage configuration with sanitized UUID filenames
 const storage = multer.diskStorage({
   destination: (_req: Request, file: Express.Multer.File, cb) => {
-    if (file.mimetype.startsWith('video/')) {
+    if (isVideoFile(file)) {
       cb(null, videosDir);
     } else {
       cb(null, imagesDir);
     }
   },
   filename: (_req: Request, file: Express.Multer.File, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase().replace(/[^a-z0-9.]/g, '');
-    const safeExt = ext || (file.mimetype.startsWith('video/') ? '.mp4' : '.jpg');
+    const rawExt = path.extname(file.originalname || '').toLowerCase().replace(/[^a-z0-9.]/g, '');
+    const isVid = isVideoFile(file);
+    const defaultExt = isVid ? '.mp4' : '.jpg';
+    const safeExt = rawExt || defaultExt;
     const uniqueName = `${crypto.randomUUID()}${safeExt}`;
     cb(null, uniqueName);
   }
 });
 
-// File filter validating mime types and extensions
+// File filter validating mime types and extensions for both mobile & desktop
 const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowedMimeTypes = [
-    // Videos
-    'video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska', 'video/ogg',
-    // Images
-    'image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif'
-  ];
+  const isVid = isVideoFile(file);
+  const isImg = isImageFile(file);
 
-  const allowedExts = ['.mp4', '.webm', '.mov', '.mkv', '.ogg', '.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif'];
-  const ext = path.extname(file.originalname).toLowerCase();
-
-  if (allowedMimeTypes.includes(file.mimetype) || allowedExts.includes(ext)) {
+  if (isVid || isImg) {
     cb(null, true);
   } else {
-    cb(new Error(`Unsupported file type (${file.mimetype}). Allowed: MP4, WebM, MOV, MKV, JPG, PNG, WebP.`));
+    cb(new Error(`Unsupported file type "${file.mimetype || file.originalname}". Supported videos: MP4, WebM, MOV, MKV, 3GP, OGG. Supported images: JPG, PNG, WebP, AVIF.`));
   }
 };
 
@@ -56,6 +74,7 @@ export const uploadMediaMiddleware = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 500 * 1024 * 1024 // 500MB max limit for local dev uploads
+    fileSize: 1024 * 1024 * 1024, // 1GB max limit for video & media uploads
+    files: 1
   }
 });

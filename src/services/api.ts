@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { ContentItem, Season, Episode } from '../types/content';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 /**
  * Backend API Base URL Configuration:
@@ -105,49 +106,49 @@ export function adaptDbContentToFrontend(item: any): ContentItem {
   }
 
   const seasons: Season[] = (item.seasons || []).map((s: any) => ({
-    seasonNumber: s.season_number,
+    seasonNumber: s.season_number ?? s.seasonNumber,
     title: s.title,
     episodes: (s.episodes || []).map((e: any): Episode => ({
       id: e.id,
       seriesId: item.id,
-      seasonNumber: s.season_number,
-      episodeNumber: e.episode_number,
+      seasonNumber: s.season_number ?? s.seasonNumber,
+      episodeNumber: e.episode_number ?? e.episodeNumber,
       title: e.title,
       duration: e.duration || '45m',
-      durationSeconds: e.duration_seconds || 0,
-      thumbnailUrl: e.thumbnail || item.poster,
-      videoUrl: e.video_url,
-      synopsis: e.description || ''
+      durationSeconds: e.duration_seconds ?? e.durationSeconds ?? 0,
+      thumbnailUrl: e.thumbnail || e.thumbnail_url || e.thumbnailUrl || item.poster || item.posterUrl,
+      videoUrl: resolveMediaUrl(e.video_url || e.videoUrl || '', API_BASE_URL),
+      synopsis: e.description || e.synopsis || ''
     }))
   }));
 
-  const priceRupees = item.price ? Math.round(item.price / 100) : 0;
+  const priceRupees = item.price ? Math.round(item.price / 100) : (item.priceRupees ?? 0);
 
   return {
     id: item.id,
     title: item.title,
     type: item.type ? (item.type.toLowerCase() as 'movie' | 'series') : 'movie',
-    backdropUrl: item.backdrop || item.backdropUrl,
-    posterUrl: item.poster || item.posterUrl,
+    backdropUrl: item.backdrop || item.backdropUrl || item.backdrop_url,
+    posterUrl: item.poster || item.posterUrl || item.poster_url,
     tagline: item.tagline,
     description: item.description,
     about: item.about || item.description,
     rating: Number(item.rating || 8.0),
     releaseYear: Number(item.release_year || item.releaseYear || 2025),
-    runtime: item.duration || undefined,
-    seasonsCount: seasons.length > 0 ? seasons.length : (item.seasonsCount || undefined),
+    runtime: item.duration || item.runtime || undefined,
+    seasonsCount: seasons.length > 0 ? seasons.length : (item.seasonsCount || item.seasons_count || undefined),
     language: item.language || 'Hindi',
     genres: item.genres || [],
     price: priceRupees,
     isFree: priceRupees === 0,
-    isFeatured: Boolean(item.featured),
-    isHero: Boolean(item.is_hero),
+    isFeatured: Boolean(item.featured ?? item.isFeatured),
+    isHero: Boolean(item.is_hero ?? item.isHero),
     director: item.director || undefined,
     cast,
-    trailerUrl: item.trailer_url || item.trailerUrl,
-    videoUrl: item.video_url || item.videoUrl,
-    trendingPosition: item.trending_position !== null && item.trending_position !== undefined ? Number(item.trending_position) : undefined,
-    displayPriority: item.display_priority !== null && item.display_priority !== undefined ? Number(item.display_priority) : undefined,
+    trailerUrl: resolveMediaUrl(item.trailer_url || item.trailerUrl, API_BASE_URL) || undefined,
+    videoUrl: resolveMediaUrl(item.video_url || item.videoUrl, API_BASE_URL) || undefined,
+    trendingPosition: item.trending_position !== null && item.trending_position !== undefined ? Number(item.trending_position) : (item.trendingPosition !== undefined ? Number(item.trendingPosition) : undefined),
+    displayPriority: item.display_priority !== null && item.display_priority !== undefined ? Number(item.display_priority) : (item.displayPriority !== undefined ? Number(item.displayPriority) : undefined),
     seasons: seasons.length > 0 ? seasons : undefined
   };
 }
@@ -375,7 +376,7 @@ export const api = {
   // --------------------------------------------------------------------------
   media: {
     async getContentMedia(contentId: string, mediaType: 'MAIN' | 'TRAILER' = 'MAIN') {
-      return request<{
+      const res = await request<{
         mediaId?: string;
         mediaType: 'MAIN' | 'TRAILER';
         sourceType: 'UPLOAD' | 'DIRECT_URL' | 'YOUTUBE';
@@ -386,10 +387,14 @@ export const api = {
         poster?: string;
         authorized: boolean;
       }>(`/media/content/${contentId}?type=${mediaType}`);
+      if (res && res.url) {
+        res.url = resolveMediaUrl(res.url, API_BASE_URL);
+      }
+      return res;
     },
 
     async getEpisodeMedia(episodeId: string, mediaType: 'MAIN' | 'TRAILER' = 'MAIN') {
-      return request<{
+      const res = await request<{
         mediaId?: string;
         mediaType: 'MAIN' | 'TRAILER';
         sourceType: 'UPLOAD' | 'DIRECT_URL' | 'YOUTUBE';
@@ -400,6 +405,10 @@ export const api = {
         poster?: string;
         authorized: boolean;
       }>(`/media/episode/${episodeId}?type=${mediaType}`);
+      if (res && res.url) {
+        res.url = resolveMediaUrl(res.url, API_BASE_URL);
+      }
+      return res;
     }
   },
 
@@ -481,20 +490,70 @@ export const api = {
       return request<{ count: number; transactions: any[] }>(`/admin/transactions?limit=${limit}`);
     },
 
-    async uploadFile(file: File) {
-      const formData = new FormData();
-      formData.append('file', file);
-      const token = tokenStorage.get();
-      const res = await fetch(`${API_BASE_URL}/admin/upload`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData
+    async uploadFile(
+      file: File,
+      onProgress?: (percent: number) => void
+    ): Promise<{ success: boolean; url: string; filename: string; mimeType: string; size: number }> {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const url = `${API_BASE_URL}/admin/upload`;
+
+        xhr.open('POST', url, true);
+        xhr.timeout = 10 * 60 * 1000; // 10 minutes timeout for large video uploads
+
+        const token = tokenStorage.get();
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
+
+        if (xhr.upload && onProgress) {
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percent = Math.min(100, Math.round((event.loaded / event.total) * 100));
+              onProgress(percent);
+            }
+          };
+        }
+
+        xhr.onload = () => {
+          let data: any = {};
+          try {
+            data = JSON.parse(xhr.responseText);
+          } catch {
+            data = {
+              error: {
+                message: xhr.status === 413
+                  ? 'Video file size exceeds the allowed limit (1GB). Please select a compressed file.'
+                  : `Server responded with status ${xhr.status}.`
+              }
+            };
+          }
+
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const rawUrl = data.url || '';
+            const resolvedUrl = resolveMediaUrl(rawUrl, API_BASE_URL);
+            resolve({
+              ...data,
+              url: resolvedUrl || rawUrl
+            });
+          } else {
+            const errMsg = data?.error?.message || `Upload failed with status ${xhr.status}.`;
+            reject(new Error(errMsg));
+          }
+        };
+
+        xhr.onerror = () => {
+          reject(new Error('Network error during upload. Please verify your connection to the server.'));
+        };
+
+        xhr.ontimeout = () => {
+          reject(new Error('Upload timed out. The file may be too large for your connection speed.'));
+        };
+
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+        xhr.send(formData);
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.error?.message || 'Upload failed.');
-      }
-      return data as { success: boolean; url: string; filename: string; mimeType: string; size: number };
     },
 
     async createContent(contentData: any) {

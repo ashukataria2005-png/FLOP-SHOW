@@ -6,11 +6,11 @@ export const mediaRouter = Router();
 
 // GET /api/media/content/:contentId
 // Optional auth allows public trailers, but enforces ownership for main content
-mediaRouter.get('/content/:contentId', optionalAuth, (req: AuthenticatedRequest, res: Response, next) => {
+mediaRouter.get('/content/:contentId', optionalAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const mediaType = (req.query.type as 'MAIN' | 'TRAILER') || 'MAIN';
     const userId = req.user?.id;
-    const result = mediaService.getPlayableContentMedia(req.params.contentId, mediaType, userId);
+    const result = await mediaService.getPlayableContentMedia(req.params.contentId, mediaType, userId);
     res.json(result);
   } catch (err) {
     next(err);
@@ -18,11 +18,11 @@ mediaRouter.get('/content/:contentId', optionalAuth, (req: AuthenticatedRequest,
 });
 
 // GET /api/media/episode/:episodeId
-mediaRouter.get('/episode/:episodeId', optionalAuth, (req: AuthenticatedRequest, res: Response, next) => {
+mediaRouter.get('/episode/:episodeId', optionalAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const mediaType = (req.query.type as 'MAIN' | 'TRAILER') || 'MAIN';
     const userId = req.user?.id;
-    const result = mediaService.getPlayableEpisodeMedia(req.params.episodeId, mediaType, userId);
+    const result = await mediaService.getPlayableEpisodeMedia(req.params.episodeId, mediaType, userId);
     res.json(result);
   } catch (err) {
     next(err);

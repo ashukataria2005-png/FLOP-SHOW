@@ -8,9 +8,9 @@ export const walletRouter = Router();
 walletRouter.use(requireAuth);
 
 // GET /api/wallet/balance
-walletRouter.get('/balance', (req: AuthenticatedRequest, res: Response, next) => {
+walletRouter.get('/balance', async (req: AuthenticatedRequest, res: Response, next) => {
   try {
-    const summary = walletService.getBalance(req.user!.id);
+    const summary = await walletService.getBalance(req.user!.id);
     res.json(summary);
   } catch (err) {
     next(err);
@@ -18,10 +18,10 @@ walletRouter.get('/balance', (req: AuthenticatedRequest, res: Response, next) =>
 });
 
 // GET /api/wallet/transactions
-walletRouter.get('/transactions', (req: AuthenticatedRequest, res: Response, next) => {
+walletRouter.get('/transactions', async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
-    const transactions = walletService.getTransactions(req.user!.id, limit);
+    const transactions = await walletService.getTransactions(req.user!.id, limit);
     res.json({ count: transactions.length, transactions });
   } catch (err) {
     next(err);
@@ -30,25 +30,22 @@ walletRouter.get('/transactions', (req: AuthenticatedRequest, res: Response, nex
 
 // POST /api/wallet/recharge
 // Simulated recharge structure for Phase 2; prepared for real payment gateway webhook integration
-walletRouter.post('/recharge', (req: AuthenticatedRequest, res: Response, next) => {
+walletRouter.post('/recharge', async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { amount, referenceId } = req.body;
     const numAmount = Number(amount);
 
     if (isNaN(numAmount) || numAmount <= 0) {
       res.status(400).json({
-        error: {
-          code: 'BAD_REQUEST',
-          message: 'Valid positive recharge amount is required.'
-        }
+        error: { code: 'BAD_REQUEST', message: 'Valid positive recharge amount is required.' },
       });
       return;
     }
 
-    const updatedWallet = walletService.recharge(req.user!.id, numAmount, referenceId);
+    const updatedWallet = await walletService.recharge(req.user!.id, numAmount, referenceId);
     res.json({
       message: `Successfully credited ₹${numAmount} to wallet.`,
-      wallet: updatedWallet
+      wallet: updatedWallet,
     });
   } catch (err) {
     next(err);

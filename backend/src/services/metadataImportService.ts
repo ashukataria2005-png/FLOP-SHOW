@@ -1,4 +1,4 @@
-import { getDatabase } from '../db/connection.js';
+import { getAdapter } from '../db/adapter.js';
 import { contentRepository, ContentRecord } from '../repositories/contentRepository.js';
 import { config } from '../config/env.js';
 
@@ -118,7 +118,7 @@ export const metadataImportService = {
     if (!trimmedQuery) return [];
 
     const candidatesMap = new Map<string, SearchCandidate>();
-    const db = getDatabase();
+    const db = getAdapter();
 
     // 1. If TV series, search TVMaze (instant, high accuracy, free)
     if (type === 'SERIES') {
@@ -128,7 +128,7 @@ export const metadataImportService = {
           signal: AbortSignal.timeout(5000)
         });
         if (tvmazeRes.ok) {
-          const shows = await tvmazeRes.json();
+          const shows = await tvmazeRes.json() as any;
           for (const item of shows) {
             const s = item.show;
             const premieredYear = s.premiered ? parseInt(s.premiered.split('-')[0], 10) : 0;
@@ -171,7 +171,7 @@ export const metadataImportService = {
 
         const omdbRes = await fetch(omdbUrl, { signal: AbortSignal.timeout(5000) });
         if (omdbRes.ok) {
-          const omdbData = await omdbRes.json();
+          const omdbData = await omdbRes.json() as any;
         if (omdbData.Search && Array.isArray(omdbData.Search)) {
           for (const item of omdbData.Search) {
             const providerId = `imdb:${item.imdbID}`;
@@ -211,7 +211,7 @@ export const metadataImportService = {
 
         const tmdbRes = await fetch(tmdbUrl, { signal: AbortSignal.timeout(5000) });
         if (tmdbRes.ok) {
-          const tmdbData = await tmdbRes.json();
+          const tmdbData = await tmdbRes.json() as any;
           if (tmdbData.results && Array.isArray(tmdbData.results)) {
             for (const item of tmdbData.results.slice(0, 10)) {
               const tmdbId = `tmdb:${type === 'SERIES' ? 'tv' : 'movie'}:${item.id}`;
@@ -247,13 +247,15 @@ export const metadataImportService = {
     // 4. Cross-reference with central FLOPSHOW database to check for existing content & duplicate detection
     for (const item of results) {
       const slugCandidate = generateSlug(item.title, item.year);
-      const existing = db.prepare(`
-        SELECT id, title, release_year, type FROM content 
-        WHERE (LOWER(title) = LOWER(?) AND release_year = ? AND type = ?)
-           OR slug = ?
-           OR id = ?
-        LIMIT 1;
-      `).get(item.title, item.year, item.type, slugCandidate, slugCandidate) as any;
+      const { rows } = await db.query(
+        `SELECT id, title, release_year, type FROM content
+         WHERE (LOWER(title) = LOWER(?) AND release_year = ? AND type = ?)
+            OR slug = ?
+            OR id = ?
+         LIMIT 1;`,
+        [item.title, item.year, item.type, slugCandidate, slugCandidate]
+      );
+      const existing = rows[0] as any;
 
       if (existing) {
         item.alreadyInFlopshow = true;
@@ -283,7 +285,7 @@ export const metadataImportService = {
    * Fetch complete metadata details for the selected title
    */
   async getDetails(providerId: string, type: 'MOVIE' | 'SERIES'): Promise<ContentDetailsPreview> {
-    const db = getDatabase();
+    const db = getAdapter();
 
     let title = '';
     let releaseYear = new Date().getFullYear();
@@ -312,7 +314,7 @@ export const metadataImportService = {
           signal: AbortSignal.timeout(6000)
         });
         if (cinemetaRes.ok) {
-          const cData = await cinemetaRes.json();
+          const cData = await cinemetaRes.json() as any;
           const meta = cData.meta || {};
 
           title = meta.name || title;
@@ -391,7 +393,7 @@ export const metadataImportService = {
             signal: AbortSignal.timeout(5000)
           });
           if (omdbRes.ok) {
-            const omdb = await omdbRes.json();
+            const omdb = await omdbRes.json() as any;
           if (omdb.Response === 'True') {
             if (!title) title = omdb.Title;
             if (omdb.Year && !releaseYear) releaseYear = parseInt(omdb.Year.split('–')[0], 10);
@@ -442,7 +444,7 @@ export const metadataImportService = {
         if (url) {
           const tmRes = await fetch(url, { signal: AbortSignal.timeout(5000) });
           if (tmRes.ok) {
-            const show = await tmRes.json();
+            const show = await tmRes.json() as any;
             if (!title) title = show.name;
             if (show.premiered && !releaseYear) releaseYear = parseInt(show.premiered.split('-')[0], 10);
             if (!description) description = stripHtml(show.summary);
@@ -504,7 +506,7 @@ export const metadataImportService = {
         const tmdbUrl = `https://api.themoviedb.org/3/${tmdbType}/${tmdbId}?api_key=${config.tmdbApiKey}&append_to_response=videos,credits`;
         const tmdbRes = await fetch(tmdbUrl, { signal: AbortSignal.timeout(6000) });
         if (tmdbRes.ok) {
-          const tmdb = await tmdbRes.json();
+          const tmdb = await tmdbRes.json() as any;
           title = tmdb.title || tmdb.name || title;
           tagline = tmdb.tagline || tagline;
           description = tmdb.overview || description;
@@ -574,13 +576,15 @@ export const metadataImportService = {
 
     // Check duplicate in FLOPSHOW database
     const slug = generateSlug(title || 'untitled', releaseYear);
-    const existing = db.prepare(`
-      SELECT id, title, release_year, type FROM content 
-      WHERE (LOWER(title) = LOWER(?) AND release_year = ? AND type = ?)
-         OR slug = ?
-         OR id = ?
-      LIMIT 1;
-    `).get(title, releaseYear, type, slug, slug) as any;
+    const { rows: dupRows } = await db.query(
+      `SELECT id, title, release_year, type FROM content
+       WHERE (LOWER(title) = LOWER(?) AND release_year = ? AND type = ?)
+          OR slug = ?
+          OR id = ?
+       LIMIT 1;`,
+      [title, releaseYear, type, slug, slug]
+    );
+    const existing = dupRows[0] as any;
 
     return {
       providerId,
@@ -614,15 +618,15 @@ export const metadataImportService = {
   /**
    * Import verified content directly into FLOPSHOW central database
    */
-  importContent(payload: ImportPayload): {
+  async importContent(payload: ImportPayload): Promise<{
     success: boolean;
     contentId: string;
     title: string;
     type: 'MOVIE' | 'SERIES';
     seasonsCount: number;
     episodesCount: number;
-  } {
-    const db = getDatabase();
+  }> {
+    const db = getAdapter();
 
     const title = payload.title.trim();
     if (!title) {
@@ -634,13 +638,15 @@ export const metadataImportService = {
     const slug = payload.slug || generateSlug(title, releaseYear);
 
     // Duplicate detection check
-    const existingItem = db.prepare(`
-      SELECT id, title, release_year, type, slug FROM content 
-      WHERE (LOWER(title) = LOWER(?) AND release_year = ? AND type = ?)
-         OR slug = ?
-         OR id = ?
-      LIMIT 1;
-    `).get(title, releaseYear, type, slug, slug) as any;
+    const { rows: existRows } = await db.query(
+      `SELECT id, title, release_year, type, slug FROM content
+       WHERE (LOWER(title) = LOWER(?) AND release_year = ? AND type = ?)
+          OR slug = ?
+          OR id = ?
+       LIMIT 1;`,
+      [title, releaseYear, type, slug, slug]
+    );
+    const existingItem = existRows[0] as any;
 
     if (existingItem && !payload.overwrite) {
       throw new Error(
@@ -667,13 +673,17 @@ export const metadataImportService = {
         const cleanName = gName.trim();
         if (!cleanName) continue;
         const gSlug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        const existingGenre = db.prepare('SELECT id FROM genres WHERE LOWER(name) = LOWER(?) OR slug = ?').get(cleanName, gSlug) as any;
+        const { rows: genreRows } = await db.query(
+          'SELECT id FROM genres WHERE LOWER(name) = LOWER(?) OR slug = ?',
+          [cleanName, gSlug]
+        );
+        const existingGenre = genreRows[0] as any;
 
         if (existingGenre) {
           genreIds.push(existingGenre.id);
         } else {
           const newGenreId = `genre-${gSlug}`;
-          contentRepository.createGenre(newGenreId, cleanName, gSlug);
+          await contentRepository.createGenre(newGenreId, cleanName, gSlug);
           genreIds.push(newGenreId);
         }
       }
@@ -681,7 +691,7 @@ export const metadataImportService = {
 
     // If overwriting existing, delete old record first
     if (existingItem && payload.overwrite) {
-      contentRepository.deleteContent(existingItem.id);
+      await contentRepository.deleteContent(existingItem.id);
     }
 
     // Create central content record
@@ -712,7 +722,7 @@ export const metadataImportService = {
       cast_json: JSON.stringify(payload.cast || [])
     };
 
-    contentRepository.createContent(record, genreIds);
+    await contentRepository.createContent(record, genreIds);
 
     // If SERIES and seasons/episodes supplied, import seasons and episodes structure
     let seasonsCount = 0;
@@ -722,7 +732,7 @@ export const metadataImportService = {
       for (const s of payload.seasons) {
         seasonsCount++;
         const seasonId = `${contentId}-s${s.seasonNumber}`;
-        contentRepository.createSeason({
+        await contentRepository.createSeason({
           id: seasonId,
           contentId,
           seasonNumber: s.seasonNumber,
@@ -733,7 +743,7 @@ export const metadataImportService = {
           for (const ep of s.episodes) {
             episodesCount++;
             const epId = `${seasonId}-e${ep.episodeNumber}`;
-            contentRepository.createEpisode({
+            await contentRepository.createEpisode({
               id: epId,
               seasonId,
               episodeNumber: ep.episodeNumber,

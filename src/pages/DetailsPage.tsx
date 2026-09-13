@@ -46,22 +46,20 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
 
   useEffect(() => {
     setDetails(item);
-    if (item.type === 'series') {
-      api.content.getDetails(item.id)
-        .then(full => {
-          if (full) {
-            setDetails(full);
-            if (full.seasons && full.seasons.length > 0) {
-              setSelectedSeasonNumber(prev => {
-                const seasonExists = full.seasons!.some(s => s.seasonNumber === prev);
-                if (seasonExists) return prev;
-                return getInitialSeasonNumber(full.seasons);
-              });
-            }
+    api.content.getDetails(item.id)
+      .then(full => {
+        if (full) {
+          setDetails(full);
+          if (full.type === 'series' && full.seasons && full.seasons.length > 0) {
+            setSelectedSeasonNumber(prev => {
+              const seasonExists = full.seasons!.some(s => s.seasonNumber === prev);
+              if (seasonExists) return prev;
+              return getInitialSeasonNumber(full.seasons);
+            });
           }
-        })
-        .catch(() => {});
-    }
+        }
+      })
+      .catch(() => {});
   }, [item.id]);
 
   const currentItem = details || item;

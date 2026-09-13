@@ -10,12 +10,12 @@ authRouter.post('/register', async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
     const result = await authService.register({ name, email, password });
-    const wallet = walletService.getBalance(result.user.id);
+    const wallet = await walletService.getBalance(result.user.id);
 
     res.status(201).json({
       user: result.user,
       token: result.token,
-      wallet
+      wallet,
     });
   } catch (err) {
     next(err);
@@ -27,12 +27,12 @@ authRouter.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const result = await authService.login({ email, password });
-    const wallet = walletService.getBalance(result.user.id);
+    const wallet = await walletService.getBalance(result.user.id);
 
     res.json({
       user: result.user,
       token: result.token,
-      wallet
+      wallet,
     });
   } catch (err) {
     next(err);
@@ -48,13 +48,13 @@ export const handleAdminLogin = async (req: any, res: any, next: any) => {
 
     const result = await authService.adminLogin({
       adminId: inputId,
-      adminPassword: inputPassword
+      adminPassword: inputPassword,
     });
 
     res.json({
       success: true,
       user: result.user,
-      token: result.token
+      token: result.token,
     });
   } catch (err) {
     next(err);
@@ -65,15 +65,15 @@ authRouter.post('/admin-login', handleAdminLogin);
 authRouter.post('/admin/login', handleAdminLogin);
 
 // GET /api/auth/me
-authRouter.get('/me', requireAuth, (req: AuthenticatedRequest, res: Response, next) => {
+authRouter.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
-    const user = authService.getUserProfile(req.user!.id);
+    const user = await authService.getUserProfile(req.user!.id);
     if (!user) {
       res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found.' } });
       return;
     }
 
-    const wallet = walletService.getBalance(user.id);
+    const wallet = await walletService.getBalance(user.id);
     res.json({ user, wallet });
   } catch (err) {
     next(err);

@@ -23,7 +23,7 @@ export function toSafeUser(user: UserRecord): SafeUser {
     role: user.role,
     status: user.status,
     createdAt: user.created_at,
-    updatedAt: user.updated_at
+    updatedAt: user.updated_at,
   };
 }
 
@@ -44,7 +44,7 @@ export const authService = {
       throw new Error('Password must be at least 6 characters long.');
     }
 
-    const existing = userRepository.findByEmail(cleanEmail);
+    const existing = await userRepository.findByEmail(cleanEmail);
     if (existing) {
       const err = new Error('An account with this email already exists.');
       (err as any).statusCode = 409;
@@ -56,31 +56,31 @@ export const authService = {
     const id = `user-${crypto.randomUUID()}`;
     const now = new Date().toISOString();
 
-    userRepository.create({
+    await userRepository.create({
       id,
       name: cleanName,
       email: cleanEmail,
       passwordHash,
       role: 'USER',
       status: 'ACTIVE',
-      now
+      now,
     });
 
     // Create initial wallet for user (₹100 = 10,000 paise bonus for demo/testing)
     const initialPaise = 10000;
-    walletRepository.createWallet(id, initialPaise, now);
-    walletRepository.addTransaction({
+    await walletRepository.createWallet(id, initialPaise, now);
+    await walletRepository.addTransaction({
       id: `tx-${crypto.randomUUID()}`,
       userId: id,
       type: 'RECHARGE',
       amount: initialPaise,
       balanceAfter: initialPaise,
       description: 'Welcome Bonus Credit',
-      createdAt: now
+      createdAt: now,
     });
 
-    const userRecord = userRepository.findById(id)!;
-    const safeUser = toSafeUser(userRecord);
+    const userRecord = await userRepository.findById(id);
+    const safeUser = toSafeUser(userRecord!);
     const token = authService.generateToken(safeUser);
 
     return { user: safeUser, token };
@@ -102,7 +102,7 @@ export const authService = {
     if (
       config.adminPassword &&
       (cleanEmail.toLowerCase() === config.adminId.toLowerCase() ||
-       cleanEmail.toLowerCase() === (config.devAdminEmail || 'admin@flopshow.tv').toLowerCase()) &&
+        cleanEmail.toLowerCase() === (config.devAdminEmail || 'admin@flopshow.tv').toLowerCase()) &&
       params.password === config.adminPassword
     ) {
       const adminUser: SafeUser = {
@@ -112,13 +112,13 @@ export const authService = {
         role: 'ADMIN',
         status: 'ACTIVE',
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       };
       const token = authService.generateToken(adminUser);
       return { user: adminUser, token };
     }
 
-    const userRecord = userRepository.findByEmail(cleanEmail);
+    const userRecord = await userRepository.findByEmail(cleanEmail);
     if (!userRecord) {
       const err = new Error('Invalid email or password.');
       (err as any).statusCode = 401;
@@ -179,7 +179,7 @@ export const authService = {
       role: 'ADMIN',
       status: 'ACTIVE',
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     const token = authService.generateToken(adminUser);
@@ -188,11 +188,7 @@ export const authService = {
 
   generateToken(user: SafeUser): string {
     return jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role
-      },
+      { id: user.id, email: user.email, role: user.role },
       config.jwtSecret,
       { expiresIn: config.jwtExpiresIn as any }
     );
@@ -212,7 +208,7 @@ export const authService = {
     }
   },
 
-  getUserProfile(userId: string): SafeUser | null {
+  async getUserProfile(userId: string): Promise<SafeUser | null> {
     if (userId === 'admin-master' || userId === 'admin-system') {
       return {
         id: userId,
@@ -221,11 +217,11 @@ export const authService = {
         role: 'ADMIN',
         status: 'ACTIVE',
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       };
     }
-    const record = userRepository.findById(userId);
+    const record = await userRepository.findById(userId);
     if (!record) return null;
     return toSafeUser(record);
-  }
+  },
 };

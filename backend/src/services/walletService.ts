@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { walletRepository, WalletTransactionRecord } from '../repositories/walletRepository.js';
-import { runTransaction } from '../db/connection.js';
+import { getAdapter } from '../db/adapter.js';
 
 export interface WalletSummary {
   balancePaise: number;
@@ -9,26 +9,25 @@ export interface WalletSummary {
 }
 
 export const walletService = {
-  getBalance(userId: string): WalletSummary {
-    const balancePaise = walletRepository.getBalance(userId);
+  async getBalance(userId: string): Promise<WalletSummary> {
+    const balancePaise = await walletRepository.getBalance(userId);
     const balanceRupees = balancePaise / 100;
     return {
       balancePaise,
       balanceRupees,
-      formattedBalance: `₹${balanceRupees.toFixed(0)}`
+      formattedBalance: `₹${balanceRupees.toFixed(0)}`,
     };
   },
 
-  getTransactions(userId: string, limit: number = 50): WalletTransactionRecord[] {
+  async getTransactions(userId: string, limit = 50): Promise<WalletTransactionRecord[]> {
     return walletRepository.getTransactions(userId, limit);
   },
 
   /**
    * Recharge user wallet.
-   * Note: In Phase 2 this executes safe ledger credit. In Phase 3, a payment gateway webhook
-   * will invoke this method upon verified payment confirmation.
+   * Executes an atomic balance credit + ledger transaction.
    */
-  recharge(userId: string, amountRupees: number, referenceId?: string): WalletSummary {
+  async recharge(userId: string, amountRupees: number, referenceId?: string): Promise<WalletSummary> {
     if (amountRupees <= 0) {
       const err = new Error('Recharge amount must be greater than zero.');
       (err as any).statusCode = 400;
@@ -37,14 +36,14 @@ export const walletService = {
 
     const amountPaise = Math.round(amountRupees * 100);
     const now = new Date().toISOString();
+    const db = getAdapter();
 
-    return runTransaction(txDb => {
-      const currentBalance = walletRepository.getBalance(userId, txDb);
+    return db.transaction(async txAdapter => {
+      const currentBalance = await walletRepository.getBalance(userId, txAdapter);
       const newBalance = currentBalance + amountPaise;
 
-      walletRepository.updateBalance(userId, newBalance, now, txDb);
-
-      walletRepository.addTransaction(
+      await walletRepository.updateBalance(userId, newBalance, now, txAdapter);
+      await walletRepository.addTransaction(
         {
           id: `tx-${crypto.randomUUID()}`,
           userId,
@@ -53,16 +52,16 @@ export const walletService = {
           balanceAfter: newBalance,
           description: `Wallet Recharge (₹${amountRupees})`,
           referenceId: referenceId || `sim-pay-${Date.now()}`,
-          createdAt: now
+          createdAt: now,
         },
-        txDb
+        txAdapter
       );
 
       return {
         balancePaise: newBalance,
         balanceRupees: newBalance / 100,
-        formattedBalance: `₹${(newBalance / 100).toFixed(0)}`
+        formattedBalance: `₹${(newBalance / 100).toFixed(0)}`,
       };
     });
-  }
+  },
 };

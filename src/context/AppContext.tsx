@@ -13,7 +13,8 @@ import {
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { formatCurrentDate } from '../utils/formatters';
 import { MediaPlayerSource } from '../components/player/MediaPlayer';
-import { api, tokenStorage } from '../services/api';
+import { api, tokenStorage, API_BASE_URL } from '../services/api';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 interface Toast {
   id: string;
@@ -383,61 +384,106 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let episodeId = episode?.id;
 
     if (content.type === 'series') {
-      if (!ep && content.seasons && content.seasons.length > 0) {
+      // If no specific episode was provided, try to find from progress or first season episode
+      if (!ep) {
+        if (!content.seasons || content.seasons.length === 0) {
+          try {
+            const full = await api.content.getDetails(content.id);
+            if (full?.seasons && full.seasons.length > 0) {
+              content = full;
+              setActivePlayerContent(full);
+            }
+          } catch {
+            // Keep existing content
+          }
+        }
+
         const existingProgress = getProgress(content.id);
-        if (existingProgress?.episodeId) {
+        if (existingProgress?.episodeId && content.seasons) {
           ep = content.seasons.flatMap(s => s.episodes).find(e => e.id === existingProgress.episodeId);
         }
-        if (!ep && content.seasons[0].episodes?.length > 0) {
-          ep = content.seasons[0].episodes[0];
+        if (!ep && content.seasons && content.seasons.length > 0) {
+          for (const s of content.seasons) {
+            if (s.episodes && s.episodes.length > 0) {
+              ep = s.episodes[0];
+              break;
+            }
+          }
         }
       }
-      setActiveEpisode(ep || null);
-      if (ep) {
-        subtitle = `S${ep.seasonNumber} E${ep.episodeNumber}: ${ep.title}`;
-        episodeId = ep.id;
-        sourceUrl = ep.videoUrl || '';
-      }
-    } else {
-      setActiveEpisode(null);
-      sourceUrl = content.videoUrl || '';
-    }
 
-    // Attempt to resolve real media from backend API
-    try {
-      if (episodeId) {
-        const mediaRes = await api.media.getEpisodeMedia(episodeId, 'MAIN');
+      if (!ep) {
+        showToast(`No episodes are currently available for "${content.title}".`, 'info');
+        return;
+      }
+
+      setActiveEpisode(ep);
+      subtitle = `S${ep.seasonNumber} E${ep.episodeNumber}: ${ep.title}`;
+      episodeId = ep.id;
+
+      // Attempt to resolve real episode media from backend database
+      try {
+        const mediaRes = await api.media.getEpisodeMedia(ep.id, 'MAIN');
         if (mediaRes?.url && mediaRes.url.trim() !== '') {
           sourceUrl = mediaRes.url;
         }
-      } else {
+      } catch (err: any) {
+        if (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403) {
+          openPurchaseModal(content);
+          return;
+        }
+        if (ep.videoUrl && ep.videoUrl.trim() !== '') {
+          sourceUrl = ep.videoUrl;
+        }
+      }
+
+      // Safeguard: Ensure episode media never uses series trailer
+      if (content.trailerUrl && sourceUrl === content.trailerUrl) {
+        sourceUrl = '';
+      }
+
+      if (!sourceUrl || sourceUrl.trim() === '') {
+        showToast(`No playable video is currently configured for Episode ${ep.episodeNumber}: "${ep.title}".`, 'info');
+        return;
+      }
+    } else {
+      setActiveEpisode(null);
+
+      // Attempt to resolve real movie media from backend database
+      try {
         const mediaRes = await api.media.getContentMedia(content.id, 'MAIN');
         if (mediaRes?.url && mediaRes.url.trim() !== '') {
           sourceUrl = mediaRes.url;
         }
+      } catch (err: any) {
+        if (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403) {
+          openPurchaseModal(content);
+          return;
+        }
+        if (content.videoUrl && content.videoUrl.trim() !== '') {
+          sourceUrl = content.videoUrl;
+        }
       }
-    } catch {
-      // Keep local sourceUrl or fallback
+
+      // Safeguard: Trailer video must remain completely separate from MAIN movie video
+      if (content.trailerUrl && sourceUrl === content.trailerUrl) {
+        sourceUrl = '';
+      }
+
+      if (!sourceUrl || sourceUrl.trim() === '') {
+        showToast(`No playable video is currently configured for "${content.title}".`, 'info');
+        return;
+      }
     }
 
-    // If no MAIN video is configured, show a clear message instead of breaking
-    if (!sourceUrl || sourceUrl.trim() === '') {
-      showToast(
-        ep
-          ? `No playable video is currently configured for Episode ${ep.episodeNumber}: "${ep.title}".`
-          : `No playable video is currently configured for "${content.title}".`,
-        'info'
-      );
-      return;
-    }
-
+    const resolvedUrl = resolveMediaUrl(sourceUrl, API_BASE_URL);
     const progress = ep ? getProgress(content.id, ep.id) : getProgress(content.id);
 
     setActiveMediaSource({
       title: content.title,
       subtitle,
       mediaType: 'MAIN',
-      url: sourceUrl,
+      url: resolvedUrl,
       poster: ep?.thumbnailUrl || content.backdropUrl || content.posterUrl,
       contentId: content.id,
       episodeId,
@@ -455,7 +501,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Keep item trailerUrl
     }
 
-    if (!trailerUrl) {
+    if (!trailerUrl || trailerUrl.trim() === '') {
       showToast(`Trailer is not currently available for "${content.title}".`, 'info');
       return;
     }
@@ -463,7 +509,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setActiveMediaSource({
       title: `${content.title} (Official Trailer)`,
       mediaType: 'TRAILER',
-      url: trailerUrl,
+      url: resolveMediaUrl(trailerUrl, API_BASE_URL),
       poster: content.backdropUrl || content.posterUrl,
       contentId: content.id
     });

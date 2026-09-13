@@ -2,8 +2,8 @@ import crypto from 'crypto';
 import { mediaRepository, MediaRecord } from '../repositories/mediaRepository.js';
 import { contentRepository } from '../repositories/contentRepository.js';
 import { purchaseRepository } from '../repositories/purchaseRepository.js';
-import { getDatabase } from '../db/connection.js';
-import { parseYouTubeUrl, isValidMediaUrl, detectSourceType } from '../utils/mediaUrl.js';
+import { getAdapter } from '../db/adapter.js';
+import { parseYouTubeUrl, isValidMediaUrl } from '../utils/mediaUrl.js';
 
 export interface MediaPlayableResponse {
   mediaId?: string;
@@ -23,7 +23,7 @@ export const mediaService = {
   /**
    * Attach media to a movie/series content item
    */
-  attachContentMedia(
+  async attachContentMedia(
     contentId: string,
     params: {
       mediaType: 'MAIN' | 'TRAILER';
@@ -35,8 +35,8 @@ export const mediaService = {
       thumbnail?: string;
       isActive?: boolean;
     }
-  ): MediaRecord {
-    const content = contentRepository.findByIdOrSlug(contentId);
+  ): Promise<MediaRecord> {
+    const content = await contentRepository.findByIdOrSlug(contentId);
     if (!content) {
       const err = new Error('Content not found.');
       (err as any).statusCode = 404;
@@ -50,7 +50,6 @@ export const mediaService = {
       throw err;
     }
 
-    // Auto-detect YouTube if not upload
     let detectedSource = params.sourceType || 'DIRECT_URL';
     const yt = parseYouTubeUrl(cleanUrl);
 
@@ -65,7 +64,7 @@ export const mediaService = {
     const now = new Date().toISOString();
     const mediaId = `med-${crypto.randomUUID()}`;
 
-    mediaRepository.create({
+    await mediaRepository.create({
       id: mediaId,
       contentId: content.id,
       mediaType: params.mediaType,
@@ -76,23 +75,23 @@ export const mediaService = {
       durationSeconds: params.durationSeconds || 0,
       thumbnail: params.thumbnail || content.poster,
       isActive: params.isActive !== false ? 1 : 0,
-      now
+      now,
     });
 
-    // Also synchronize to content table for seamless backwards-compatibility
+    // Synchronize to content table for backwards-compatibility
     if (params.mediaType === 'TRAILER') {
-      contentRepository.updateContent(content.id, { trailer_url: cleanUrl });
+      await contentRepository.updateContent(content.id, { trailer_url: cleanUrl });
     } else if (params.mediaType === 'MAIN') {
-      contentRepository.updateContent(content.id, { video_url: cleanUrl });
+      await contentRepository.updateContent(content.id, { video_url: cleanUrl });
     }
 
-    return mediaRepository.findById(mediaId)!;
+    return (await mediaRepository.findById(mediaId))!;
   },
 
   /**
    * Attach media to a series episode
    */
-  attachEpisodeMedia(
+  async attachEpisodeMedia(
     episodeId: string,
     params: {
       mediaType: 'MAIN' | 'TRAILER';
@@ -104,9 +103,10 @@ export const mediaService = {
       thumbnail?: string;
       isActive?: boolean;
     }
-  ): MediaRecord {
-    const db = getDatabase();
-    const episode = db.prepare('SELECT * FROM episodes WHERE id = ?').get(episodeId) as any;
+  ): Promise<MediaRecord> {
+    const db = getAdapter();
+    const { rows } = await db.query('SELECT * FROM episodes WHERE id = ?', [episodeId]);
+    const episode = rows[0] as any;
     if (!episode) {
       const err = new Error('Episode not found.');
       (err as any).statusCode = 404;
@@ -134,7 +134,7 @@ export const mediaService = {
     const now = new Date().toISOString();
     const mediaId = `med-${crypto.randomUUID()}`;
 
-    mediaRepository.create({
+    await mediaRepository.create({
       id: mediaId,
       episodeId: episode.id,
       mediaType: params.mediaType,
@@ -145,27 +145,30 @@ export const mediaService = {
       durationSeconds: params.durationSeconds || episode.duration_seconds,
       thumbnail: params.thumbnail || episode.thumbnail,
       isActive: params.isActive !== false ? 1 : 0,
-      now
+      now,
     });
 
     // Synchronize to episode table
     if (params.mediaType === 'MAIN') {
-      db.prepare('UPDATE episodes SET video_url = ?, updated_at = ? WHERE id = ?')
-        .run(cleanUrl, now, episode.id);
+      await db.run('UPDATE episodes SET video_url = ?, updated_at = ? WHERE id = ?', [
+        cleanUrl,
+        now,
+        episode.id,
+      ]);
     }
 
-    return mediaRepository.findById(mediaId)!;
+    return (await mediaRepository.findById(mediaId))!;
   },
 
   /**
    * Get playable media for a movie with access control
    */
-  getPlayableContentMedia(
+  async getPlayableContentMedia(
     contentId: string,
     mediaType: 'MAIN' | 'TRAILER',
     userId?: string
-  ): MediaPlayableResponse {
-    const content = contentRepository.findByIdOrSlug(contentId);
+  ): Promise<MediaPlayableResponse> {
+    const content = await contentRepository.findByIdOrSlug(contentId);
     if (!content) {
       const err = new Error('Content not found.');
       (err as any).statusCode = 404;
@@ -174,7 +177,7 @@ export const mediaService = {
 
     // 1. Trailers are always publicly authorized
     if (mediaType === 'TRAILER') {
-      const trailerMedia = mediaRepository.getActiveMediaForContent(content.id, 'TRAILER');
+      const trailerMedia = await mediaRepository.getActiveMediaForContent(content.id, 'TRAILER');
       const trailerUrl = trailerMedia ? trailerMedia.url : content.trailer_url;
 
       if (!trailerUrl) {
@@ -194,13 +197,13 @@ export const mediaService = {
         mimeType: trailerMedia?.mime_type,
         title: `${content.title} — Official Trailer`,
         poster: content.backdrop || content.poster,
-        authorized: true
+        authorized: true,
       };
     }
 
     // 2. Main video access control
     const isFree = content.price === 0;
-    const isOwned = userId ? purchaseRepository.isOwned(userId, content.id) : false;
+    const isOwned = userId ? await purchaseRepository.isOwned(userId, content.id) : false;
 
     if (!isFree && !isOwned) {
       const err = new Error('Purchase required to watch this movie.');
@@ -209,8 +212,13 @@ export const mediaService = {
       throw err;
     }
 
-    const mainMedia = mediaRepository.getActiveMediaForContent(content.id, 'MAIN');
-    const mainVideoUrl = mainMedia ? mainMedia.url : content.video_url;
+    const mainMedia = await mediaRepository.getActiveMediaForContent(content.id, 'MAIN');
+    let mainVideoUrl = mainMedia ? mainMedia.url : content.video_url;
+
+    // Trailer video must remain completely separate from MAIN movie video
+    if (!mainMedia && content.trailer_url && mainVideoUrl === content.trailer_url) {
+      mainVideoUrl = null;
+    }
 
     if (!mainVideoUrl) {
       const err = new Error('Main video is not available yet. The administrator has not configured media for this title.');
@@ -231,26 +239,30 @@ export const mediaService = {
       duration: mainMedia?.duration || content.duration,
       title: content.title,
       poster: content.backdrop || content.poster,
-      authorized: true
+      authorized: true,
     };
   },
 
   /**
    * Get playable media for an episode with access control
    */
-  getPlayableEpisodeMedia(
+  async getPlayableEpisodeMedia(
     episodeId: string,
     mediaType: 'MAIN' | 'TRAILER',
     userId?: string
-  ): MediaPlayableResponse {
-    const db = getDatabase();
-    const episode = db.prepare(`
-      SELECT e.*, s.content_id, c.title as series_title, c.price, c.poster as series_poster, c.backdrop as series_backdrop
-      FROM episodes e
-      JOIN seasons s ON e.season_id = s.id
-      JOIN content c ON s.content_id = c.id
-      WHERE e.id = ?
-    `).get(episodeId) as any;
+  ): Promise<MediaPlayableResponse> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT e.*, s.content_id, c.title as series_title, c.price,
+              c.poster as series_poster, c.backdrop as series_backdrop,
+              c.trailer_url as series_trailer_url
+       FROM episodes e
+       JOIN seasons s ON e.season_id = s.id
+       JOIN content c ON s.content_id = c.id
+       WHERE e.id = ?`,
+      [episodeId]
+    );
+    const episode = rows[0] as any;
 
     if (!episode) {
       const err = new Error('Episode not found.');
@@ -260,7 +272,7 @@ export const mediaService = {
 
     // Trailers are publicly authorized
     if (mediaType === 'TRAILER') {
-      const trailerMedia = mediaRepository.getActiveMediaForEpisode(episode.id, 'TRAILER');
+      const trailerMedia = await mediaRepository.getActiveMediaForEpisode(episode.id, 'TRAILER');
       if (!trailerMedia || !trailerMedia.url) {
         const err = new Error('No trailer configured for this episode.');
         (err as any).statusCode = 404;
@@ -277,13 +289,13 @@ export const mediaService = {
         isYouTube: yt.isYouTube,
         title: `${episode.series_title} — ${episode.title} (Trailer)`,
         poster: episode.thumbnail || episode.series_backdrop,
-        authorized: true
+        authorized: true,
       };
     }
 
-    // Main episode access control: check if series is free or purchased
+    // Main episode access control
     const isFree = episode.price === 0;
-    const isOwned = userId ? purchaseRepository.isOwned(userId, episode.content_id) : false;
+    const isOwned = userId ? await purchaseRepository.isOwned(userId, episode.content_id) : false;
 
     if (!isFree && !isOwned) {
       const err = new Error('Purchase required to watch this series episode.');
@@ -292,8 +304,13 @@ export const mediaService = {
       throw err;
     }
 
-    const mainMedia = mediaRepository.getActiveMediaForEpisode(episode.id, 'MAIN');
-    const videoUrl = mainMedia ? mainMedia.url : episode.video_url;
+    const mainMedia = await mediaRepository.getActiveMediaForEpisode(episode.id, 'MAIN');
+    let videoUrl = mainMedia ? mainMedia.url : episode.video_url;
+
+    // Ensure episode never accidentally uses the series trailer
+    if (!mainMedia && episode.series_trailer_url && videoUrl === episode.series_trailer_url) {
+      videoUrl = null;
+    }
 
     if (!videoUrl) {
       const err = new Error('Episode video is not available yet.');
@@ -314,19 +331,19 @@ export const mediaService = {
       duration: episode.duration,
       title: `${episode.series_title}: ${episode.title}`,
       poster: episode.thumbnail || episode.series_backdrop,
-      authorized: true
+      authorized: true,
     };
   },
 
-  getAllMediaForContent(contentId: string): MediaRecord[] {
+  async getAllMediaForContent(contentId: string): Promise<MediaRecord[]> {
     return mediaRepository.getMediaForContent(contentId);
   },
 
-  getAllMediaForEpisode(episodeId: string): MediaRecord[] {
+  async getAllMediaForEpisode(episodeId: string): Promise<MediaRecord[]> {
     return mediaRepository.getMediaForEpisode(episodeId);
   },
 
-  deleteMedia(mediaId: string): void {
-    mediaRepository.delete(mediaId);
-  }
+  async deleteMedia(mediaId: string): Promise<void> {
+    await mediaRepository.delete(mediaId);
+  },
 };

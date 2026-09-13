@@ -11,9 +11,13 @@
     "server": "tsx watch backend/src/index.ts",
     "db:migrate": "tsx backend/src/db/migrator.ts",
     "db:seed": "tsx backend/src/db/seed.ts",
+    "db:export": "tsx backend/src/scripts/exportSqliteToPostgres.ts",
+    "db:migrate:data": "tsx backend/src/scripts/migrateDataToPostgres.ts",
+    "db:status": "tsx backend/src/scripts/checkDbStatus.ts",
     "test:backend": "tsx backend/src/tests/runTests.ts"
   },
   "dependencies": {
+    "@types/pg": "^8.23.1",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -21,6 +25,7 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.453.0",
     "multer": "^2.3.0",
+    "pg": "^8.23.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tsx": "^4.23.13"

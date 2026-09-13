@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { getDatabase, runTransaction } from './connection.js';
+import { getAdapter } from './adapter.js';
 import { config } from '../config/env.js';
 
 export interface SeedReport {
@@ -18,15 +18,17 @@ export interface SeedReport {
  * Seeds standard taxonomy genres and ensures administrator account exists.
  * Does NOT insert any hardcoded sample/testing movies or series.
  * Catalog content is exclusively added by administrator via Admin Panel / Quick Add.
+ *
+ * Works with both SQLite (local) and PostgreSQL (production) via the unified adapter.
  */
-export function seedDatabase(): SeedReport {
-  const db = getDatabase();
+export async function seedDatabase(): Promise<SeedReport> {
+  const db = getAdapter();
   const now = new Date().toISOString();
 
   let adminCreated = false;
   let adminGeneratedPassword: string | undefined;
 
-  runTransaction(txDb => {
+  await db.transaction(async txDb => {
     // ------------------------------------------------------------------------
     // 1. SEED STANDARD GENRES TAXONOMY
     // ------------------------------------------------------------------------
@@ -44,20 +46,19 @@ export function seedDatabase(): SeedReport {
       { id: 'genre-comedy', name: 'Comedy', slug: 'comedy' },
       { id: 'genre-adventure', name: 'Adventure', slug: 'adventure' },
       { id: 'genre-biography', name: 'Biography', slug: 'biography' },
-      { id: 'genre-history', name: 'History', slug: 'history' }
+      { id: 'genre-history', name: 'History', slug: 'history' },
     ];
 
-    const insertGenre = txDb.prepare(`
-      INSERT OR IGNORE INTO genres (id, name, slug)
-      VALUES (?, ?, ?);
-    `);
-
     for (const g of genres) {
-      insertGenre.run(g.id, g.name, g.slug);
+      await txDb.run(
+        `INSERT INTO genres (id, name, slug) VALUES (?, ?, ?)
+         ON CONFLICT (id) DO NOTHING;`,
+        [g.id, g.name, g.slug]
+      );
     }
 
     // ------------------------------------------------------------------------
-    // 2. SEED ADMIN ACCOUNT (SAFE MECHANISM)
+    // 2. SEED ADMIN ACCOUNT (SAFE MECHANISM — idempotent)
     // ------------------------------------------------------------------------
     let adminPassword = config.devAdminPassword;
 
@@ -71,60 +72,64 @@ export function seedDatabase(): SeedReport {
       console.log('------------------------------------------------------------');
     }
 
-    const adminSalt = bcrypt.genSaltSync(10);
-    const adminPasswordHash = bcrypt.hashSync(adminPassword, adminSalt);
+    const adminSalt = await bcrypt.genSalt(10);
+    const adminPasswordHash = await bcrypt.hash(adminPassword, adminSalt);
     const adminEmail = config.devAdminEmail.toLowerCase().trim();
     const adminId = 'admin-dev-01';
 
-    const insertAdmin = txDb.prepare(`
-      INSERT OR IGNORE INTO users (
-        id, name, email, password_hash, role, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?);
-    `);
-    insertAdmin.run(adminId, 'FLOPSHOW System Admin', adminEmail, adminPasswordHash, now, now);
+    await txDb.run(
+      `INSERT INTO users (id, name, email, password_hash, role, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?)
+       ON CONFLICT (id) DO NOTHING;`,
+      [adminId, 'FLOPSHOW System Admin', adminEmail, adminPasswordHash, now, now]
+    );
 
-    const insertAdminWallet = txDb.prepare(`
-      INSERT OR IGNORE INTO wallets (user_id, balance, updated_at)
-      VALUES (?, 0, ?);
-    `);
-    insertAdminWallet.run(adminId, now);
+    await txDb.run(
+      `INSERT INTO wallets (user_id, balance, updated_at)
+       VALUES (?, 0, ?)
+       ON CONFLICT (user_id) DO NOTHING;`,
+      [adminId, now]
+    );
 
     adminCreated = true;
   });
 
   // Query counts to verify
-  const genresCount = (db.prepare('SELECT COUNT(*) as c FROM genres').get() as { c: number }).c;
-  const contentCount = (db.prepare('SELECT COUNT(*) as c FROM content').get() as { c: number }).c;
-  const seasonsCount = (db.prepare('SELECT COUNT(*) as c FROM seasons').get() as { c: number }).c;
-  const episodesCount = (db.prepare('SELECT COUNT(*) as c FROM episodes').get() as { c: number }).c;
+  const { rows: gcRows } = await db.query('SELECT COUNT(*) as c FROM genres');
+  const { rows: ccRows } = await db.query('SELECT COUNT(*) as c FROM content');
+  const { rows: scRows } = await db.query('SELECT COUNT(*) as c FROM seasons');
+  const { rows: ecRows } = await db.query('SELECT COUNT(*) as c FROM episodes');
+
+  const getCount = (row: any) => Number(row?.c ?? row?.count ?? 0);
 
   return {
-    genresCount,
-    contentCount,
-    seasonsCount,
-    episodesCount,
+    genresCount: getCount(gcRows[0]),
+    contentCount: getCount(ccRows[0]),
+    seasonsCount: getCount(scRows[0]),
+    episodesCount: getCount(ecRows[0]),
     adminCreated,
     adminEmail: config.devAdminEmail,
-    adminGeneratedPassword
+    adminGeneratedPassword,
   };
 }
 
 // Allow direct CLI execution: tsx backend/src/db/seed.ts
 if (process.argv[1] && process.argv[1].endsWith('seed.ts')) {
-  try {
-    const report = seedDatabase();
-    console.log('✓ Database initialized successfully (without sample catalog):');
-    console.log(`  - Genres: ${report.genresCount}`);
-    console.log(`  - Content: ${report.contentCount}`);
-    console.log(`  - Seasons: ${report.seasonsCount}`);
-    console.log(`  - Episodes: ${report.episodesCount}`);
-    console.log(`  - Admin user ready: ${report.adminCreated} (${report.adminEmail})`);
-    if (report.adminGeneratedPassword) {
-      console.log(`  - Temporary admin password: ${report.adminGeneratedPassword}`);
-    }
-    process.exit(0);
-  } catch (err) {
-    console.error('Database seeding failed:', err);
-    process.exit(1);
-  }
+  seedDatabase()
+    .then(report => {
+      console.log('✓ Database initialized successfully (without sample catalog):');
+      console.log(`  - Genres: ${report.genresCount}`);
+      console.log(`  - Content: ${report.contentCount}`);
+      console.log(`  - Seasons: ${report.seasonsCount}`);
+      console.log(`  - Episodes: ${report.episodesCount}`);
+      console.log(`  - Admin user ready: ${report.adminCreated} (${report.adminEmail})`);
+      if (report.adminGeneratedPassword) {
+        console.log(`  - Temporary admin password: ${report.adminGeneratedPassword}`);
+      }
+      process.exit(0);
+    })
+    .catch(err => {
+      console.error('Database seeding failed:', err);
+      process.exit(1);
+    });
 }

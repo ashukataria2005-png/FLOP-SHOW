@@ -10,15 +10,11 @@ interface HeroBannerProps {
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({ item, onViewDetails }) => {
   if (!item) return null;
-  const { isOwned, startPlaying, openPurchaseModal, playTrailer } = useApp();
+  const { isOwned, playTrailer } = useApp();
   const owned = isOwned(item.id);
 
   const handlePrimaryClick = () => {
-    if (owned || item.isFree) {
-      startPlaying(item);
-    } else {
-      openPurchaseModal(item);
-    }
+    onViewDetails(item);
   };
 
   return (

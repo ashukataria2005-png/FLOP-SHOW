@@ -60,3 +60,25 @@ export function detectSourceType(urlString: string): 'YOUTUBE' | 'DIRECT_URL' {
   }
   return 'DIRECT_URL';
 }
+
+/**
+ * Resolves a media URL to an absolute URL if it is a relative upload path (/uploads/...)
+ */
+export function resolveMediaUrl(rawUrl?: string | null, apiBaseUrl?: string): string {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  const trimmed = rawUrl.trim();
+  if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
+    const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    if (apiBaseUrl && apiBaseUrl.startsWith('http')) {
+      try {
+        const origin = new URL(apiBaseUrl).origin;
+        return `${origin}${cleanPath}`;
+      } catch {
+        return cleanPath;
+      }
+    }
+    return cleanPath;
+  }
+  return trimmed;
+}
+

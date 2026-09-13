@@ -210,4 +210,6 @@ async function applyArtwork() {
   }
 }
 
-applyArtwork().catch(console.error);
+if (process.argv[1] && process.argv[1].includes('apply_official_artwork')) {
+  applyArtwork().catch(console.error);
+}

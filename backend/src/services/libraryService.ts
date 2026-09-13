@@ -5,42 +5,42 @@ import { contentRepository, ContentRecord } from '../repositories/contentReposit
 
 export const libraryService = {
   // Purchases
-  getPurchases(userId: string): PurchaseRecord[] {
+  async getPurchases(userId: string): Promise<PurchaseRecord[]> {
     return purchaseRepository.getPurchasesByUser(userId);
   },
 
   // My List
-  getMyList(userId: string): ContentRecord[] {
+  async getMyList(userId: string): Promise<ContentRecord[]> {
     return libraryRepository.getMyList(userId);
   },
 
-  isInMyList(userId: string, contentId: string): boolean {
-    const item = contentRepository.findByIdOrSlug(contentId);
+  async isInMyList(userId: string, contentId: string): Promise<boolean> {
+    const item = await contentRepository.findByIdOrSlug(contentId);
     if (!item) return false;
     return libraryRepository.isInMyList(userId, item.id);
   },
 
-  toggleMyList(userId: string, contentId: string): { inList: boolean; contentId: string } {
-    const item = contentRepository.findByIdOrSlug(contentId);
+  async toggleMyList(userId: string, contentId: string): Promise<{ inList: boolean; contentId: string }> {
+    const item = await contentRepository.findByIdOrSlug(contentId);
     if (!item) {
       const err = new Error('Content not found.');
       (err as any).statusCode = 404;
       throw err;
     }
 
-    const exists = libraryRepository.isInMyList(userId, item.id);
+    const exists = await libraryRepository.isInMyList(userId, item.id);
     if (exists) {
-      libraryRepository.removeFromMyList(userId, item.id);
+      await libraryRepository.removeFromMyList(userId, item.id);
       return { inList: false, contentId: item.id };
     } else {
       const id = `ml-${crypto.randomUUID()}`;
-      libraryRepository.addToMyList(id, userId, item.id, new Date().toISOString());
+      await libraryRepository.addToMyList(id, userId, item.id, new Date().toISOString());
       return { inList: true, contentId: item.id };
     }
   },
 
   // Watch Progress
-  saveProgress(
+  async saveProgress(
     userId: string,
     params: {
       contentId: string;
@@ -49,8 +49,8 @@ export const libraryService = {
       currentTimeSeconds: number;
       durationSeconds: number;
     }
-  ): void {
-    const item = contentRepository.findByIdOrSlug(params.contentId);
+  ): Promise<void> {
+    const item = await contentRepository.findByIdOrSlug(params.contentId);
     if (!item) {
       const err = new Error('Content not found.');
       (err as any).statusCode = 404;
@@ -61,7 +61,7 @@ export const libraryService = {
     const isCompleted = params.progressPercent >= 90 ? 1 : 0;
     const progressId = `wp-${crypto.randomUUID()}`;
 
-    libraryRepository.saveProgress({
+    await libraryRepository.saveProgress({
       id: progressId,
       userId,
       contentId: item.id,
@@ -70,26 +70,30 @@ export const libraryService = {
       currentTimeSeconds: Math.max(0, Math.round(params.currentTimeSeconds)),
       durationSeconds: Math.max(0, Math.round(params.durationSeconds)),
       completed: isCompleted,
-      updatedAt: now
+      updatedAt: now,
     });
 
     // Also record into watch history
     const historyId = `wh-${crypto.randomUUID()}`;
-    libraryRepository.addHistory(historyId, userId, item.id, params.episodeId || null, now);
+    await libraryRepository.addHistory(historyId, userId, item.id, params.episodeId || null, now);
   },
 
-  getProgress(userId: string, contentId: string, episodeId?: string | null): WatchProgressRecord | null {
-    const item = contentRepository.findByIdOrSlug(contentId);
+  async getProgress(
+    userId: string,
+    contentId: string,
+    episodeId?: string | null
+  ): Promise<WatchProgressRecord | null> {
+    const item = await contentRepository.findByIdOrSlug(contentId);
     if (!item) return null;
     return libraryRepository.getProgress(userId, item.id, episodeId);
   },
 
-  getAllProgress(userId: string): WatchProgressRecord[] {
+  async getAllProgress(userId: string): Promise<WatchProgressRecord[]> {
     return libraryRepository.getAllProgressForUser(userId);
   },
 
   // Watch History
-  getHistory(userId: string, limit: number = 30): WatchHistoryRecord[] {
+  async getHistory(userId: string, limit = 30): Promise<WatchHistoryRecord[]> {
     return libraryRepository.getHistory(userId, limit);
-  }
+  },
 };

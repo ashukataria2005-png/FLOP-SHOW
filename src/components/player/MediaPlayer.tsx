@@ -151,6 +151,12 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       return;
     }
 
+    if (!source.url || source.url.trim() === '') {
+      setIsLoading(false);
+      setErrorMessage('No video stream or file is currently configured for this title.');
+      return;
+    }
+
     // Set initial video seek if resuming
     if (videoRef.current && source.initialTimeSeconds && source.initialTimeSeconds > 5) {
       videoRef.current.currentTime = source.initialTimeSeconds;
@@ -204,7 +210,11 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       recordProgress(videoRef.current.currentTime, videoRef.current.duration);
     } else {
       videoRef.current.play().then(() => setIsPlaying(true)).catch((err) => {
-        setErrorMessage('Unable to play video: ' + (err.message || 'playback error'));
+        if (err?.name === 'NotAllowedError') {
+          setIsPlaying(false);
+        } else {
+          setErrorMessage('Unable to play video: ' + (err?.message || 'playback error'));
+        }
       });
     }
   };
@@ -327,7 +337,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             onPlaying={() => setIsLoading(false)}
             onError={() => {
               setIsLoading(false);
-              setErrorMessage('Failed to load video file. The URL may be unreachable or invalid.');
+              setErrorMessage('The video stream or media file could not be loaded. Please check the URL or try again later.');
             }}
             onClick={togglePlay}
             onEnded={() => {

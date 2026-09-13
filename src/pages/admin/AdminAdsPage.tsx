@@ -105,30 +105,11 @@ export const AdminAdsPage: React.FC<AdminAdsPageProps> = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append('media', file);
-    formData.append('mediaType', 'TRAILER'); // general public bucket
-    formData.append('sourceType', 'UPLOAD');
-
     try {
       setUploading(true);
-      // Upload via backend API
-      const token = localStorage.getItem('flopshow_auth_token');
-      const response = await fetch('/api/admin/media/upload', {
-        method: 'POST',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: formData
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error?.message || 'Upload failed');
-      }
-
-      if (data.mediaUrl) {
-        setMediaUrl(data.mediaUrl);
+      const res = await api.admin.uploadFile(file);
+      if (res.url) {
+        setMediaUrl(res.url);
         showToast('Ad media file uploaded successfully!', 'success');
       }
     } catch (err: any) {

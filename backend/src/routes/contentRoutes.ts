@@ -5,9 +5,9 @@ import { adminService } from '../services/adminService.js';
 export const contentRouter = Router();
 
 // GET /api/content/featured
-contentRouter.get('/featured', (_req, res, next) => {
+contentRouter.get('/featured', async (_req, res, next) => {
   try {
-    const items = contentService.getFeatured();
+    const items = await contentService.getFeatured();
     res.json({ items });
   } catch (err) {
     next(err);
@@ -15,9 +15,9 @@ contentRouter.get('/featured', (_req, res, next) => {
 });
 
 // GET /api/content/genres
-contentRouter.get('/genres', (_req, res, next) => {
+contentRouter.get('/genres', async (_req, res, next) => {
   try {
-    const genres = contentService.getGenres();
+    const genres = await contentService.getGenres();
     res.json({ genres });
   } catch (err) {
     next(err);
@@ -25,13 +25,13 @@ contentRouter.get('/genres', (_req, res, next) => {
 });
 
 // GET /api/content/search
-contentRouter.get('/search', (req, res, next) => {
+contentRouter.get('/search', async (req, res, next) => {
   try {
     const q = (req.query.q as string) || '';
     const type = req.query.type as 'MOVIE' | 'SERIES' | undefined;
     const genre = req.query.genre as string | undefined;
 
-    const items = contentService.search(q, { type, genreSlug: genre });
+    const items = await contentService.search(q, { type, genreSlug: genre });
     res.json({ query: q, count: items.length, items });
   } catch (err) {
     next(err);
@@ -39,7 +39,7 @@ contentRouter.get('/search', (req, res, next) => {
 });
 
 // GET /api/content
-contentRouter.get('/', (req, res, next) => {
+contentRouter.get('/', async (req, res, next) => {
   try {
     const type = req.query.type as 'MOVIE' | 'SERIES' | undefined;
     const genre = req.query.genre as string | undefined;
@@ -47,12 +47,12 @@ contentRouter.get('/', (req, res, next) => {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
 
-    const items = contentService.listPublished({
+    const items = await contentService.listPublished({
       type,
       genreSlug: genre,
       featured,
       limit,
-      offset
+      offset,
     });
 
     res.json({ count: items.length, items });
@@ -62,9 +62,9 @@ contentRouter.get('/', (req, res, next) => {
 });
 
 // GET /api/content/hero (Dedicated Home Hero)
-contentRouter.get('/hero', (_req, res, next) => {
+contentRouter.get('/hero', async (_req, res, next) => {
   try {
-    const hero = contentService.getHero();
+    const hero = await contentService.getHero();
     res.json({ hero });
   } catch (err) {
     next(err);
@@ -72,9 +72,9 @@ contentRouter.get('/hero', (_req, res, next) => {
 });
 
 // GET /api/content/ads (Public Pre-roll Advertisement Configuration)
-contentRouter.get('/ads', (_req, res, next) => {
+contentRouter.get('/ads', async (_req, res, next) => {
   try {
-    const ads = adminService.getAdsConfig();
+    const ads = await adminService.getAdsConfig();
     res.json({ ads });
   } catch (err) {
     next(err);
@@ -82,9 +82,9 @@ contentRouter.get('/ads', (_req, res, next) => {
 });
 
 // GET /api/content/theme (Public App Theme Setting)
-contentRouter.get('/theme', (_req, res, next) => {
+contentRouter.get('/theme', async (_req, res, next) => {
   try {
-    const settings = adminService.getSettings();
+    const settings = await adminService.getSettings();
     const theme = settings.app_theme || 'flopshow-gold';
     res.json({ theme });
   } catch (err) {
@@ -93,15 +93,15 @@ contentRouter.get('/theme', (_req, res, next) => {
 });
 
 // GET /api/content/:idOrSlug
-contentRouter.get('/:idOrSlug', (req, res, next) => {
+contentRouter.get('/:idOrSlug', async (req, res, next) => {
   try {
-    const item = contentService.getDetails(req.params.idOrSlug);
+    const item = await contentService.getDetails(req.params.idOrSlug);
     if (!item) {
       res.status(404).json({
         error: {
           code: 'NOT_FOUND',
-          message: `Content "${req.params.idOrSlug}" not found.`
-        }
+          message: `Content "${req.params.idOrSlug}" not found.`,
+        },
       });
       return;
     }

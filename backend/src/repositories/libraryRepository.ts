@@ -1,4 +1,4 @@
-import { getDatabase } from '../db/connection.js';
+import { getAdapter } from '../db/adapter.js';
 import { ContentRecord } from './contentRepository.js';
 
 export interface WatchProgressRecord {
@@ -31,47 +31,50 @@ export const libraryRepository = {
   // --------------------------------------------------------------------------
   // MY LIST
   // --------------------------------------------------------------------------
-  addToMyList(id: string, userId: string, contentId: string, createdAt: string): void {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      INSERT OR IGNORE INTO my_list (id, user_id, content_id, created_at)
-      VALUES (?, ?, ?, ?);
-    `);
-    stmt.run(id, userId, contentId, createdAt);
+  async addToMyList(id: string, userId: string, contentId: string, createdAt: string): Promise<void> {
+    const db = getAdapter();
+    await db.run(
+      `INSERT INTO my_list (id, user_id, content_id, created_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT (user_id, content_id) DO NOTHING;`,
+      [id, userId, contentId, createdAt]
+    );
   },
 
-  removeFromMyList(userId: string, contentId: string): void {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      DELETE FROM my_list WHERE user_id = ? AND content_id = ?;
-    `);
-    stmt.run(userId, contentId);
+  async removeFromMyList(userId: string, contentId: string): Promise<void> {
+    const db = getAdapter();
+    await db.run(
+      `DELETE FROM my_list WHERE user_id = ? AND content_id = ?;`,
+      [userId, contentId]
+    );
   },
 
-  isInMyList(userId: string, contentId: string): boolean {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      SELECT 1 FROM my_list WHERE user_id = ? AND content_id = ?;
-    `);
-    return !!stmt.get(userId, contentId);
+  async isInMyList(userId: string, contentId: string): Promise<boolean> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT 1 FROM my_list WHERE user_id = ? AND content_id = ?;`,
+      [userId, contentId]
+    );
+    return rows.length > 0;
   },
 
-  getMyList(userId: string): ContentRecord[] {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      SELECT c.*
-      FROM my_list ml
-      JOIN content c ON ml.content_id = c.id
-      WHERE ml.user_id = ?
-      ORDER BY ml.created_at DESC;
-    `);
-    return stmt.all(userId) as ContentRecord[];
+  async getMyList(userId: string): Promise<ContentRecord[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT c.*
+       FROM my_list ml
+       JOIN content c ON ml.content_id = c.id
+       WHERE ml.user_id = ?
+       ORDER BY ml.created_at DESC;`,
+      [userId]
+    );
+    return rows as ContentRecord[];
   },
 
   // --------------------------------------------------------------------------
   // WATCH PROGRESS (Null-Safe Movie vs Episode)
   // --------------------------------------------------------------------------
-  saveProgress(data: {
+  async saveProgress(data: {
     id: string;
     userId: string;
     contentId: string;
@@ -81,117 +84,129 @@ export const libraryRepository = {
     durationSeconds: number;
     completed: number;
     updatedAt: string;
-  }): void {
-    const db = getDatabase();
+  }): Promise<void> {
+    const db = getAdapter();
     const episodeId = data.episodeId || null;
 
-    // Check existing entry based on movie vs episode uniqueness
-    let existing: { id: string } | undefined;
-
+    // Check for an existing record
+    let existingId: string | null = null;
     if (episodeId === null) {
-      existing = db.prepare(`
-        SELECT id FROM watch_progress
-        WHERE user_id = ? AND content_id = ? AND episode_id IS NULL;
-      `).get(data.userId, data.contentId) as { id: string } | undefined;
+      const { rows } = await db.query(
+        `SELECT id FROM watch_progress WHERE user_id = ? AND content_id = ? AND episode_id IS NULL;`,
+        [data.userId, data.contentId]
+      );
+      existingId = rows[0]?.id || null;
     } else {
-      existing = db.prepare(`
-        SELECT id FROM watch_progress
-        WHERE user_id = ? AND content_id = ? AND episode_id = ?;
-      `).get(data.userId, data.contentId, episodeId) as { id: string } | undefined;
+      const { rows } = await db.query(
+        `SELECT id FROM watch_progress WHERE user_id = ? AND content_id = ? AND episode_id = ?;`,
+        [data.userId, data.contentId, episodeId]
+      );
+      existingId = rows[0]?.id || null;
     }
 
-    if (existing) {
-      const updateStmt = db.prepare(`
-        UPDATE watch_progress
-        SET progress_percent = ?, current_time_seconds = ?, duration_seconds = ?,
-            completed = ?, updated_at = ?
-        WHERE id = ?;
-      `);
-      updateStmt.run(
-        data.progressPercent,
-        data.currentTimeSeconds,
-        data.durationSeconds,
-        data.completed,
-        data.updatedAt,
-        existing.id
+    if (existingId) {
+      await db.run(
+        `UPDATE watch_progress
+         SET progress_percent = ?, current_time_seconds = ?, duration_seconds = ?,
+             completed = ?, updated_at = ?
+         WHERE id = ?;`,
+        [
+          data.progressPercent,
+          data.currentTimeSeconds,
+          data.durationSeconds,
+          data.completed,
+          data.updatedAt,
+          existingId,
+        ]
       );
     } else {
-      const insertStmt = db.prepare(`
-        INSERT INTO watch_progress (
-          id, user_id, content_id, episode_id,
-          progress_percent, current_time_seconds, duration_seconds,
-          completed, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-      `);
-      insertStmt.run(
-        data.id,
-        data.userId,
-        data.contentId,
-        episodeId,
-        data.progressPercent,
-        data.currentTimeSeconds,
-        data.durationSeconds,
-        data.completed,
-        data.updatedAt
+      await db.run(
+        `INSERT INTO watch_progress
+           (id, user_id, content_id, episode_id,
+            progress_percent, current_time_seconds, duration_seconds,
+            completed, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        [
+          data.id,
+          data.userId,
+          data.contentId,
+          episodeId,
+          data.progressPercent,
+          data.currentTimeSeconds,
+          data.durationSeconds,
+          data.completed,
+          data.updatedAt,
+        ]
       );
     }
   },
 
-  getProgress(userId: string, contentId: string, episodeId?: string | null): WatchProgressRecord | null {
-    const db = getDatabase();
+  async getProgress(
+    userId: string,
+    contentId: string,
+    episodeId?: string | null
+  ): Promise<WatchProgressRecord | null> {
+    const db = getAdapter();
     const epId = episodeId || null;
 
-    let stmt;
     if (epId === null) {
-      stmt = db.prepare(`
-        SELECT * FROM watch_progress
-        WHERE user_id = ? AND content_id = ? AND episode_id IS NULL;
-      `);
-      return (stmt.get(userId, contentId) as WatchProgressRecord) || null;
+      const { rows } = await db.query(
+        `SELECT * FROM watch_progress WHERE user_id = ? AND content_id = ? AND episode_id IS NULL;`,
+        [userId, contentId]
+      );
+      return (rows[0] as WatchProgressRecord) || null;
     } else {
-      stmt = db.prepare(`
-        SELECT * FROM watch_progress
-        WHERE user_id = ? AND content_id = ? AND episode_id = ?;
-      `);
-      return (stmt.get(userId, contentId, epId) as WatchProgressRecord) || null;
+      const { rows } = await db.query(
+        `SELECT * FROM watch_progress WHERE user_id = ? AND content_id = ? AND episode_id = ?;`,
+        [userId, contentId, epId]
+      );
+      return (rows[0] as WatchProgressRecord) || null;
     }
   },
 
-  getAllProgressForUser(userId: string): WatchProgressRecord[] {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      SELECT wp.*, c.title, c.poster, c.type, e.title as episode_title
-      FROM watch_progress wp
-      JOIN content c ON wp.content_id = c.id
-      LEFT JOIN episodes e ON wp.episode_id = e.id
-      WHERE wp.user_id = ?
-      ORDER BY wp.updated_at DESC;
-    `);
-    return stmt.all(userId) as WatchProgressRecord[];
+  async getAllProgressForUser(userId: string): Promise<WatchProgressRecord[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT wp.*, c.title, c.poster, c.type, e.title as episode_title
+       FROM watch_progress wp
+       JOIN content c ON wp.content_id = c.id
+       LEFT JOIN episodes e ON wp.episode_id = e.id
+       WHERE wp.user_id = ?
+       ORDER BY wp.updated_at DESC;`,
+      [userId]
+    );
+    return rows as WatchProgressRecord[];
   },
 
   // --------------------------------------------------------------------------
   // WATCH HISTORY
   // --------------------------------------------------------------------------
-  addHistory(id: string, userId: string, contentId: string, episodeId: string | null, watchedAt: string): void {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      INSERT INTO watch_history (id, user_id, content_id, episode_id, watched_at)
-      VALUES (?, ?, ?, ?, ?);
-    `);
-    stmt.run(id, userId, contentId, episodeId, watchedAt);
+  async addHistory(
+    id: string,
+    userId: string,
+    contentId: string,
+    episodeId: string | null,
+    watchedAt: string
+  ): Promise<void> {
+    const db = getAdapter();
+    await db.run(
+      `INSERT INTO watch_history (id, user_id, content_id, episode_id, watched_at)
+       VALUES (?, ?, ?, ?, ?);`,
+      [id, userId, contentId, episodeId, watchedAt]
+    );
   },
 
-  getHistory(userId: string, limit: number = 30): WatchHistoryRecord[] {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      SELECT wh.*, c.title, c.poster
-      FROM watch_history wh
-      JOIN content c ON wh.content_id = c.id
-      WHERE wh.user_id = ?
-      ORDER BY wh.watched_at DESC
-      LIMIT ?;
-    `);
-    return stmt.all(userId, limit) as WatchHistoryRecord[];
-  }
+  async getHistory(userId: string, limit = 30): Promise<WatchHistoryRecord[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT wh.*, c.title, c.poster
+       FROM watch_history wh
+       JOIN content c ON wh.content_id = c.id
+       WHERE wh.user_id = ?
+       ORDER BY wh.watched_at DESC
+       LIMIT ?;`,
+      [userId, limit]
+    );
+    return rows as WatchHistoryRecord[];
+  },
 };

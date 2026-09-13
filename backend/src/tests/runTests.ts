@@ -1,5 +1,5 @@
 import { createServer } from '../server.js';
-import { runMigrations } from '../db/migrator.js';
+import { runMigrationsAsync } from '../db/migrator.js';
 import { seedDatabase } from '../db/seed.js';
 import { config } from '../config/env.js';
 import { Server } from 'http';
@@ -37,8 +37,8 @@ async function main() {
   console.log('============================================================');
 
   // 1. Setup DB
-  runMigrations();
-  const seedReport = seedDatabase();
+  await runMigrationsAsync();
+  const seedReport = await seedDatabase();
 
   // 2. Start Test Server on ephemeral port
   const app = createServer();

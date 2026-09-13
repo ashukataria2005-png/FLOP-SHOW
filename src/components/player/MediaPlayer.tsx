@@ -68,30 +68,24 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
 
   // Advertisement Pre-roll State
   const [adConfig, setAdConfig] = useState<AdConfig | null>(null);
-  const [adFinished, setAdFinished] = useState<boolean>(source?.mediaType !== 'MAIN');
+  // adFinished: true for trailers (no ad needed), initially checked for MAIN
+  const [adFinished, setAdFinished] = useState<boolean>(
+    !source || source.mediaType !== 'MAIN'
+  );
+  // adChecking: true while we are waiting for getAdsConfig() to resolve.
+  // The video element is NOT mounted until adChecking becomes false.
+  // This prevents the 1-second video flash before AdPreroll appears.
+  const [adChecking, setAdChecking] = useState<boolean>(
+    !!(source && source.mediaType === 'MAIN')
+  );
 
-  // Reset player error & loading state whenever source changes
-  useEffect(() => {
-    setErrorMessage(null);
-    setIsLoading(true);
-    setCurrentTime(source?.initialTimeSeconds || 0);
-  }, [source?.url]);
+  // ─── ALL HOOKS UNCONDITIONAL — Rules of Hooks requires this ─────────────────
 
-  const handleRetry = () => {
-    setErrorMessage(null);
-    setIsLoading(true);
-    if (videoRef.current) {
-      videoRef.current.load();
-      videoRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => setIsPlaying(false));
-    }
-  };
-
+  // Fetch ad config once per content/episode for MAIN type
   useEffect(() => {
     let active = true;
     if (source?.mediaType === 'MAIN') {
+      setAdChecking(true);
       api.content.getAdsConfig()
         .then(cfg => {
           if (active) {
@@ -104,34 +98,32 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
           }
         })
         .catch(() => {
+          // Ad check failed — skip ads and proceed to main content immediately
           if (active) setAdFinished(true);
+        })
+        .finally(() => {
+          if (active) setAdChecking(false);
         });
     } else {
       setAdFinished(true);
+      setAdChecking(false);
     }
     return () => { active = false; };
   }, [source?.contentId, source?.episodeId, source?.mediaType]);
 
-  if (!source) return null;
-
-  // Render Pre-roll Advertisement if active and not yet finished
-  if (!adFinished && adConfig && adConfig.enabled && adConfig.mediaUrl) {
-    return (
-      <AdPreroll
-        adConfig={adConfig}
-        onComplete={() => setAdFinished(true)}
-        onClose={onClose}
-      />
-    );
-  }
-
-  // Determine if source is YouTube
-  const youtubeInfo = parseYouTubeUrl(source.url);
-  const isYouTube = youtubeInfo.isYouTube;
+  // Reset player state whenever the source URL changes
+  useEffect(() => {
+    if (!source?.url) return;
+    setErrorMessage(null);
+    setIsLoading(true);
+    setCurrentTime(source.initialTimeSeconds || 0);
+    setDuration(0);
+    setIsPlaying(false);
+  }, [source?.url]);
 
   // Sync watch progress to backend & local context
   const recordProgress = useCallback((curTime: number, durTime: number) => {
-    if (!source.contentId || source.mediaType === 'TRAILER' || durTime <= 0) return;
+    if (!source || !source.contentId || source.mediaType === 'TRAILER' || durTime <= 0) return;
 
     const percent = Math.min(100, Math.round((curTime / durTime) * 100));
 
@@ -159,54 +151,115 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     });
   }, [source, saveWatchProgress]);
 
-  // Initial setup & progress restore
-  useEffect(() => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    setCurrentTime(source.initialTimeSeconds || 0);
-
-    if (isYouTube) {
-      setIsLoading(false);
-      return;
-    }
-
-    if (!source.url || source.url.trim() === '') {
-      setIsLoading(false);
-      setErrorMessage('No video stream or file is currently configured for this title.');
-      return;
-    }
-
-    // Set initial video seek if resuming
-    if (videoRef.current && source.initialTimeSeconds && source.initialTimeSeconds > 5) {
-      videoRef.current.currentTime = source.initialTimeSeconds;
-    }
-  }, [source.url, source.initialTimeSeconds, isYouTube]);
-
   // Periodic watch progress interval (every 5 seconds)
   useEffect(() => {
-    if (!isYouTube && isPlaying) {
+    const isYT = source ? parseYouTubeUrl(source.url).isYouTube : false;
+    if (!isYT && isPlaying) {
       progressIntervalRef.current = window.setInterval(() => {
         if (videoRef.current) {
           recordProgress(videoRef.current.currentTime, videoRef.current.duration);
         }
       }, 5000);
     }
-
     return () => {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
       }
     };
-  }, [isPlaying, isYouTube, recordProgress]);
+  }, [isPlaying, source, recordProgress]);
 
   // Save progress on unmount / close
   useEffect(() => {
     return () => {
-      if (videoRef.current && !isYouTube) {
+      const isYT = source ? parseYouTubeUrl(source.url).isYouTube : false;
+      if (videoRef.current && !isYT) {
         recordProgress(videoRef.current.currentTime, videoRef.current.duration);
       }
     };
-  }, [isYouTube, recordProgress]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── END UNCONDITIONAL HOOKS ─────────────────────────────────────────────────
+
+  if (!source) return null;
+
+  // While ad check is still in-flight, show a neutral loading overlay.
+  // This prevents the video from mounting and playing for ~1s before AdPreroll appears.
+  if (adChecking) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 2500,
+          backgroundColor: '#000000',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: '16px'
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', pointerEvents: 'none' }}>
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              border: '4px solid rgba(245, 197, 24, 0.2)',
+              borderTopColor: 'var(--brand-gold, #F5C518)',
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite'
+            }}
+          />
+          <span style={{ fontSize: '14px', fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Preparing playback...</span>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            marginTop: '24px',
+            padding: '10px 22px',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(255,255,255,0.08)',
+            border: 'none',
+            color: '#FFFFFF',
+            fontWeight: 600,
+            fontSize: '14px',
+            cursor: 'pointer'
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  // Render Pre-roll Advertisement if active and not yet finished
+  if (!adFinished && adConfig && adConfig.enabled && adConfig.mediaUrl) {
+    return (
+      <AdPreroll
+        adConfig={adConfig}
+        onComplete={() => setAdFinished(true)}
+        onClose={onClose}
+      />
+    );
+  }
+
+  // Determine if source is YouTube
+  const youtubeInfo = parseYouTubeUrl(source.url);
+  const isYouTube = youtubeInfo.isYouTube;
+
+  const handleRetry = () => {
+    setErrorMessage(null);
+    setIsLoading(true);
+    if (videoRef.current) {
+      videoRef.current.load();
+      videoRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => setIsPlaying(false));
+    }
+  };
 
   // Handle controls hide on idle
   const handleUserActivity = () => {
@@ -340,25 +393,42 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             ref={videoRef}
             src={source.url}
             poster={source.poster}
-            preload="metadata"
+            preload="auto"
             playsInline
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              zIndex: 1
+            }}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => {
+              if (!videoRef.current) return;
+              const vid = videoRef.current;
+              setDuration(vid.duration);
+              if (source.initialTimeSeconds && source.initialTimeSeconds > 5) {
+                vid.currentTime = source.initialTimeSeconds;
+              }
               setIsLoading(false);
               setErrorMessage(null);
-              if (videoRef.current) {
-                setDuration(videoRef.current.duration);
-                if (source.initialTimeSeconds && source.initialTimeSeconds > 5) {
-                  videoRef.current.currentTime = source.initialTimeSeconds;
-                }
-                videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-              }
+              vid.play()
+                .then(() => setIsPlaying(true))
+                .catch((err) => {
+                  if (err?.name !== 'NotAllowedError') {
+                    setErrorMessage('Unable to start playback: ' + (err?.message || 'unknown error'));
+                  }
+                  setIsPlaying(false);
+                });
             }}
+            onCanPlay={() => setIsLoading(false)}
             onWaiting={() => setIsLoading(true)}
+            onStalled={() => setIsLoading(true)}
             onPlaying={() => {
               setIsLoading(false);
               setIsPlaying(true);
+              setErrorMessage(null);
             }}
             onPause={() => setIsPlaying(false)}
             onError={() => {
@@ -394,7 +464,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             }}
           />
 
-          {/* Large Center Play Trigger */}
+          {/* Large Center Play Trigger — only when NOT playing, NOT loading, NO error */}
           {!isPlaying && !isLoading && !errorMessage && (
             <div
               onClick={togglePlay}
@@ -410,7 +480,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
                 justifyContent: 'center',
                 boxShadow: '0 0 35px rgba(245, 197, 24, 0.55)',
                 cursor: 'pointer',
-                zIndex: 5,
+                zIndex: 10,
                 transition: 'transform 0.15s ease'
               }}
             >
@@ -420,7 +490,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
         </>
       )}
 
-      {/* Loading Spinner */}
+      {/* Loading Spinner — overlaid on video, does NOT hide the video element */}
       {isLoading && (
         <div
           style={{
@@ -430,7 +500,8 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             flexDirection: 'column',
             alignItems: 'center',
             gap: '12px',
-            color: '#FFFFFF'
+            color: '#FFFFFF',
+            pointerEvents: 'none'
           }}
         >
           <Loader2 size={44} className="spin" color="var(--brand-gold, #F5C518)" />

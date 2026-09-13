@@ -164,6 +164,21 @@ input, textarea, select {
   50% { opacity: 0.4; }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Spin animation utilities */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+
 /* App Shell Layout */
 .app-container {
   display: flex;

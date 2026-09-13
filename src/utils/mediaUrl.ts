@@ -62,23 +62,45 @@ export function detectSourceType(urlString: string): 'YOUTUBE' | 'DIRECT_URL' {
 }
 
 /**
- * Resolves a media URL to an absolute URL if it is a relative upload path (/uploads/...)
+ * Resolves a media URL to an absolute URL if it is a relative upload path (/uploads/...).
+ * Handles three cases:
+ *  1. Already an absolute http/https URL — returned as-is.
+ *  2. Relative /uploads/... path with an absolute apiBaseUrl — prefixed with origin of apiBaseUrl.
+ *  3. Relative /uploads/... path with a relative apiBaseUrl (e.g. '/api', local dev) —
+ *     prefixed with window.location.origin so Vite proxy or same-server routing handles it.
  */
 export function resolveMediaUrl(rawUrl?: string | null, apiBaseUrl?: string): string {
   if (!rawUrl || typeof rawUrl !== 'string') return '';
   const trimmed = rawUrl.trim();
+
+  // Already an absolute URL — return as-is
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+
+  // Relative upload path: resolve to absolute
   if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
     const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-    if (apiBaseUrl && apiBaseUrl.startsWith('http')) {
+
+    // If apiBaseUrl is absolute (production Render backend URL), use its origin
+    if (apiBaseUrl && (apiBaseUrl.startsWith('http://') || apiBaseUrl.startsWith('https://'))) {
       try {
         const origin = new URL(apiBaseUrl).origin;
         return `${origin}${cleanPath}`;
       } catch {
-        return cleanPath;
+        // fall through
       }
     }
+
+    // For relative apiBaseUrl (local dev with Vite proxy), use current page origin
+    // so browser requests /uploads/... through the Vite proxy → backend
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return `${window.location.origin}${cleanPath}`;
+    }
+
     return cleanPath;
   }
+
   return trimmed;
 }
 

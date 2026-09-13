@@ -361,49 +361,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Admin Panel Gateway */}
-      <div
-        onClick={() => onNavigate('admin')}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: 'rgba(245, 197, 24, 0.08)',
-          border: '1px solid rgba(245, 197, 24, 0.3)',
-          borderRadius: '16px',
-          padding: '16px 20px',
-          marginBottom: '24px',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '10px',
-              backgroundColor: 'rgba(245, 197, 24, 0.2)',
-              color: 'var(--brand-gold, #F5C518)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Sliders size={20} />
-          </div>
-          <div>
-            <div style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF' }}>
-              FLOPSHOW Admin Panel
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary, #9CA3AF)' }}>
-              Manage movies, series, pricing, Trending #1, and media
-            </div>
-          </div>
-        </div>
 
-        <ChevronRight size={18} color="var(--brand-gold, #F5C518)" />
-      </div>
 
       {/* Account Switcher / Sign Out */}
       <div style={{ display: 'flex', gap: '12px' }}>

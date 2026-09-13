@@ -55,8 +55,11 @@ export const mediaService = {
 
     if (yt.isYouTube) {
       detectedSource = 'YOUTUBE';
+    } else if (cleanUrl.startsWith('/uploads/') || cleanUrl.startsWith('uploads/')) {
+      // Relative upload paths from the file upload endpoint — treat as UPLOAD
+      detectedSource = 'UPLOAD';
     } else if (detectedSource !== 'UPLOAD' && !isValidMediaUrl(cleanUrl)) {
-      const err = new Error('Invalid URL. Please provide a valid http or https URL.');
+      const err = new Error('Invalid URL. Please provide a valid http or https URL, or upload a file.');
       (err as any).statusCode = 400;
       throw err;
     }
@@ -125,8 +128,11 @@ export const mediaService = {
 
     if (yt.isYouTube) {
       detectedSource = 'YOUTUBE';
+    } else if (cleanUrl.startsWith('/uploads/') || cleanUrl.startsWith('uploads/')) {
+      // Relative upload paths from the file upload endpoint — treat as UPLOAD
+      detectedSource = 'UPLOAD';
     } else if (detectedSource !== 'UPLOAD' && !isValidMediaUrl(cleanUrl)) {
-      const err = new Error('Invalid URL. Please provide a valid http or https URL.');
+      const err = new Error('Invalid URL. Please provide a valid http or https URL, or upload a file.');
       (err as any).statusCode = 400;
       throw err;
     }

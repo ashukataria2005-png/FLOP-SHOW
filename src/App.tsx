@@ -133,7 +133,18 @@ function tabToPath(tab: string, param?: string): string {
 }
 
 const AppContent: React.FC = () => {
-  const { user, isAuthenticated, toasts, activeMediaSource, closePlayer, catalog } = useApp();
+  const {
+    user,
+    isAuthenticated,
+    toasts,
+    activeMediaSource,
+    closePlayer,
+    catalog,
+    hasNextEpisode,
+    hasPrevEpisode,
+    playNextEpisode,
+    playPrevEpisode
+  } = useApp();
   const isAdmin = Boolean(user && user.role === 'ADMIN');
 
   const [currentTab, setCurrentTab] = useState<string>(() => {
@@ -244,7 +255,14 @@ const AppContent: React.FC = () => {
 
         {/* Real Media Player Overlay */}
         {activeMediaSource && (
-          <MediaPlayer source={activeMediaSource} onClose={closePlayer} />
+          <MediaPlayer
+            source={activeMediaSource}
+            onClose={closePlayer}
+            onNextEpisode={playNextEpisode}
+            onPrevEpisode={playPrevEpisode}
+            hasNextEpisode={hasNextEpisode}
+            hasPrevEpisode={hasPrevEpisode}
+          />
         )}
 
         {/* Toast Notifications */}
@@ -336,7 +354,14 @@ const AppContent: React.FC = () => {
 
       {/* Real Media Player (HTML5, local uploads, direct URLs, YouTube trailers) */}
       {activeMediaSource && (
-        <MediaPlayer source={activeMediaSource} onClose={closePlayer} />
+        <MediaPlayer
+          source={activeMediaSource}
+          onClose={closePlayer}
+          onNextEpisode={playNextEpisode}
+          onPrevEpisode={playPrevEpisode}
+          hasNextEpisode={hasNextEpisode}
+          hasPrevEpisode={hasPrevEpisode}
+        />
       )}
 
       {/* Toast Notifications */}

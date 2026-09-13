@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ContentItem, Episode } from '../types/content';
 import { useApp } from '../context/AppContext';
 import { EpisodeCard } from '../components/cards/EpisodeCard';
 import { ContentCard } from '../components/cards/ContentCard';
+import { api } from '../services/api';
 import {
   ArrowLeft,
   Play,
@@ -27,36 +28,70 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
     inMyList,
     toggleMyList,
     activeEpisode,
-    catalog
+    catalog,
+    getProgress
   } = useApp();
 
-  const [selectedSeasonNumber, setSelectedSeasonNumber] = useState(1);
+  const [details, setDetails] = useState<ContentItem>(item);
 
-  const owned = isOwned(item.id);
-  const isInList = inMyList(item.id);
-  const isSeries = item.type === 'series';
+  const getInitialSeasonNumber = (seasonsList?: { seasonNumber: number }[]) => {
+    if (!seasonsList || seasonsList.length === 0) return 1;
+    const hasS1 = seasonsList.some(s => s.seasonNumber === 1);
+    return hasS1 ? 1 : seasonsList[0].seasonNumber;
+  };
+
+  const [selectedSeasonNumber, setSelectedSeasonNumber] = useState<number>(() =>
+    getInitialSeasonNumber(item.seasons)
+  );
+
+  useEffect(() => {
+    setDetails(item);
+    if (item.type === 'series') {
+      api.content.getDetails(item.id)
+        .then(full => {
+          if (full) {
+            setDetails(full);
+            if (full.seasons && full.seasons.length > 0) {
+              setSelectedSeasonNumber(prev => {
+                const seasonExists = full.seasons!.some(s => s.seasonNumber === prev);
+                if (seasonExists) return prev;
+                return getInitialSeasonNumber(full.seasons);
+              });
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [item.id]);
+
+  const currentItem = details || item;
+  const owned = isOwned(currentItem.id);
+  const isInList = inMyList(currentItem.id);
+  const isSeries = currentItem.type === 'series';
+  const seasons = currentItem.seasons || [];
 
   // Current season episodes if series
-  const activeSeason = item.seasons?.find(s => s.seasonNumber === selectedSeasonNumber) || item.seasons?.[0];
+  const activeSeason = seasons.find(s => s.seasonNumber === selectedSeasonNumber) || seasons[0];
+  const episodes = activeSeason?.episodes || [];
 
   // Recommendations (same genre or other titles) from central catalog
   const recommendations = (catalog || []).filter(
-    c => c.id !== item.id && c.genres.some(g => item.genres.includes(g))
+    c => c.id !== currentItem.id && c.genres.some(g => currentItem.genres.includes(g))
   ).slice(0, 4);
 
   const handlePrimaryAction = () => {
-    if (owned || item.isFree) {
-      startPlaying(item);
+    if (owned || currentItem.isFree) {
+      startPlaying(currentItem);
     } else {
-      openPurchaseModal(item);
+      openPurchaseModal(currentItem);
     }
   };
 
   const handlePlayEpisode = (episode: Episode) => {
-    if (owned || item.isFree) {
-      startPlaying(item, episode);
+    if (owned || currentItem.isFree) {
+      startPlaying(currentItem, episode);
     } else {
-      openPurchaseModal(item);
+      openPurchaseModal(currentItem);
     }
   };
 
@@ -113,8 +148,8 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
       >
         {/* Backdrop Image */}
         <img
-          src={item.backdropUrl}
-          alt={item.title}
+          src={currentItem.backdropUrl || currentItem.posterUrl}
+          alt={currentItem.title}
           style={{
             position: 'absolute',
             inset: 0,
@@ -157,7 +192,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
               textTransform: 'uppercase'
             }}
           >
-            {item.categoryLabel || `${item.type.toUpperCase()} • ${item.genres.join(' • ')}`}
+            {currentItem.categoryLabel || `${currentItem.type.toUpperCase()} • ${currentItem.genres.join(' • ')}`}
           </div>
 
           {/* Title */}
@@ -170,7 +205,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
               lineHeight: 1.05
             }}
           >
-            {item.title}
+            {currentItem.title}
           </h1>
 
           {/* Description */}
@@ -182,7 +217,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
               maxWidth: '580px'
             }}
           >
-            {item.description}
+            {currentItem.description}
           </p>
 
           {/* Metadata Row matching Screenshot 3: ★ 9.1  2024  2 Seasons  Hindi  Directed by S. Banerjee */}
@@ -199,12 +234,12 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#FFFFFF', fontWeight: 700 }}>
               <Star size={16} fill="var(--brand-gold)" color="var(--brand-gold)" />
-              <span>{item.rating.toFixed(1)}</span>
+              <span>{currentItem.rating.toFixed(1)}</span>
             </div>
 
-            <span>{item.releaseYear}</span>
+            <span>{currentItem.releaseYear}</span>
 
-            <span>{isSeries ? `${item.seasonsCount} Seasons` : item.runtime}</span>
+            <span>{isSeries ? `${seasons.length > 0 ? seasons.length : (currentItem.seasonsCount || 1)} Seasons` : currentItem.runtime}</span>
 
             <span
               style={{
@@ -217,12 +252,12 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
                 fontWeight: 600
               }}
             >
-              {item.language}
+              {currentItem.language}
             </span>
 
-            {item.director && (
+            {currentItem.director && (
               <span style={{ color: 'var(--text-secondary)' }}>
-                Directed by <strong>{item.director}</strong>
+                Directed by <strong>{currentItem.director}</strong>
               </span>
             )}
           </div>
@@ -236,15 +271,15 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
             >
               <Play size={18} fill="#0E0E12" />
               <span>
-                {owned || item.isFree
+                {owned || currentItem.isFree
                   ? 'Watch now'
-                  : `Buy for ₹${item.price}`}
+                  : `Buy for ₹${currentItem.price}`}
               </span>
             </button>
 
             {/* Watch Trailer CTA */}
             <button
-              onClick={() => playTrailer(item)}
+              onClick={() => playTrailer(currentItem)}
               className="btn btn-secondary btn-lg"
               style={{ minWidth: '150px' }}
             >
@@ -253,7 +288,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
             </button>
 
             <button
-              onClick={() => toggleMyList(item.id)}
+              onClick={() => toggleMyList(currentItem.id)}
               className="btn btn-secondary btn-lg"
               style={{ minWidth: '130px' }}
             >
@@ -295,17 +330,17 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
               maxWidth: '820px'
             }}
           >
-            {item.about}
+            {currentItem.about}
           </p>
 
           {/* Cast Chips */}
-          {item.cast && item.cast.length > 0 && (
+          {currentItem.cast && currentItem.cast.length > 0 && (
             <div style={{ marginTop: '20px' }}>
               <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
                 Cast & Credits
               </h4>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {item.cast.map(actor => (
+                {currentItem.cast.map(actor => (
                   <span
                     key={actor}
                     style={{
@@ -326,48 +361,87 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
         </div>
 
         {/* If Series: Seasons & Episodes Listing */}
-        {isSeries && item.seasons && (
+        {isSeries && (
           <div style={{ margin: '36px 0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF' }}>
-                Episodes
-              </h2>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '14px',
+                marginBottom: '20px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                  Episodes
+                </h2>
+                {activeSeason && (
+                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    {activeSeason.title || `Season ${activeSeason.seasonNumber}`} • {episodes.length} {episodes.length === 1 ? 'Episode' : 'Episodes'}
+                  </span>
+                )}
+              </div>
 
               {/* Season Selector Tabs */}
-              {item.seasons.length > 1 && (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {item.seasons.map(s => (
-                    <button
-                      key={s.seasonNumber}
-                      onClick={() => setSelectedSeasonNumber(s.seasonNumber)}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: 'var(--radius-pill)',
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        backgroundColor: selectedSeasonNumber === s.seasonNumber ? 'var(--brand-gold)' : 'rgba(255, 255, 255, 0.08)',
-                        color: selectedSeasonNumber === s.seasonNumber ? '#0E0E12' : '#FFFFFF',
-                        transition: 'all var(--transition-fast)'
-                      }}
-                    >
-                      Season {s.seasonNumber}
-                    </button>
-                  ))}
+              {seasons.length > 1 && (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {seasons.map(s => {
+                    const isSelected = selectedSeasonNumber === s.seasonNumber;
+                    return (
+                      <button
+                        key={s.seasonNumber}
+                        onClick={() => setSelectedSeasonNumber(s.seasonNumber)}
+                        style={{
+                          padding: '7px 18px',
+                          borderRadius: 'var(--radius-pill)',
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          backgroundColor: isSelected ? 'var(--brand-gold)' : 'rgba(255, 255, 255, 0.08)',
+                          color: isSelected ? '#0E0E12' : '#FFFFFF',
+                          border: isSelected ? '1px solid var(--brand-gold)' : '1px solid rgba(255, 255, 255, 0.12)',
+                          cursor: 'pointer',
+                          transition: 'all var(--transition-fast)'
+                        }}
+                      >
+                        {s.title || `Season ${s.seasonNumber}`}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
 
             {/* Episode Cards Grid/List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {activeSeason?.episodes.map(ep => (
-                <EpisodeCard
-                  key={ep.id}
-                  episode={ep}
-                  isCurrent={activeEpisode?.id === ep.id}
-                  onPlay={handlePlayEpisode}
-                />
-              ))}
-            </div>
+            {episodes.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {episodes.map(ep => (
+                  <EpisodeCard
+                    key={ep.id}
+                    episode={ep}
+                    seriesPosterUrl={currentItem.posterUrl}
+                    isCurrent={activeEpisode?.id === ep.id}
+                    progress={getProgress(currentItem.id, ep.id)}
+                    onPlay={handlePlayEpisode}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: '36px 20px',
+                  borderRadius: '16px',
+                  backgroundColor: 'rgba(22, 22, 34, 0.4)',
+                  border: '1px dashed rgba(255, 255, 255, 0.12)',
+                  textAlign: 'center',
+                  color: 'var(--text-secondary)',
+                  fontSize: '14px'
+                }}
+              >
+                No episodes available in this season yet.
+              </div>
+            )}
           </div>
         )}
 

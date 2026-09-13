@@ -57,7 +57,7 @@ interface AppContextType {
 
   // Watch Progress
   watchProgress: WatchProgress[];
-  getProgress: (contentId: string) => WatchProgress | undefined;
+  getProgress: (contentId: string, episodeId?: string) => WatchProgress | undefined;
   saveWatchProgress: (progress: Omit<WatchProgress, 'updatedAt'>) => void;
 
   // Modals & UI Triggers
@@ -78,6 +78,10 @@ interface AppContextType {
   playTrailer: (content: ContentItem) => Promise<void>;
   playMedia: (source: MediaPlayerSource) => void;
   closePlayer: () => void;
+  hasNextEpisode: boolean;
+  hasPrevEpisode: boolean;
+  playNextEpisode: () => void;
+  playPrevEpisode: () => void;
 
   // Feedback Toast
   toasts: Toast[];
@@ -309,7 +313,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Watch Progress
-  const getProgress = (contentId: string): WatchProgress | undefined => {
+  const getProgress = (contentId: string, episodeId?: string): WatchProgress | undefined => {
+    if (episodeId) {
+      return watchProgress.find(p => p.contentId === contentId && p.episodeId === episodeId)
+        || watchProgress.find(p => p.episodeId === episodeId);
+    }
     return watchProgress.find(p => p.contentId === contentId);
   };
 
@@ -320,9 +328,49 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     setWatchProgress(prev => {
-      const filtered = prev.filter(p => p.contentId !== progressData.contentId);
+      const filtered = prev.filter(p => {
+        if (progressData.episodeId) {
+          return !(p.contentId === progressData.contentId && p.episodeId === progressData.episodeId);
+        }
+        return p.contentId !== progressData.contentId;
+      });
       return [entry, ...filtered];
     });
+  };
+
+  // Determine current season's episodes for Previous / Next Episode navigation
+  const currentSeasonEpisodes = React.useMemo(() => {
+    if (!activePlayerContent || activePlayerContent.type !== 'series' || !activeEpisode) {
+      return [];
+    }
+    const season = activePlayerContent.seasons?.find(s => s.seasonNumber === activeEpisode.seasonNumber);
+    return season?.episodes || [];
+  }, [activePlayerContent, activeEpisode]);
+
+  const currentEpisodeIndex = React.useMemo(() => {
+    if (!activeEpisode || currentSeasonEpisodes.length === 0) return -1;
+    return currentSeasonEpisodes.findIndex(e => e.id === activeEpisode.id);
+  }, [activeEpisode, currentSeasonEpisodes]);
+
+  const hasPrevEpisode = currentEpisodeIndex > 0;
+  const hasNextEpisode = currentEpisodeIndex >= 0 && currentEpisodeIndex < currentSeasonEpisodes.length - 1;
+
+  const playPrevEpisode = () => {
+    if (hasPrevEpisode && activePlayerContent) {
+      const prevEp = currentSeasonEpisodes[currentEpisodeIndex - 1];
+      if (prevEp) {
+        startPlaying(activePlayerContent, prevEp);
+      }
+    }
+  };
+
+  const playNextEpisode = () => {
+    if (hasNextEpisode && activePlayerContent) {
+      const nextEp = currentSeasonEpisodes[currentEpisodeIndex + 1];
+      if (nextEp) {
+        startPlaying(activePlayerContent, nextEp);
+      }
+    }
   };
 
   // Real Media Player controls
@@ -335,11 +383,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let episodeId = episode?.id;
 
     if (content.type === 'series') {
-      if (!ep && content.seasons && content.seasons.length > 0 && content.seasons[0].episodes.length > 0) {
+      if (!ep && content.seasons && content.seasons.length > 0) {
         const existingProgress = getProgress(content.id);
-        ep = existingProgress?.episodeId
-          ? content.seasons.flatMap(s => s.episodes).find(e => e.id === existingProgress.episodeId)
-          : content.seasons[0].episodes[0];
+        if (existingProgress?.episodeId) {
+          ep = content.seasons.flatMap(s => s.episodes).find(e => e.id === existingProgress.episodeId);
+        }
+        if (!ep && content.seasons[0].episodes?.length > 0) {
+          ep = content.seasons[0].episodes[0];
+        }
       }
       setActiveEpisode(ep || null);
       if (ep) {
@@ -356,28 +407,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       if (episodeId) {
         const mediaRes = await api.media.getEpisodeMedia(episodeId, 'MAIN');
-        if (mediaRes?.url) sourceUrl = mediaRes.url;
+        if (mediaRes?.url && mediaRes.url.trim() !== '') {
+          sourceUrl = mediaRes.url;
+        }
       } else {
         const mediaRes = await api.media.getContentMedia(content.id, 'MAIN');
-        if (mediaRes?.url) sourceUrl = mediaRes.url;
+        if (mediaRes?.url && mediaRes.url.trim() !== '') {
+          sourceUrl = mediaRes.url;
+        }
       }
     } catch {
       // Keep local sourceUrl or fallback
     }
 
-    // Default sample stream if none configured
-    if (!sourceUrl) {
-      sourceUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    // If no MAIN video is configured, show a clear message instead of breaking
+    if (!sourceUrl || sourceUrl.trim() === '') {
+      showToast(
+        ep
+          ? `No playable video is currently configured for Episode ${ep.episodeNumber}: "${ep.title}".`
+          : `No playable video is currently configured for "${content.title}".`,
+        'info'
+      );
+      return;
     }
 
-    const progress = getProgress(content.id);
+    const progress = ep ? getProgress(content.id, ep.id) : getProgress(content.id);
 
     setActiveMediaSource({
       title: content.title,
       subtitle,
       mediaType: 'MAIN',
       url: sourceUrl,
-      poster: content.backdropUrl || content.posterUrl,
+      poster: ep?.thumbnailUrl || content.backdropUrl || content.posterUrl,
       contentId: content.id,
       episodeId,
       initialTimeSeconds: progress?.currentTime || 0
@@ -485,6 +546,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         playTrailer,
         playMedia,
         closePlayer,
+        hasNextEpisode,
+        hasPrevEpisode,
+        playNextEpisode,
+        playPrevEpisode,
         toasts,
         showToast
       }}

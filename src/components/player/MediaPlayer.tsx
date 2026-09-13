@@ -15,7 +15,9 @@ import {
   Maximize,
   Minimize,
   AlertCircle,
-  Loader2
+  Loader2,
+  SkipBack,
+  SkipForward
 } from 'lucide-react';
 
 export interface MediaPlayerSource {
@@ -30,18 +32,22 @@ export interface MediaPlayerSource {
   initialTimeSeconds?: number;
 }
 
-interface MediaPlayerProps {
+export interface MediaPlayerProps {
   source: MediaPlayerSource | null;
   onClose: () => void;
   onNextEpisode?: () => void;
+  onPrevEpisode?: () => void;
   hasNextEpisode?: boolean;
+  hasPrevEpisode?: boolean;
 }
 
 export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   source,
   onClose,
   onNextEpisode,
-  hasNextEpisode
+  onPrevEpisode,
+  hasNextEpisode,
+  hasPrevEpisode
 }) => {
   const { saveWatchProgress } = useApp();
 
@@ -485,7 +491,62 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
           )}
         </div>
 
-        <div style={{ width: '80px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '80px', justifyContent: 'flex-end' }}>
+          {source.episodeId && (
+            <>
+              {onPrevEpisode && (
+                <button
+                  onClick={onPrevEpisode}
+                  disabled={!hasPrevEpisode}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 12px',
+                    borderRadius: '9999px',
+                    backgroundColor: hasPrevEpisode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                    border: 'none',
+                    color: hasPrevEpisode ? '#FFFFFF' : 'rgba(255, 255, 255, 0.3)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: hasPrevEpisode ? 'pointer' : 'not-allowed',
+                    transition: 'background-color 0.2s'
+                  }}
+                  title={hasPrevEpisode ? 'Previous Episode' : 'First episode in season'}
+                  aria-label="Previous Episode"
+                >
+                  <SkipBack size={14} />
+                  <span>Prev</span>
+                </button>
+              )}
+              {onNextEpisode && (
+                <button
+                  onClick={onNextEpisode}
+                  disabled={!hasNextEpisode}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 14px',
+                    borderRadius: '9999px',
+                    backgroundColor: hasNextEpisode ? 'rgba(245, 166, 35, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                    border: hasNextEpisode ? '1px solid var(--brand-gold, #F5C518)' : 'none',
+                    color: hasNextEpisode ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.3)',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: hasNextEpisode ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.2s'
+                  }}
+                  title={hasNextEpisode ? 'Next Episode' : 'Last episode in season'}
+                  aria-label="Next Episode"
+                >
+                  <span>Next</span>
+                  <SkipForward size={14} />
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* -------------------------------------------------------------------- */}
@@ -534,7 +595,28 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
 
           {/* Controls Row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {/* Previous Episode button */}
+              {source.episodeId && onPrevEpisode && (
+                <button
+                  onClick={onPrevEpisode}
+                  disabled={!hasPrevEpisode}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: hasPrevEpisode ? '#FFFFFF' : 'rgba(255, 255, 255, 0.25)',
+                    cursor: hasPrevEpisode ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px'
+                  }}
+                  title={hasPrevEpisode ? 'Previous Episode' : 'First episode in season'}
+                  aria-label="Previous Episode"
+                >
+                  <SkipBack size={20} />
+                </button>
+              )}
+
               <button
                 onClick={togglePlay}
                 style={{ background: 'none', border: 'none', color: '#FFFFFF', cursor: 'pointer' }}
@@ -542,6 +624,27 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
               >
                 {isPlaying ? <Pause size={24} /> : <Play size={24} fill="#FFFFFF" />}
               </button>
+
+              {/* Next Episode button */}
+              {source.episodeId && onNextEpisode && (
+                <button
+                  onClick={onNextEpisode}
+                  disabled={!hasNextEpisode}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: hasNextEpisode ? '#FFFFFF' : 'rgba(255, 255, 255, 0.25)',
+                    cursor: hasNextEpisode ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '4px'
+                  }}
+                  title={hasNextEpisode ? 'Next Episode' : 'Last episode in season'}
+                  aria-label="Next Episode"
+                >
+                  <SkipForward size={20} />
+                </button>
+              )}
 
               <button
                 onClick={() => skipTime(-10)}
@@ -577,6 +680,30 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {source.episodeId && hasNextEpisode && onNextEpisode && (
+                <button
+                  onClick={onNextEpisode}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    borderRadius: 'var(--radius-pill)',
+                    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+                    border: '1px solid var(--brand-gold, #F5C518)',
+                    color: 'var(--brand-gold, #F5C518)',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  aria-label="Next Episode"
+                >
+                  <span>Next Episode</span>
+                  <SkipForward size={14} />
+                </button>
+              )}
+
               <button
                 onClick={toggleFullscreen}
                 style={{ background: 'none', border: 'none', color: '#FFFFFF', cursor: 'pointer' }}

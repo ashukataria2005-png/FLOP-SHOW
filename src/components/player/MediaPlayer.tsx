@@ -70,6 +70,25 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   const [adConfig, setAdConfig] = useState<AdConfig | null>(null);
   const [adFinished, setAdFinished] = useState<boolean>(source?.mediaType !== 'MAIN');
 
+  // Reset player error & loading state whenever source changes
+  useEffect(() => {
+    setErrorMessage(null);
+    setIsLoading(true);
+    setCurrentTime(source?.initialTimeSeconds || 0);
+  }, [source?.url]);
+
+  const handleRetry = () => {
+    setErrorMessage(null);
+    setIsLoading(true);
+    if (videoRef.current) {
+      videoRef.current.load();
+      videoRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(() => setIsPlaying(false));
+    }
+  };
+
   useEffect(() => {
     let active = true;
     if (source?.mediaType === 'MAIN') {
@@ -321,10 +340,13 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             ref={videoRef}
             src={source.url}
             poster={source.poster}
+            preload="metadata"
+            playsInline
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={() => {
               setIsLoading(false);
+              setErrorMessage(null);
               if (videoRef.current) {
                 setDuration(videoRef.current.duration);
                 if (source.initialTimeSeconds && source.initialTimeSeconds > 5) {
@@ -334,10 +356,33 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
               }
             }}
             onWaiting={() => setIsLoading(true)}
-            onPlaying={() => setIsLoading(false)}
+            onPlaying={() => {
+              setIsLoading(false);
+              setIsPlaying(true);
+            }}
+            onPause={() => setIsPlaying(false)}
             onError={() => {
               setIsLoading(false);
-              setErrorMessage('The video stream or media file could not be loaded. Please check the URL or try again later.');
+              setIsPlaying(false);
+              const mediaErr = videoRef.current?.error;
+              let detailMsg = 'The video stream or media file could not be loaded. Please verify the URL or try again later.';
+              if (mediaErr) {
+                switch (mediaErr.code) {
+                  case 1:
+                    detailMsg = 'Playback was aborted by the browser. Click Retry to reload the video.';
+                    break;
+                  case 2:
+                    detailMsg = 'A network error occurred while downloading the video stream. Please check your internet connection and retry.';
+                    break;
+                  case 3:
+                    detailMsg = 'The video file could not be decoded. The stream may be corrupt or encoded with an unsupported codec.';
+                    break;
+                  case 4:
+                    detailMsg = 'The video format is not natively supported by your browser or the media source was not found. Standard MP4 (H.264/AAC) or WebM is required.';
+                    break;
+                }
+              }
+              setErrorMessage(detailMsg);
             }}
             onClick={togglePlay}
             onEnded={() => {
@@ -347,7 +392,6 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
                 onNextEpisode();
               }
             }}
-            playsInline
           />
 
           {/* Large Center Play Trigger */}
@@ -400,36 +444,53 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
           style={{
             position: 'absolute',
             zIndex: 20,
-            maxWidth: '480px',
-            padding: '24px',
-            backgroundColor: 'rgba(22, 22, 34, 0.95)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
+            maxWidth: '500px',
+            padding: '28px',
+            backgroundColor: 'rgba(18, 18, 28, 0.96)',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
             borderRadius: '16px',
             textAlign: 'center',
             color: '#FFFFFF',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.8)'
+            boxShadow: '0 16px 40px rgba(0,0,0,0.85)'
           }}
         >
-          <AlertCircle size={40} color="#EF4444" style={{ margin: '0 auto 12px' }} />
+          <AlertCircle size={44} color="#EF4444" style={{ margin: '0 auto 12px' }} />
           <h4 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>Playback Notice</h4>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary, #9CA3AF)', marginBottom: '18px', lineHeight: 1.5 }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary, #9CA3AF)', marginBottom: '20px', lineHeight: 1.5 }}>
             {errorMessage}
           </p>
-          <button
-            onClick={handleClose}
-            style={{
-              padding: '10px 24px',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
-              color: '#FFFFFF',
-              fontWeight: 600,
-              fontSize: '14px',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            Back to Browse
-          </button>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleRetry}
+              style={{
+                padding: '10px 22px',
+                backgroundColor: 'var(--brand-gold, #F5C518)',
+                borderRadius: '8px',
+                color: '#0E0E12',
+                fontWeight: 700,
+                fontSize: '14px',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              Retry Playback
+            </button>
+            <button
+              onClick={handleClose}
+              style={{
+                padding: '10px 22px',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                color: '#FFFFFF',
+                fontWeight: 600,
+                fontSize: '14px',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              Back to Browse
+            </button>
+          </div>
         </div>
       )}
 

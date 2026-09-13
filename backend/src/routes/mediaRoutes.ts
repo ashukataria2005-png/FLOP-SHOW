@@ -10,7 +10,8 @@ mediaRouter.get('/content/:contentId', optionalAuth, async (req: AuthenticatedRe
   try {
     const mediaType = (req.query.type as 'MAIN' | 'TRAILER') || 'MAIN';
     const userId = req.user?.id;
-    const result = await mediaService.getPlayableContentMedia(req.params.contentId, mediaType, userId);
+    const contentId = Array.isArray(req.params.contentId) ? req.params.contentId[0] : req.params.contentId;
+    const result = await mediaService.getPlayableContentMedia(contentId, mediaType, userId);
     res.json(result);
   } catch (err) {
     next(err);
@@ -22,7 +23,8 @@ mediaRouter.get('/episode/:episodeId', optionalAuth, async (req: AuthenticatedRe
   try {
     const mediaType = (req.query.type as 'MAIN' | 'TRAILER') || 'MAIN';
     const userId = req.user?.id;
-    const result = await mediaService.getPlayableEpisodeMedia(req.params.episodeId, mediaType, userId);
+    const episodeId = Array.isArray(req.params.episodeId) ? req.params.episodeId[0] : req.params.episodeId;
+    const result = await mediaService.getPlayableEpisodeMedia(episodeId, mediaType, userId);
     res.json(result);
   } catch (err) {
     next(err);

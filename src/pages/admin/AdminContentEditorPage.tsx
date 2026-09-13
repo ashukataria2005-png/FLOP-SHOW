@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api';
+import { api, API_BASE_URL } from '../../services/api';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { ContentType } from '../../types/content';
 import { useApp } from '../../context/AppContext';
 import { MediaPlayer, MediaPlayerSource } from '../../components/player/MediaPlayer';
@@ -416,29 +417,70 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
         });
       }
 
-      // If series, create seasons & episodes on backend
+      // If series, save seasons & episodes on backend
       if (type === 'series' && seasons.length > 0 && targetId) {
         for (const s of seasons) {
           try {
-            const seasonRes = await api.admin.createSeason(targetId, s.seasonNumber, s.title);
+            let activeSeasonId = (s as any).id;
+            if (!activeSeasonId || activeSeasonId.startsWith('new-')) {
+              try {
+                const seasonRes = await api.admin.createSeason(targetId, s.seasonNumber, s.title);
+                activeSeasonId = seasonRes.seasonId;
+              } catch {
+                const currentFull = await api.content.getDetails(targetId);
+                const matchingSeason = currentFull?.seasons?.find(cs => cs.seasonNumber === s.seasonNumber);
+                if (matchingSeason) activeSeasonId = (matchingSeason as any).id;
+              }
+            } else {
+              try {
+                await api.admin.updateSeason(activeSeasonId, s.title, s.seasonNumber);
+              } catch {
+                // Ignore if not modified
+              }
+            }
+
             for (const ep of s.episodes) {
-              const epRes = await api.admin.createEpisode(seasonRes.seasonId, {
+              let activeEpId = ep.id;
+              const epData = {
                 episodeNumber: ep.episodeNumber,
                 title: ep.title,
                 durationSeconds: ep.durationSeconds || 2400,
+                duration: ep.duration || '45m',
                 synopsis: ep.synopsis,
-                thumbnailUrl: ep.thumbnailUrl
-              });
-              if (ep.videoUrl) {
-                await api.admin.attachMedia({
-                  episodeId: epRes.episodeId,
-                  mediaType: 'MAIN',
-                  url: ep.videoUrl
-                });
+                description: ep.synopsis,
+                thumbnail: ep.thumbnailUrl,
+                thumbnailUrl: ep.thumbnailUrl,
+                videoUrl: ep.videoUrl
+              };
+
+              if (!activeEpId || !activeEpId.startsWith('ep-')) {
+                try {
+                  if (activeSeasonId) {
+                    const epRes = await api.admin.createEpisode(activeSeasonId, epData);
+                    activeEpId = epRes.episodeId;
+                  }
+                } catch {
+                  // Episode might already exist
+                }
+              }
+
+              if (activeEpId) {
+                try {
+                  await api.admin.updateEpisode(activeEpId, epData);
+                } catch {
+                  // Episode update fallback
+                }
+                if (ep.videoUrl) {
+                  await api.admin.attachMedia({
+                    episodeId: activeEpId,
+                    mediaType: 'MAIN',
+                    url: ep.videoUrl
+                  });
+                }
               }
             }
-          } catch {
-            // Already created or existing
+          } catch (seasonErr) {
+            console.warn('Season save error:', seasonErr);
           }
         }
       }
@@ -1287,7 +1329,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                     <span>{uploadingTrailer ? `Uploading ${uploadProgressTrailer > 0 ? `${uploadProgressTrailer}%` : '...'}` : 'Upload Trailer'}</span>
                     <input
                       type="file"
-                      accept="video/*"
+                      accept="video/mp4,video/webm,video/quicktime"
                       onChange={handleUploadTrailer}
                       disabled={uploadingTrailer}
                       style={{ display: 'none' }}
@@ -1301,7 +1343,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                           setPreviewSource({
                             title: `${title || 'Title'} (Trailer Preview)`,
                             mediaType: 'TRAILER',
-                            url: trailerUrl
+                            url: resolveMediaUrl(trailerUrl, API_BASE_URL)
                           })
                         }
                         style={{
@@ -1409,7 +1451,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                       </span>
                       <input
                         type="file"
-                        accept="video/*"
+                        accept="video/mp4,video/webm,video/quicktime"
                         onChange={handleUploadMainVideo}
                         disabled={uploadingVideo}
                         style={{ display: 'none' }}
@@ -1424,7 +1466,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                             setPreviewSource({
                               title: `${title || 'Movie'} — Main Video Preview (Admin Test Play)`,
                               mediaType: 'MAIN',
-                              url: mainVideoUrl
+                              url: resolveMediaUrl(mainVideoUrl, API_BASE_URL)
                             })
                           }
                           style={{
@@ -1877,7 +1919,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                     </span>
                     <input
                       type="file"
-                      accept="video/*"
+                      accept="video/mp4,video/webm,video/quicktime"
                       onChange={handleUploadEpisodeVideo}
                       disabled={uploadingEpisodeVideo}
                       style={{ display: 'none' }}
@@ -1891,7 +1933,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                           setPreviewSource({
                             title: `Episode ${episodeNumber}: ${episodeTitle || 'Preview'}`,
                             mediaType: 'MAIN',
-                            url: episodeVideoUrl
+                            url: resolveMediaUrl(episodeVideoUrl, API_BASE_URL)
                           })
                         }
                         style={{

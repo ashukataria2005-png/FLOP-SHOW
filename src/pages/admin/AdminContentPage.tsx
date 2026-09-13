@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api';
+import { api, API_BASE_URL } from '../../services/api';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { ContentItem } from '../../types/content';
 import { useApp } from '../../context/AppContext';
 import { MediaPlayer, MediaPlayerSource } from '../../components/player/MediaPlayer';
@@ -198,7 +199,7 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
       return;
     }
     setActivePreviewPlayer({
-      url: item.trailerUrl,
+      url: resolveMediaUrl(item.trailerUrl, API_BASE_URL),
       title: `${item.title} — Official Trailer Preview`,
       poster: item.backdropUrl || item.posterUrl,
       mediaType: 'TRAILER'
@@ -212,7 +213,7 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
       return;
     }
     setActivePreviewPlayer({
-      url: item.videoUrl,
+      url: resolveMediaUrl(item.videoUrl, API_BASE_URL),
       title: `${item.title} — Main Video Preview (Admin Direct Access)`,
       poster: item.backdropUrl || item.posterUrl,
       mediaType: 'MAIN'

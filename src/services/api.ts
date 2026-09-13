@@ -116,8 +116,8 @@ export function adaptDbContentToFrontend(item: any): ContentItem {
       title: e.title,
       duration: e.duration || '45m',
       durationSeconds: e.duration_seconds ?? e.durationSeconds ?? 0,
-      thumbnailUrl: e.thumbnail || e.thumbnail_url || e.thumbnailUrl || item.poster || item.posterUrl,
-      videoUrl: e.video_url || e.videoUrl || '',
+      thumbnailUrl: resolveMediaUrl(e.thumbnail || e.thumbnail_url || e.thumbnailUrl || item.poster || item.posterUrl, API_BASE_URL),
+      videoUrl: e.video_url || e.videoUrl ? resolveMediaUrl(e.video_url || e.videoUrl, API_BASE_URL) : '',
       synopsis: e.description || e.synopsis || ''
     }))
   }));
@@ -145,8 +145,8 @@ export function adaptDbContentToFrontend(item: any): ContentItem {
     isHero: Boolean(item.is_hero ?? item.isHero),
     director: item.director || undefined,
     cast,
-    trailerUrl: item.trailer_url || item.trailerUrl || undefined,
-    videoUrl: item.video_url || item.videoUrl || undefined,
+    trailerUrl: item.trailer_url || item.trailerUrl ? resolveMediaUrl(item.trailer_url || item.trailerUrl, API_BASE_URL) : undefined,
+    videoUrl: item.video_url || item.videoUrl ? resolveMediaUrl(item.video_url || item.videoUrl, API_BASE_URL) : undefined,
     trendingPosition: item.trending_position !== null && item.trending_position !== undefined ? Number(item.trending_position) : (item.trendingPosition !== undefined ? Number(item.trendingPosition) : undefined),
     displayPriority: item.display_priority !== null && item.display_priority !== undefined ? Number(item.display_priority) : (item.displayPriority !== undefined ? Number(item.displayPriority) : undefined),
     seasons: seasons.length > 0 ? seasons : undefined

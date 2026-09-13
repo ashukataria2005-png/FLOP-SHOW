@@ -92,6 +92,15 @@ export function resolveMediaUrl(rawUrl?: string | null, apiBaseUrl?: string): st
       }
     }
 
+    // In production or when hosted on Netlify, use Render backend origin by default
+    const isRemote = typeof window !== 'undefined' &&
+      window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1';
+
+    if (isRemote) {
+      return `https://flop-show.onrender.com${cleanPath}`;
+    }
+
     // For relative apiBaseUrl (local dev with Vite proxy), use current page origin
     // so browser requests /uploads/... through the Vite proxy → backend
     if (typeof window !== 'undefined' && window.location?.origin) {

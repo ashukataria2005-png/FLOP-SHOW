@@ -22,7 +22,7 @@ async function testHttpLogin() {
       })
     });
 
-    const data = await res.json();
+    const data: any = await res.json();
     console.log('HTTP Status:', res.status);
     console.log('Response:', data);
 

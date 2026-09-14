@@ -1,5 +1,6 @@
 import { createServer } from './server.js';
 import { runMigrationsAsync } from './db/migrator.js';
+import { seedDatabase } from './db/seed.js';
 import { config } from './config/env.js';
 
 async function start() {
@@ -14,6 +15,10 @@ async function start() {
     // Run schema migrations automatically on startup (async for both SQLite and PostgreSQL)
     const migrationResult = await runMigrationsAsync();
     console.log(`Migrations check: ${migrationResult.applied.length} applied (${migrationResult.total} total)`);
+
+    // Seed system accounts (admin + demo) — idempotent, safe to run on every startup
+    await seedDatabase();
+    console.log('✓ System accounts verified (admin + demo)');
 
     const app = createServer();
 

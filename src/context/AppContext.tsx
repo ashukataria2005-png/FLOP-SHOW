@@ -3,12 +3,10 @@ import { User, WatchProgress } from '../types/user';
 import { WalletTransaction, PurchaseRecord } from '../types/transaction';
 import { ContentItem, Episode } from '../types/content';
 import {
-  INITIAL_USER,
-  INITIAL_WALLET_BALANCE,
   INITIAL_PURCHASES,
   INITIAL_MY_LIST,
   INITIAL_WATCH_PROGRESS,
-  INITIAL_TRANSACTIONS
+  GUEST_USER
 } from '../data/initialData';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { formatCurrentDate } from '../utils/formatters';
@@ -36,8 +34,8 @@ interface AppContextType {
   // User & Auth
   user: User;
   isAuthenticated: boolean;
-  login: (name: string, email: string, role?: 'USER' | 'ADMIN', walletBalance?: number) => void;
-  signup: (name: string, email: string, walletBalance?: number) => void;
+  login: (userId: string, name: string, email: string, role?: 'USER' | 'ADMIN', walletBalance?: number) => void;
+  signup: (userId: string, name: string, email: string, walletBalance?: number) => void;
   logout: () => void;
   updateProfile: (name: string, email: string) => void;
 
@@ -84,6 +82,9 @@ interface AppContextType {
   playNextEpisode: () => void;
   playPrevEpisode: () => void;
 
+  // Session
+  sessionLoading: boolean;
+
   // Feedback Toast
   toasts: Toast[];
   showToast: (message: string, type?: 'success' | 'info' | 'error') => void;
@@ -93,14 +94,33 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // State initialization with localStorage persistence
+  // NOTE: isAuthenticated defaults to FALSE — the startup useEffect will restore
+  // the session from the stored JWT if one exists and is still valid.
+  // Defaulting to true was the root cause of silent demo-account auto-login.
   const [theme, setThemeState] = useState<AppTheme>(() => loadFromStorage('app_theme', 'flopshow-gold'));
-  const [user, setUser] = useState<User>(() => loadFromStorage('user', INITIAL_USER));
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => loadFromStorage('is_authenticated', true));
-  const [walletBalance, setWalletBalance] = useState<number>(() => loadFromStorage('wallet_balance', INITIAL_WALLET_BALANCE));
-  const [transactions, setTransactions] = useState<WalletTransaction[]>(() => loadFromStorage('transactions', INITIAL_TRANSACTIONS));
-  const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => loadFromStorage('purchases', INITIAL_PURCHASES));
-  const [myList, setMyList] = useState<string[]>(() => loadFromStorage('my_list', INITIAL_MY_LIST));
-  const [watchProgress, setWatchProgress] = useState<WatchProgress[]>(() => loadFromStorage('watch_progress', INITIAL_WATCH_PROGRESS));
+  const [user, setUser] = useState<User>(() => {
+    // Only restore a saved user if there is an auth token — otherwise start as guest.
+    // We check localStorage directly here to avoid a circular import (tokenStorage).
+    const hasToken = Boolean(localStorage.getItem('flopshow_auth_token'));
+    return hasToken ? loadFromStorage('user', GUEST_USER) : GUEST_USER;
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => {
+    const hasToken = Boolean(localStorage.getItem('flopshow_auth_token'));
+    return hasToken ? loadFromStorage('purchases', INITIAL_PURCHASES) : [];
+  });
+  const [myList, setMyList] = useState<string[]>(() => {
+    const hasToken = Boolean(localStorage.getItem('flopshow_auth_token'));
+    return hasToken ? loadFromStorage('my_list', INITIAL_MY_LIST) : [];
+  });
+  const [watchProgress, setWatchProgress] = useState<WatchProgress[]>(() => {
+    const hasToken = Boolean(localStorage.getItem('flopshow_auth_token'));
+    return hasToken ? loadFromStorage('watch_progress', INITIAL_WATCH_PROGRESS) : [];
+  });
+  // sessionLoading: true while we're checking the stored JWT on startup
+  const [sessionLoading, setSessionLoading] = useState<boolean>(true);
 
   const setTheme = (newTheme: AppTheme) => {
     setThemeState(newTheme);
@@ -158,29 +178,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const token = tokenStorage.get();
     if (token) {
+      // We have a stored JWT — validate it with the backend and restore the session.
       api.auth.me().then(({ user: serverUser, wallet: serverWallet }) => {
         if (serverUser) {
-          setUser(prev => ({
-            ...prev,
+          // Update user state with the authoritative backend values (including real ID)
+          const restoredUser: User = {
+            id: serverUser.id,
             name: serverUser.name,
             email: serverUser.email,
+            avatarInitials: (serverUser.name || '').trim().split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U',
+            joinedDate: serverUser.createdAt ? new Date(serverUser.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : formatCurrentDate(),
             role: serverUser.role
-          }));
+          };
+          setUser(restoredUser);
+          saveToStorage('user', restoredUser);
           setWalletBalance(serverWallet.balanceRupees);
           setIsAuthenticated(true);
-          // Fetch purchases
+          // Fetch purchases for the restored session
           api.library.getPurchases().then((backendPurchases) => {
             const localPurchases = backendPurchases.map((p: any) => ({
               id: p.id,
               contentId: p.content_id,
               title: p.title,
               price: p.amount_paid / 100,
-              purchasedAt: new Date(p.purchased_at).toLocaleString("en-IN", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
+              purchasedAt: new Date(p.purchased_at).toLocaleString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
                 hour12: true
               })
             }));
@@ -190,19 +216,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           });
         }
       }).catch(() => {
-        // Token invalid/expired
+        // Token is invalid or expired — clean up completely so the user is
+        // not silently left in an authenticated state with stale data.
+        tokenStorage.clear();
+        setIsAuthenticated(false);
+        setUser(GUEST_USER);
+        setWalletBalance(0);
+        setTransactions([]);
+        setPurchases([]);
+        setMyList([]);
+        setWatchProgress([]);
+        saveToStorage('user', GUEST_USER);
+      }).finally(() => {
+        setSessionLoading(false);
       });
+    } else {
+      // No token — definitively not authenticated
+      setIsAuthenticated(false);
+      setSessionLoading(false);
     }
   }, []);
 
-  // Sync to local storage
-  useEffect(() => { saveToStorage('user', user); }, [user]);
-  useEffect(() => { saveToStorage('is_authenticated', isAuthenticated); }, [isAuthenticated]);
-  useEffect(() => { saveToStorage('wallet_balance', walletBalance); }, [walletBalance]);
-  useEffect(() => { saveToStorage('transactions', transactions); }, [transactions]);
-  useEffect(() => { saveToStorage('purchases', purchases); }, [purchases]);
-  useEffect(() => { saveToStorage('my_list', myList); }, [myList]);
-  useEffect(() => { saveToStorage('watch_progress', watchProgress); }, [watchProgress]);
+  // Sync user-specific data to localStorage (only when authenticated, so guest state doesn't overwrite)
+  useEffect(() => { if (isAuthenticated) saveToStorage('purchases', purchases); }, [purchases, isAuthenticated]);
+  useEffect(() => { if (isAuthenticated) saveToStorage('my_list', myList); }, [myList, isAuthenticated]);
+  useEffect(() => { if (isAuthenticated) saveToStorage('watch_progress', watchProgress); }, [watchProgress, isAuthenticated]);
 
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -213,10 +251,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Auth actions
-  const login = (name: string, email: string, role: 'USER' | 'ADMIN' = 'USER', serverWalletBalance?: number) => {
-    const initials = name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DU';
+  const login = (userId: string, name: string, email: string, role: 'USER' | 'ADMIN' = 'USER', serverWalletBalance?: number) => {
+    const initials = name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
     const newUser: User = {
-      id: `user-${Date.now()}`,
+      id: userId,   // Real backend UUID — never a client-generated timestamp ID
       name,
       email,
       avatarInitials: initials,
@@ -224,14 +262,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       role
     };
     setUser(newUser);
+    // Persist the real user so a browser refresh restores it correctly
+    saveToStorage('user', newUser);
     setIsAuthenticated(true);
-    // If a real backend wallet balance was provided (from api.auth.login response),
-    // use it immediately so the UI shows the correct balance rather than stale localStorage data.
-    if (typeof serverWalletBalance === 'number') {
-      setWalletBalance(serverWalletBalance);
-      // Also reset purchases so a freshly-logged-in user's library is synced from backend
-      setPurchases([]);
-    }
+    // Use the authoritative server wallet balance; reset purchases so we re-sync from backend.
+    setWalletBalance(typeof serverWalletBalance === 'number' ? serverWalletBalance : 0);
+    setPurchases([]);
     closeAuthModal();
     showToast(`Signed in as ${name}`, 'success');
     // Fetch authoritative purchases from backend for the newly logged-in user
@@ -250,22 +286,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }).catch(() => { /* keep the empty reset */ });
   };
 
-  const signup = (name: string, email: string, serverWalletBalance?: number) => {
-    login(name, email, 'USER', serverWalletBalance);
+  const signup = (userId: string, name: string, email: string, serverWalletBalance?: number) => {
+    login(userId, name, email, 'USER', serverWalletBalance);
     showToast(`Account created! Welcome to FLOPSHOW.`, 'success');
   };
 
   const logout = () => {
     api.auth.logout();
     setIsAuthenticated(false);
+    // Reset user to a clean guest state so the old user's name/email
+    // is never visible to the next visitor or after a reload.
+    setUser(GUEST_USER);
     // Clear ALL per-user state so account A's data cannot bleed into account B.
-    // This is critical: wallet balance, purchases, watch history, and my-list
-    // are user-specific and must be reset on every logout.
     setWalletBalance(0);
+    setTransactions([]);
     setPurchases([]);
     setMyList([]);
     setWatchProgress([]);
     // Clear persisted per-user keys from localStorage
+    saveToStorage('user', GUEST_USER);
     saveToStorage('wallet_balance', 0);
     saveToStorage('purchases', []);
     saveToStorage('my_list', []);
@@ -732,7 +771,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         playNextEpisode,
         playPrevEpisode,
         toasts,
-        showToast
+        showToast,
+        sessionLoading
       }}
     >
       {children}

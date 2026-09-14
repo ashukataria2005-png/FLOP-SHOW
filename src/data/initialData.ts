@@ -5,6 +5,14 @@ import { WalletTransaction, PurchaseRecord } from '../types/transaction';
  * INITIAL CLEAN USER STATE FOR FLOPSHOW
  * All collections start empty except a starting ₹100 test balance for wallet demo.
  */
+export const GUEST_USER: User = {
+  id: '',
+  name: 'Guest',
+  email: '',
+  avatarInitials: 'G',
+  joinedDate: ''
+};
+
 export const INITIAL_USER: User = {
   id: "user-demo-01",
   name: "Demo User",
@@ -13,7 +21,7 @@ export const INITIAL_USER: User = {
   joinedDate: "September 2026"
 };
 
-export const INITIAL_WALLET_BALANCE: number = 100;
+export const INITIAL_WALLET_BALANCE: number = 0;
 
 export const INITIAL_PURCHASES: PurchaseRecord[] = [];
 

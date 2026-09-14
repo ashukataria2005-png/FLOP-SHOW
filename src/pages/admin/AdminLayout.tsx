@@ -71,7 +71,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         return;
       }
 
-      login(data.user.name, data.user.email, 'ADMIN');
+      login(data.user.id, data.user.name, data.user.email, 'ADMIN', 0);
       showToast(`Admin signed in: ${data.user.name}`, 'success');
       onNavigateTab('admin-dashboard');
     } catch (err: any) {

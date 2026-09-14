@@ -1,246 +1,260 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
-import { X, UserCheck, Sparkles, Loader2 } from 'lucide-react';
+import { X, UserCheck, Sparkles, Loader2, ShieldCheck } from 'lucide-react';
 import { Logo } from '../common/Logo';
+
+// Signup flow steps
+type SignupStep = 'details' | 'otp';
 
 export const AuthModal: React.FC = () => {
   const { activeModal, closeAuthModal, login, signup } = useApp();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const [name, setName] = useState('');
+
+  // Sign-in fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Signup fields
+  const [name, setName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupStep, setSignupStep] = useState<SignupStep>('details');
+  const [otpValue, setOtpValue] = useState('');
+
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Pending backend data carried between signup steps
+  const [pendingUserId, setPendingUserId] = useState('');
+  const [pendingName, setPendingName] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [pendingBalance, setPendingBalance] = useState(0);
+
   if (activeModal !== 'auth') return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const resetForm = () => {
+    setName(''); setEmail(''); setPassword('');
+    setSignupEmail(''); setSignupPassword(''); setOtpValue('');
+    setSignupStep('details');
+    setPendingUserId(''); setPendingName(''); setPendingEmail(''); setPendingBalance(0);
+    setError(null);
+  };
+
+  const handleModeSwitch = (newMode: 'signin' | 'signup') => {
+    setMode(newMode);
+    resetForm();
+  };
+
+  // ── Sign In ────────────────────────────────────────────────────────────────
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (mode === 'signup' && !name.trim()) {
-      setError('Please enter your full name.');
-      return;
-    }
-
-    if (!email.trim() || !email.includes('@')) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-
-    if (!password.trim() || password.length < 4) {
-      setError('Password must be at least 4 characters.');
-      return;
-    }
-
+    if (!email.trim() || !email.includes('@')) { setError('Please enter a valid email address.'); return; }
+    if (!password.trim() || password.length < 4) { setError('Password must be at least 4 characters.'); return; }
     setIsSubmitting(true);
     try {
-      if (mode === 'signup') {
-        // Real backend register — stores JWT token and creates wallet
-        const data = await api.auth.register(name.trim(), email.trim(), password.trim());
-        // Update React state with real backend user + wallet balance
-        signup(data.user.name, data.user.email, data.wallet?.balanceRupees ?? 0);
-      } else {
-        // Real backend login — stores JWT token
-        const data = await api.auth.login(email.trim(), password.trim());
-        // Update React state with real backend user + wallet balance
-        login(data.user.name, data.user.email, data.user.role, data.wallet?.balanceRupees ?? 0);
-      }
+      const data = await api.auth.login(email.trim(), password.trim());
+      // Pass real backend userId so the frontend never generates a fake timestamp ID
+      login(data.user.id, data.user.name, data.user.email, data.user.role, data.wallet?.balanceRupees ?? 0);
     } catch (err: any) {
-      setError(err?.message || 'Authentication failed. Please try again.');
+      setError(err?.message || 'Sign in failed. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // ── Signup Step 1: Account Details → register on backend ──────────────────
+  const handleSignupDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!name.trim()) { setError('Please enter your full name.'); return; }
+    if (!signupEmail.trim() || !signupEmail.includes('@')) { setError('Please enter a valid email address.'); return; }
+    if (!signupPassword.trim() || signupPassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    setIsSubmitting(true);
+    try {
+      const data = await api.auth.register(name.trim(), signupEmail.trim(), signupPassword.trim());
+      setPendingUserId(data.user.id);
+      setPendingName(data.user.name);
+      setPendingEmail(data.user.email);
+      setPendingBalance(data.wallet?.balanceRupees ?? 0);
+      setSignupStep('otp');
+    } catch (err: any) {
+      setError(err?.message || 'Account creation failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ── Signup Step 2: OTP Placeholder → complete signup ──────────────────────
+  const handleOtpVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!otpValue.trim()) {
+      setError('Please enter any 6-digit code to continue.');
+      return;
+    }
+    // OTP verification is a UI placeholder. The account already exists in the backend.
+    // A real OTP provider will be integrated in a future milestone.
+    signup(pendingUserId, pendingName, pendingEmail, pendingBalance);
+  };
+
+  // ── Quick Demo Login ───────────────────────────────────────────────────────
   const handleQuickDemo = async () => {
     setError(null);
     setIsSubmitting(true);
     try {
-      // Try to log in with demo account first; if not found, register it
+      // The demo account is seeded idempotently at backend startup.
+      // We ONLY login — never register — to avoid duplicate demo accounts.
       const data = await api.auth.login('demo@flopshow.tv', 'demo1234');
-      login(data.user.name, data.user.email, data.user.role, data.wallet?.balanceRupees ?? 0);
-    } catch {
-      try {
-        const data = await api.auth.register('Demo User', 'demo@flopshow.tv', 'demo1234');
-        signup(data.user.name, data.user.email, data.wallet?.balanceRupees ?? 0);
-      } catch (err: any) {
-        // If demo account exists but wrong password — just show a helpful message
-        setError('Demo login unavailable. Please create your own account using the sign-up tab.');
-      }
+      login(data.user.id, data.user.name, data.user.email, data.user.role, data.wallet?.balanceRupees ?? 0);
+    } catch (err: any) {
+      setError(err?.message || 'Demo account unavailable. Please create your own account.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleClose = () => {
+    resetForm();
+    closeAuthModal();
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '12px 14px', borderRadius: '10px',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    fontSize: '14px', color: '#FFFFFF'
+  };
+  const labelStyle: React.CSSProperties = {
+    fontSize: '13px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px'
+  };
+  const fieldStyle: React.CSSProperties = { marginBottom: '14px' };
+  const errorBox = error ? (
+    <div style={{
+      padding: '10px 14px', borderRadius: '8px',
+      backgroundColor: 'rgba(244, 63, 94, 0.15)', color: '#F87171',
+      fontSize: '13px', marginBottom: '16px'
+    }}>{error}</div>
+  ) : null;
+
   return (
-    <div className="modal-backdrop" onClick={closeAuthModal}>
+    <div className="modal-backdrop" onClick={handleClose}>
       <div className="modal-dialog" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="modal-header">
           <Logo size="sm" />
-          <button
-            onClick={closeAuthModal}
-            style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
-            aria-label="Close"
-          >
+          <button onClick={handleClose} style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }} aria-label="Close">
             <X size={20} />
           </button>
         </div>
 
-        {/* Tab Toggle */}
-        <div
-          style={{
-            display: 'flex',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            backgroundColor: 'rgba(0, 0, 0, 0.2)'
-          }}
-        >
-          <button
-            onClick={() => { setMode('signin'); setError(null); }}
-            style={{
-              flex: 1,
-              padding: '14px',
-              textAlign: 'center',
-              fontWeight: mode === 'signin' ? 700 : 500,
-              fontSize: '14px',
-              color: mode === 'signin' ? 'var(--brand-gold)' : 'var(--text-secondary)',
-              borderBottom: `2px solid ${mode === 'signin' ? 'var(--brand-gold)' : 'transparent'}`,
-              transition: 'all var(--transition-fast)'
-            }}
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => { setMode('signup'); setError(null); }}
-            style={{
-              flex: 1,
-              padding: '14px',
-              textAlign: 'center',
-              fontWeight: mode === 'signup' ? 700 : 500,
-              fontSize: '14px',
-              color: mode === 'signup' ? 'var(--brand-gold)' : 'var(--text-secondary)',
-              borderBottom: `2px solid ${mode === 'signup' ? 'var(--brand-gold)' : 'transparent'}`,
-              transition: 'all var(--transition-fast)'
-            }}
-          >
-            Create Account
-          </button>
-        </div>
-
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="modal-body">
-          {error && (
-            <div
-              style={{
-                padding: '10px 14px',
-                borderRadius: '8px',
-                backgroundColor: 'rgba(244, 63, 94, 0.15)',
-                color: '#F87171',
-                fontSize: '13px',
-                marginBottom: '16px'
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          {mode === 'signup' && (
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                Full Name
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Maya Roy"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                disabled={isSubmitting}
+        {/* Tab Toggle — only visible on step 1 */}
+        {!(mode === 'signup' && signupStep === 'otp') && (
+          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+            {(['signin', 'signup'] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => handleModeSwitch(m)}
                 style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  fontSize: '14px',
-                  color: '#FFFFFF'
+                  flex: 1, padding: '14px', textAlign: 'center',
+                  fontWeight: mode === m ? 700 : 500, fontSize: '14px',
+                  color: mode === m ? 'var(--brand-gold)' : 'var(--text-secondary)',
+                  borderBottom: `2px solid ${mode === m ? 'var(--brand-gold)' : 'transparent'}`,
+                  transition: 'all var(--transition-fast)'
                 }}
+              >
+                {m === 'signin' ? 'Sign In' : 'Create Account'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Sign In Form ── */}
+        {mode === 'signin' && (
+          <form onSubmit={handleSignIn} className="modal-body">
+            {errorBox}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Email Address</label>
+              <input type="email" placeholder="e.g. user@example.com" value={email} onChange={e => setEmail(e.target.value)} disabled={isSubmitting} style={inputStyle} />
+            </div>
+            <div style={{ ...fieldStyle, marginBottom: '22px' }}>
+              <label style={labelStyle}>Password</label>
+              <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} disabled={isSubmitting} style={inputStyle} />
+            </div>
+            <button type="submit" disabled={isSubmitting} className="btn btn-primary btn-block btn-lg" style={{ marginBottom: '12px' }}>
+              {isSubmitting ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <UserCheck size={18} />}
+              <span>{isSubmitting ? 'Signing in...' : 'Sign In to FLOPSHOW'}</span>
+            </button>
+            <button type="button" onClick={handleQuickDemo} disabled={isSubmitting} className="btn btn-secondary btn-block" style={{ fontSize: '13px' }}>
+              <Sparkles size={16} color="var(--brand-gold)" />
+              <span>Quick Login as Demo User</span>
+            </button>
+          </form>
+        )}
+
+        {/* ── Signup Step 1: Account Details ── */}
+        {mode === 'signup' && signupStep === 'details' && (
+          <form onSubmit={handleSignupDetails} className="modal-body">
+            {errorBox}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Full Name</label>
+              <input type="text" placeholder="e.g. Maya Roy" value={name} onChange={e => setName(e.target.value)} disabled={isSubmitting} style={inputStyle} />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Email Address</label>
+              <input type="email" placeholder="e.g. user@example.com" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} disabled={isSubmitting} style={inputStyle} />
+            </div>
+            <div style={{ ...fieldStyle, marginBottom: '22px' }}>
+              <label style={labelStyle}>Password</label>
+              <input type="password" placeholder="At least 6 characters" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} disabled={isSubmitting} style={inputStyle} />
+            </div>
+            <button type="submit" disabled={isSubmitting} className="btn btn-primary btn-block btn-lg">
+              {isSubmitting ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <UserCheck size={18} />}
+              <span>{isSubmitting ? 'Creating Account...' : 'Continue'}</span>
+            </button>
+          </form>
+        )}
+
+        {/* ── Signup Step 2: OTP Placeholder ── */}
+        {mode === 'signup' && signupStep === 'otp' && (
+          <form onSubmit={handleOtpVerify} className="modal-body">
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <ShieldCheck size={40} color="var(--brand-gold)" style={{ marginBottom: '12px' }} />
+              <p style={{ fontSize: '15px', fontWeight: 600, color: '#FFFFFF', marginBottom: '6px' }}>Verify Your Account</p>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                OTP verification is coming soon. Enter any code and click Verify to continue.
+              </p>
+              <div style={{
+                marginTop: '10px', padding: '8px 12px', borderRadius: '8px',
+                backgroundColor: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)',
+                fontSize: '12px', color: 'var(--brand-gold)'
+              }}>
+                ⚠️ No real OTP is sent — this is a UI placeholder only
+              </div>
+            </div>
+            {errorBox}
+            <div style={{ ...fieldStyle, marginBottom: '22px' }}>
+              <label style={labelStyle}>OTP Code</label>
+              <input
+                id="otp-input"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="000000"
+                value={otpValue}
+                onChange={e => setOtpValue(e.target.value.replace(/\D/g, ''))}
+                style={{ ...inputStyle, fontSize: '22px', textAlign: 'center', letterSpacing: '8px', fontFamily: 'monospace' }}
               />
             </div>
-          )}
-
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-              Email Address
-            </label>
-            <input
-              type="email"
-              placeholder="e.g. user@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              disabled={isSubmitting}
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                fontSize: '14px',
-                color: '#FFFFFF'
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '22px' }}>
-            <label style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              disabled={isSubmitting}
-              style={{
-                width: '100%',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                fontSize: '14px',
-                color: '#FFFFFF'
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="btn btn-primary btn-block btn-lg"
-            style={{ marginBottom: '12px' }}
-          >
-            {isSubmitting ? (
-              <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-            ) : (
-              <UserCheck size={18} />
-            )}
-            <span>{isSubmitting ? 'Please wait...' : (mode === 'signin' ? 'Sign In to FLOPSHOW' : 'Create Account')}</span>
-          </button>
-
-          {/* Quick Demo Login */}
-          <button
-            type="button"
-            onClick={handleQuickDemo}
-            disabled={isSubmitting}
-            className="btn btn-secondary btn-block"
-            style={{ fontSize: '13px' }}
-          >
-            <Sparkles size={16} color="var(--brand-gold)" />
-            <span>Quick Login as Demo User</span>
-          </button>
-        </form>
+            <button type="submit" className="btn btn-primary btn-block btn-lg">
+              <ShieldCheck size={18} />
+              <span>Verify &amp; Complete Signup</span>
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
 };
+

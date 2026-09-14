@@ -92,6 +92,39 @@ export async function seedDatabase(): Promise<SeedReport> {
     );
 
     adminCreated = true;
+
+    // ------------------------------------------------------------------------
+    // 3. SEED DEDICATED DEMO / TEST ACCOUNT (idempotent — never recreated)
+    // ------------------------------------------------------------------------
+    // This is the ONE fixed demo account used by the "Quick Login as Demo User"
+    // button on the AuthModal. It is created once and reused forever.
+    // Credentials: demo@flopshow.tv / demo1234
+    // Wallet starts at ₹0 (admin can top-up manually if needed for testing).
+    const demoSalt = await bcrypt.genSalt(10);
+    const demoPasswordHash = await bcrypt.hash('demo1234', demoSalt);
+    const demoId = 'user-demo-01';
+    const demoEmail = 'demo@flopshow.tv';
+
+    const { rows: demoRows } = await txDb.query(
+      'SELECT id FROM users WHERE email = ?',
+      [demoEmail]
+    );
+
+    if (demoRows.length === 0) {
+      await txDb.run(
+        `INSERT INTO users (id, name, email, password_hash, role, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'USER', 'ACTIVE', ?, ?)
+         ON CONFLICT (id) DO NOTHING;`,
+        [demoId, 'Demo User', demoEmail, demoPasswordHash, now, now]
+      );
+
+      await txDb.run(
+        `INSERT INTO wallets (user_id, balance, updated_at)
+         VALUES (?, 0, ?)
+         ON CONFLICT (user_id) DO NOTHING;`,
+        [demoId, now]
+      );
+    }
   });
 
   // Query counts to verify

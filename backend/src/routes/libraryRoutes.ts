@@ -55,7 +55,7 @@ libraryRouter.get('/progress', async (req: AuthenticatedRequest, res: Response, 
 libraryRouter.get('/progress/:contentId', async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const episodeId = req.query.episodeId as string | undefined;
-    const progress = await libraryService.getProgress(req.user!.id, req.params.contentId, episodeId);
+    const progress = await libraryService.getProgress(req.user!.id, req.params.contentId as string, episodeId);
     res.json({ progress });
   } catch (err) {
     next(err);

@@ -30,7 +30,7 @@ purchaseRouter.post('/', async (req: AuthenticatedRequest, res: Response, next) 
 // GET /api/purchases/check/:contentId
 purchaseRouter.get('/check/:contentId', async (req: AuthenticatedRequest, res: Response, next) => {
   try {
-    const owned = await purchaseService.checkOwnership(req.user!.id, req.params.contentId);
+    const owned = await purchaseService.checkOwnership(req.user!.id, req.params.contentId as string);
     res.json({ contentId: req.params.contentId, isOwned: owned });
   } catch (err) {
     next(err);

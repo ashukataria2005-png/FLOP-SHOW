@@ -13,16 +13,20 @@ export const PurchaseModal: React.FC = () => {
     startPlaying
   } = useApp();
 
+  // ALL hooks must be declared unconditionally at the top — BEFORE any early return.
+  // Previous code had useState(false) for isSubmitting AFTER an early return, which
+  // violated React Rules of Hooks and caused a full black-screen crash every time
+  // the modal was opened or closed (hook count changed between renders).
   const [purchasedSuccess, setPurchasedSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Early return AFTER all hooks — this is now safe.
   if (activeModal !== 'purchase' || !purchaseTarget) return null;
 
   const price = purchaseTarget.price;
   const hasSufficientBalance = walletBalance >= price;
   const remainingBalance = walletBalance - price;
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleConfirm = async () => {
     if (isSubmitting || !purchaseTarget) return;

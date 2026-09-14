@@ -39,6 +39,24 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
+  // ALL hooks must be declared unconditionally before any conditional early return.
+  // Previously isMenuOpen and the Escape-key useEffect were placed AFTER the
+  // non-admin early return, violating React Rules of Hooks and producing a full
+  // black-screen crash the moment the admin successfully logged in (hook count
+  // changed from N to N+2 between renders).
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Close drawer on Escape key (always registered; no-op when login screen is shown)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const isAdmin = Boolean(user && user.role === 'ADMIN');
 
   const handleAdminLogin = async (e: React.FormEvent) => {
@@ -209,19 +227,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   }
 
   // Authenticated Admin Shell
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  // Close drawer on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsMenuOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   const navItems = [
     { id: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'admin-content', label: 'Content & Media / Catalog', icon: Film },

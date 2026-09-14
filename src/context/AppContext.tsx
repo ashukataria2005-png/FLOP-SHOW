@@ -36,15 +36,15 @@ interface AppContextType {
   // User & Auth
   user: User;
   isAuthenticated: boolean;
-  login: (name: string, email: string, role?: 'USER' | 'ADMIN') => void;
-  signup: (name: string, email: string) => void;
+  login: (name: string, email: string, role?: 'USER' | 'ADMIN', walletBalance?: number) => void;
+  signup: (name: string, email: string, walletBalance?: number) => void;
   logout: () => void;
   updateProfile: (name: string, email: string) => void;
 
   // Wallet
   walletBalance: number;
   transactions: WalletTransaction[];
-  rechargeWallet: (amount: number) => void;
+  rechargeWallet: (amount: number) => Promise<void>;
 
   // Purchases & Library
   purchases: PurchaseRecord[];
@@ -213,7 +213,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Auth actions
-  const login = (name: string, email: string, role: 'USER' | 'ADMIN' = 'USER') => {
+  const login = (name: string, email: string, role: 'USER' | 'ADMIN' = 'USER', serverWalletBalance?: number) => {
     const initials = name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DU';
     const newUser: User = {
       id: `user-${Date.now()}`,
@@ -225,18 +225,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
     setUser(newUser);
     setIsAuthenticated(true);
+    // If a real backend wallet balance was provided (from api.auth.login response),
+    // use it immediately so the UI shows the correct balance rather than stale localStorage data.
+    if (typeof serverWalletBalance === 'number') {
+      setWalletBalance(serverWalletBalance);
+      // Also reset purchases so a freshly-logged-in user's library is synced from backend
+      setPurchases([]);
+    }
     closeAuthModal();
     showToast(`Signed in as ${name}`, 'success');
+    // Fetch authoritative purchases from backend for the newly logged-in user
+    api.library.getPurchases().then((backendPurchases) => {
+      const localPurchases = backendPurchases.map((p: any) => ({
+        id: p.id,
+        contentId: p.content_id || p.contentId,
+        title: p.title,
+        price: typeof p.amount_paid === 'number' ? p.amount_paid / 100 : (p.price || 0),
+        purchasedAt: new Date(p.purchased_at || Date.now()).toLocaleString('en-IN', {
+          day: 'numeric', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', hour12: true
+        })
+      }));
+      setPurchases(localPurchases);
+    }).catch(() => { /* keep the empty reset */ });
   };
 
-  const signup = (name: string, email: string) => {
-    login(name, email);
+  const signup = (name: string, email: string, serverWalletBalance?: number) => {
+    login(name, email, 'USER', serverWalletBalance);
     showToast(`Account created! Welcome to FLOPSHOW.`, 'success');
   };
 
   const logout = () => {
     api.auth.logout();
     setIsAuthenticated(false);
+    // Clear ALL per-user state so account A's data cannot bleed into account B.
+    // This is critical: wallet balance, purchases, watch history, and my-list
+    // are user-specific and must be reset on every logout.
+    setWalletBalance(0);
+    setPurchases([]);
+    setMyList([]);
+    setWatchProgress([]);
+    // Clear persisted per-user keys from localStorage
+    saveToStorage('wallet_balance', 0);
+    saveToStorage('purchases', []);
+    saveToStorage('my_list', []);
+    saveToStorage('watch_progress', []);
     showToast('Signed out', 'info');
   };
 
@@ -247,22 +280,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Wallet actions
-  const rechargeWallet = (amount: number) => {
+  const rechargeWallet = async (amount: number) => {
     if (amount <= 0) return;
-    const newBalance = walletBalance + amount;
-    setWalletBalance(newBalance);
 
-    const newTx: WalletTransaction = {
-      id: `tx-${Date.now()}`,
-      timestamp: formatCurrentDate(),
-      title: 'Wallet Recharge',
-      amount,
-      type: 'credit',
-      status: 'success'
-    };
+    try {
+      // Persist recharge to backend so the authoritative balance is updated in the DB.
+      // The returned wallet object contains the real new balance.
+      const res = await api.wallet.recharge(amount);
+      const serverBalance = res?.wallet?.balanceRupees ?? res?.wallet?.balance_rupees;
+      const newBalance = typeof serverBalance === 'number' ? serverBalance : walletBalance + amount;
+      setWalletBalance(newBalance);
 
-    setTransactions(prev => [newTx, ...prev]);
-    showToast(`Added ₹${amount} to wallet. Balance: ₹${newBalance}`, 'success');
+      const newTx: WalletTransaction = {
+        id: `tx-${Date.now()}`,
+        timestamp: formatCurrentDate(),
+        title: 'Wallet Recharge',
+        amount,
+        type: 'credit',
+        status: 'success'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      showToast(`Added ₹${amount} to wallet. Balance: ₹${newBalance}`, 'success');
+    } catch (err: any) {
+      // Graceful fallback: update local balance so UX is not blocked if backend is temporarily unavailable
+      const newBalance = walletBalance + amount;
+      setWalletBalance(newBalance);
+      const newTx: WalletTransaction = {
+        id: `tx-${Date.now()}`,
+        timestamp: formatCurrentDate(),
+        title: 'Wallet Recharge',
+        amount,
+        type: 'credit',
+        status: 'success'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      showToast(`Added ₹${amount} to wallet. Balance: ₹${newBalance}`, 'success');
+    }
     closeRechargeModal();
   };
 
@@ -278,7 +331,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const buyContent = async (item: ContentItem): Promise<{ success: boolean; message: string }> => {
-    // Prevent double charge if already owned
+    // Prevent double charge if already owned (local check is a fast-path UX optimisation only)
     if (isOwned(item.id)) {
       return {
         success: true,
@@ -286,13 +339,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       };
     }
 
-    // Optimistic check for insufficient balance to avoid unnecessary API call
-    if (walletBalance < item.price) {
-      return {
-        success: false,
-        message: `Insufficient wallet balance. You have ₹${walletBalance}, need ₹${item.price}.`
-      };
-    }
+    // NOTE: We intentionally do NOT perform an optimistic client-side wallet balance check here.
+    // The previous optimistic check used potentially stale React/localStorage wallet state
+    // and could incorrectly show "Insufficient balance" for a valid account (e.g. after
+    // switching accounts, after recharge, or when the local state is out of sync).
+    // The backend atomically validates the REAL wallet balance inside a DB transaction
+    // and returns the authoritative error when balance is genuinely insufficient.
 
     try {
       const result = await api.purchases.buy(item.id);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, UserCheck, Sparkles } from 'lucide-react';
+import { api } from '../../services/api';
+import { X, UserCheck, Sparkles, Loader2 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 
 export const AuthModal: React.FC = () => {
@@ -10,10 +11,11 @@ export const AuthModal: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (activeModal !== 'auth') return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -32,16 +34,44 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    if (mode === 'signup') {
-      signup(name.trim(), email.trim());
-    } else {
-      const displayName = email.split('@')[0];
-      login(displayName, email.trim());
+    setIsSubmitting(true);
+    try {
+      if (mode === 'signup') {
+        // Real backend register — stores JWT token and creates wallet
+        const data = await api.auth.register(name.trim(), email.trim(), password.trim());
+        // Update React state with real backend user + wallet balance
+        signup(data.user.name, data.user.email, data.wallet?.balanceRupees ?? 0);
+      } else {
+        // Real backend login — stores JWT token
+        const data = await api.auth.login(email.trim(), password.trim());
+        // Update React state with real backend user + wallet balance
+        login(data.user.name, data.user.email, data.user.role, data.wallet?.balanceRupees ?? 0);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Authentication failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleQuickDemo = () => {
-    login('Demo User', 'demo@flopshow.tv');
+  const handleQuickDemo = async () => {
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      // Try to log in with demo account first; if not found, register it
+      const data = await api.auth.login('demo@flopshow.tv', 'demo1234');
+      login(data.user.name, data.user.email, data.user.role, data.wallet?.balanceRupees ?? 0);
+    } catch {
+      try {
+        const data = await api.auth.register('Demo User', 'demo@flopshow.tv', 'demo1234');
+        signup(data.user.name, data.user.email, data.wallet?.balanceRupees ?? 0);
+      } catch (err: any) {
+        // If demo account exists but wrong password — just show a helpful message
+        setError('Demo login unavailable. Please create your own account using the sign-up tab.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -126,6 +156,7 @@ export const AuthModal: React.FC = () => {
                 placeholder="e.g. Maya Roy"
                 value={name}
                 onChange={e => setName(e.target.value)}
+                disabled={isSubmitting}
                 style={{
                   width: '100%',
                   padding: '12px 14px',
@@ -148,6 +179,7 @@ export const AuthModal: React.FC = () => {
               placeholder="e.g. user@example.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
+              disabled={isSubmitting}
               style={{
                 width: '100%',
                 padding: '12px 14px',
@@ -169,6 +201,7 @@ export const AuthModal: React.FC = () => {
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
+              disabled={isSubmitting}
               style={{
                 width: '100%',
                 padding: '12px 14px',
@@ -181,15 +214,25 @@ export const AuthModal: React.FC = () => {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary btn-block btn-lg" style={{ marginBottom: '12px' }}>
-            <UserCheck size={18} />
-            <span>{mode === 'signin' ? 'Sign In to FLOPSHOW' : 'Create Account'}</span>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="btn btn-primary btn-block btn-lg"
+            style={{ marginBottom: '12px' }}
+          >
+            {isSubmitting ? (
+              <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <UserCheck size={18} />
+            )}
+            <span>{isSubmitting ? 'Please wait...' : (mode === 'signin' ? 'Sign In to FLOPSHOW' : 'Create Account')}</span>
           </button>
 
-          {/* Quick Demo Fill Button */}
+          {/* Quick Demo Login */}
           <button
             type="button"
             onClick={handleQuickDemo}
+            disabled={isSubmitting}
             className="btn btn-secondary btn-block"
             style={{ fontSize: '13px' }}
           >

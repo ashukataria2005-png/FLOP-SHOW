@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { api } from '../../services/api';
 import { X, CheckCircle, AlertCircle, Wallet, ArrowRight, Film, Tv } from 'lucide-react';
 
 export const PurchaseModal: React.FC = () => {
@@ -10,7 +11,9 @@ export const PurchaseModal: React.FC = () => {
     walletBalance,
     buyContent,
     openRechargeModal,
-    startPlaying
+    openAuthModal,
+    startPlaying,
+    isAuthenticated
   } = useApp();
 
   // ALL hooks must be declared unconditionally at the top — BEFORE any early return.
@@ -20,16 +23,45 @@ export const PurchaseModal: React.FC = () => {
   const [purchasedSuccess, setPurchasedSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // liveBalance holds the freshly-fetched backend balance for display; falls back to context value.
+  const [liveBalance, setLiveBalance] = useState<number>(walletBalance);
+
+  // Fetch a live wallet balance from the backend whenever this modal opens.
+  // This ensures the displayed balance and insufficient-balance indicator always reflect
+  // the actual backend balance for the current authenticated user — not stale localStorage state.
+  useEffect(() => {
+    if (activeModal === 'purchase' && purchaseTarget && isAuthenticated) {
+      setLiveBalance(walletBalance); // seed with context value immediately
+      api.wallet.getBalance()
+        .then(res => {
+          if (typeof res.balanceRupees === 'number') {
+            setLiveBalance(res.balanceRupees);
+          }
+        })
+        .catch(() => {
+          // Backend unavailable — keep the context value
+          setLiveBalance(walletBalance);
+        });
+    }
+  }, [activeModal, purchaseTarget?.id, isAuthenticated]);
 
   // Early return AFTER all hooks — this is now safe.
   if (activeModal !== 'purchase' || !purchaseTarget) return null;
 
   const price = purchaseTarget.price;
-  const hasSufficientBalance = walletBalance >= price;
-  const remainingBalance = walletBalance - price;
+  const hasSufficientBalance = liveBalance >= price;
+  const remainingBalance = liveBalance - price;
 
   const handleConfirm = async () => {
     if (isSubmitting || !purchaseTarget) return;
+
+    // Gate: unauthenticated users cannot purchase. Direct them to sign in.
+    if (!isAuthenticated) {
+      handleClose();
+      openAuthModal();
+      return;
+    }
+
     setErrorMessage(null);
     setIsSubmitting(true);
     try {
@@ -195,7 +227,7 @@ export const PurchaseModal: React.FC = () => {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Current Wallet Balance:</span>
-                  <span style={{ fontWeight: 600, color: '#FFFFFF' }}>₹{walletBalance}</span>
+                  <span style={{ fontWeight: 600, color: '#FFFFFF' }}>₹{liveBalance}</span>
                 </div>
 
                 <div

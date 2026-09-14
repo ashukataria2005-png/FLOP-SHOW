@@ -547,6 +547,14 @@ export const adminService = {
     await contentRepository.setHero(contentId);
   },
 
+  async getSpotlight(): Promise<ContentRecord | null> {
+    return contentRepository.getSpotlight();
+  },
+
+  async setSpotlight(contentId: string | null): Promise<void> {
+    await contentRepository.setSpotlight(contentId);
+  },
+
   async getAdsConfig() {
     const settings = await this.getSettings();
     return {

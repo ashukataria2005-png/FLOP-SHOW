@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { HeroBanner } from '../components/home/HeroBanner';
+import { CinematicSpotlight } from '../components/home/CinematicSpotlight';
 import { ContentSection } from '../components/home/ContentSection';
 import { BrandPromoCard } from '../components/home/BrandPromoCard';
 import { ContentItem } from '../types/content';
@@ -27,11 +28,15 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
   const { watchProgress, catalog } = useApp();
   const activeCatalog = catalog || [];
   const [dedicatedHero, setDedicatedHero] = useState<ContentItem | null>(null);
+  const [spotlightItem, setSpotlightItem] = useState<ContentItem | null>(null);
 
   useEffect(() => {
     let mounted = true;
     api.content.getHero().then(h => {
       if (mounted) setDedicatedHero(h);
+    }).catch(() => {});
+    api.content.getSpotlight().then(s => {
+      if (mounted) setSpotlightItem(s);
     }).catch(() => {});
     return () => { mounted = false; };
   }, [catalog]);
@@ -112,6 +117,9 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
           onSeeAll={() => onNavigate('search')}
         />
       )}
+
+      {/* Large Full-Width Cinematic Spotlight Banner */}
+      <CinematicSpotlight item={spotlightItem} onViewDetails={onSelectItem} />
 
       {/* Row: Top Rated — sorted by real rating field */}
       {topRated.length > 0 && (

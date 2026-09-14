@@ -54,4 +54,8 @@ export const contentService = {
   async getHero(): Promise<ContentRecord | null> {
     return contentRepository.getHero();
   },
+
+  async getSpotlight(): Promise<ContentRecord | null> {
+    return contentRepository.getSpotlight();
+  },
 };

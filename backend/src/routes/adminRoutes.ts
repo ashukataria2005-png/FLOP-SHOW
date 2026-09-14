@@ -535,8 +535,35 @@ adminRouter.put('/hero', async (req, res, next) => {
     const hero = await adminService.getHero();
     res.json({
       success: true,
-      message: contentId ? 'Home Hero updated successfully.' : 'Home Hero cleared successfully.',
+      message: contentId ? 'Main Hero updated successfully.' : 'Main Hero cleared successfully.',
       hero,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ----------------------------------------------------------------------------
+// 7B. DEDICATED CINEMATIC SPOTLIGHT CONTROL
+// ----------------------------------------------------------------------------
+adminRouter.get('/spotlight', async (_req, res, next) => {
+  try {
+    const spotlight = await adminService.getSpotlight();
+    res.json({ success: true, spotlight });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.put('/spotlight', async (req, res, next) => {
+  try {
+    const { contentId } = req.body;
+    await adminService.setSpotlight(contentId ?? null);
+    const spotlight = await adminService.getSpotlight();
+    res.json({
+      success: true,
+      message: contentId ? 'Cinematic Spotlight updated successfully.' : 'Cinematic Spotlight cleared successfully.',
+      spotlight,
     });
   } catch (err) {
     next(err);

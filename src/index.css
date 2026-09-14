@@ -365,3 +365,49 @@ input, textarea, select {
   background: rgba(0, 0, 0, 0.25);
   border-top: 1px solid var(--border-subtle);
 }
+
+/* ==========================================================================
+   CINEMATIC SPOTLIGHT COMPONENT
+   Full-width responsive immersive banner
+   ========================================================================== */
+.cinematic-spotlight-container {
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+@media (max-width: 768px) {
+  .cinematic-spotlight-container {
+    margin: 24px 0 20px !important;
+    min-height: 480px !important;
+    max-height: none !important;
+    border-radius: 18px !important;
+    padding: 24px 18px !important;
+  }
+
+  .cinematic-spotlight-container h2 {
+    font-size: 26px !important;
+    line-height: 1.2 !important;
+  }
+
+  .cinematic-spotlight-container p {
+    font-size: 13px !important;
+    -webkit-line-clamp: 2 !important;
+  }
+
+  .cinematic-spotlight-container .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .cinematic-spotlight-container {
+    border-radius: 14px !important;
+    padding: 20px 14px !important;
+    min-height: 460px !important;
+  }
+
+  .cinematic-spotlight-container h2 {
+    font-size: 22px !important;
+  }
+}
+

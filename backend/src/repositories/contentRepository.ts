@@ -611,4 +611,45 @@ export const contentRepository = {
       }
     });
   },
+
+  async getSpotlight(): Promise<ContentRecord | null> {
+    const db = getAdapter();
+    try {
+      const { rows: settingRows } = await db.query(
+        `SELECT value FROM app_settings WHERE key = 'cinematic_spotlight_id';`
+      );
+      const spotlightId = (settingRows[0] as { value: string } | undefined)?.value?.trim();
+      if (spotlightId) {
+        const item = await contentRepository.findByIdOrSlug(spotlightId);
+        if (item && item.status === 'PUBLISHED') {
+          return item;
+        }
+      }
+    } catch {
+      // Return null on missing tables or errors
+    }
+    return null;
+  },
+
+  async setSpotlight(contentId: string | null): Promise<void> {
+    const db = getAdapter();
+    const now = new Date().toISOString();
+
+    if (contentId && contentId.trim() !== '') {
+      const cleanId = contentId.trim();
+      await db.run(
+        `INSERT INTO app_settings (key, value, updated_at)
+         VALUES ('cinematic_spotlight_id', ?, ?)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
+        [cleanId, now]
+      );
+    } else {
+      await db.run(
+        `INSERT INTO app_settings (key, value, updated_at)
+         VALUES ('cinematic_spotlight_id', '', ?)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
+        [now]
+      );
+    }
+  },
 };

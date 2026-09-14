@@ -3,25 +3,24 @@ import { api } from '../../services/api';
 import { ContentItem } from '../../types/content';
 import { useApp } from '../../context/AppContext';
 import {
-  Crown,
+  Sparkles,
   Search,
   Check,
   XCircle,
   Film,
   Tv,
   Loader2,
-  Sparkles,
   ArrowLeft,
   AlertCircle
 } from 'lucide-react';
 
-interface AdminHeroPageProps {
+interface AdminSpotlightPageProps {
   onNavigateTab: (tab: string, param?: string) => void;
 }
 
-export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) => {
+export const AdminSpotlightPage: React.FC<AdminSpotlightPageProps> = ({ onNavigateTab }) => {
   const { showToast, refreshCatalog } = useApp();
-  const [currentHero, setCurrentHero] = useState<ContentItem | null>(null);
+  const [currentSpotlight, setCurrentSpotlight] = useState<ContentItem | null>(null);
   const [catalog, setCatalog] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -34,14 +33,14 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
   const loadData = async () => {
     try {
       setLoading(true);
-      const [heroData, contentData] = await Promise.all([
-        api.admin.getHero(),
+      const [spotlightData, contentData] = await Promise.all([
+        api.admin.getSpotlight(),
         api.admin.listContent({ status: 'PUBLISHED' })
       ]);
-      setCurrentHero(heroData);
+      setCurrentSpotlight(spotlightData);
       setCatalog(contentData || []);
     } catch (err: any) {
-      showToast(err.message || 'Failed to load Hero or catalog data.', 'error');
+      showToast(err.message || 'Failed to load Cinematic Spotlight or catalog data.', 'error');
     } finally {
       setLoading(false);
     }
@@ -70,48 +69,35 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
     });
   }, [catalog, typeFilter, searchQuery]);
 
-  // Handle setting a new Main Hero
-  const handleSetHero = async (item: ContentItem) => {
+  // Handle setting a new Cinematic Spotlight
+  const handleSetSpotlight = async (item: ContentItem) => {
     try {
       setUpdatingId(item.id);
-      const res = await api.admin.setHero(item.id);
+      const res = await api.admin.setSpotlight(item.id);
       if (res.success) {
-        setCurrentHero(res.hero || item);
-        showToast(`"${item.title}" is now designated as Main Hero!`, 'success');
+        setCurrentSpotlight(res.spotlight || item);
+        showToast(`"${item.title}" is now designated as Cinematic Spotlight!`, 'success');
         refreshCatalog();
-        // Update catalog local state so isHero flags match
-        setCatalog(prev =>
-          prev.map(c => ({
-            ...c,
-            isHero: c.id === item.id
-          }))
-        );
       }
     } catch (err: any) {
-      showToast(err.message || 'Failed to update Main Hero.', 'error');
+      showToast(err.message || 'Failed to update Cinematic Spotlight.', 'error');
     } finally {
       setUpdatingId(null);
     }
   };
 
-  // Handle clearing current Main Hero
-  const handleClearHero = async () => {
+  // Handle clearing current Cinematic Spotlight
+  const handleClearSpotlight = async () => {
     try {
       setIsClearing(true);
-      const res = await api.admin.setHero(null);
+      const res = await api.admin.setSpotlight(null);
       if (res.success) {
-        setCurrentHero(null);
-        showToast('Main Hero removed. No title is currently active as Main Hero.', 'info');
+        setCurrentSpotlight(null);
+        showToast('Cinematic Spotlight removed. No banner is currently spotlighted.', 'info');
         refreshCatalog();
-        setCatalog(prev =>
-          prev.map(c => ({
-            ...c,
-            isHero: false
-          }))
-        );
       }
     } catch (err: any) {
-      showToast(err.message || 'Failed to clear Main Hero.', 'error');
+      showToast(err.message || 'Failed to clear Cinematic Spotlight.', 'error');
     } finally {
       setIsClearing(false);
     }
@@ -121,7 +107,7 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '12px', color: '#9CA3AF' }}>
         <Loader2 className="animate-spin" size={28} style={{ color: 'var(--brand-gold, #F5C518)' }} />
-        <span>Loading Main Hero configuration...</span>
+        <span>Loading Cinematic Spotlight configuration...</span>
       </div>
     );
   }
@@ -162,43 +148,43 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
                 color: 'var(--brand-gold, #F5C518)'
               }}
             >
-              <Crown size={24} />
+              <Sparkles size={24} />
             </div>
             <div>
               <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em', margin: 0 }}>
-                Main Hero Control
+                Cinematic Spotlight Control
               </h1>
               <p style={{ fontSize: '14px', color: '#9CA3AF', margin: '4px 0 0' }}>
-                Designate the single premier title showcased on the Discover page Hero banner. Selecting a title replaces the previous Main Hero.
+                Designate the large full-width cinematic spotlight featured on the Discover page. Selecting a title replaces the previous spotlight.
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* SECTION 1: Active Hero Showcase Card */}
+      {/* SECTION 1: Active Spotlight Showcase Card */}
       <div
         style={{
           backgroundColor: 'var(--bg-surface, #12121A)',
           borderRadius: '18px',
-          border: currentHero ? '1px solid rgba(245, 197, 24, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
+          border: currentSpotlight ? '1px solid rgba(245, 197, 24, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
           padding: '24px',
           marginBottom: '36px',
           position: 'relative',
           overflow: 'hidden',
-          boxShadow: currentHero ? '0 12px 36px rgba(0, 0, 0, 0.5)' : 'none'
+          boxShadow: currentSpotlight ? '0 12px 36px rgba(0, 0, 0, 0.5)' : 'none'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Sparkles size={18} color="var(--brand-gold, #F5C518)" />
             <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', letterSpacing: '0.04em', textTransform: 'uppercase', margin: 0 }}>
-              Current Active Main Hero
+              Current Active Cinematic Spotlight
             </h2>
           </div>
-          {currentHero && (
+          {currentSpotlight && (
             <button
-              onClick={handleClearHero}
+              onClick={handleClearSpotlight}
               disabled={isClearing}
               style={{
                 display: 'flex',
@@ -216,12 +202,12 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
               }}
             >
               {isClearing ? <Loader2 size={15} className="animate-spin" /> : <XCircle size={15} />}
-              <span>Clear / Remove Main Hero</span>
+              <span>Clear / Remove Spotlight</span>
             </button>
           )}
         </div>
 
-        {currentHero ? (
+        {currentSpotlight ? (
           <div
             style={{
               display: 'flex',
@@ -234,24 +220,32 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
               border: '1px solid rgba(255, 255, 255, 0.06)'
             }}
           >
-            {/* Poster Thumbnail */}
+            {/* Backdrop Artwork Preview */}
             <div
               style={{
-                width: '110px',
-                height: '160px',
+                width: '240px',
+                height: '140px',
                 borderRadius: '10px',
                 overflow: 'hidden',
                 backgroundColor: '#1E1E2A',
                 flexShrink: 0,
-                boxShadow: '0 8px 20px rgba(0,0,0,0.6)'
+                boxShadow: '0 8px 20px rgba(0,0,0,0.6)',
+                position: 'relative'
               }}
             >
               <img
-                src={currentHero.posterUrl || currentHero.backdropUrl}
-                alt={currentHero.title}
+                src={currentSpotlight.backdropUrl || currentSpotlight.posterUrl}
+                alt={currentSpotlight.title}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=300&q=80';
+                  (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=600&q=80';
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.85) 100%)'
                 }}
               />
             </div>
@@ -274,8 +268,8 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
                     border: '1px solid var(--brand-gold, #F5C518)'
                   }}
                 >
-                  <Crown size={12} />
-                  <span>★ ACTIVE MAIN HERO</span>
+                  <Sparkles size={12} />
+                  <span>★ ACTIVE CINEMATIC SPOTLIGHT</span>
                 </span>
                 <span
                   style={{
@@ -288,32 +282,32 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
                     textTransform: 'uppercase'
                   }}
                 >
-                  {currentHero.type === 'series' ? 'TV SERIES' : 'FEATURE FILM'}
+                  {currentSpotlight.type === 'series' ? 'TV SERIES' : 'FEATURE FILM'}
                 </span>
-                <span style={{ fontSize: '13px', color: '#9CA3AF' }}>• {currentHero.releaseYear}</span>
-                {currentHero.rating > 0 && (
+                <span style={{ fontSize: '13px', color: '#9CA3AF' }}>• {currentSpotlight.releaseYear}</span>
+                {currentSpotlight.rating > 0 && (
                   <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
-                    ★ {currentHero.rating}
+                    ★ {currentSpotlight.rating}
                   </span>
                 )}
               </div>
 
               <h3 style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 8px', letterSpacing: '-0.01em' }}>
-                {currentHero.title}
+                {currentSpotlight.title}
               </h3>
 
-              {currentHero.tagline && (
+              {currentSpotlight.tagline && (
                 <p style={{ fontSize: '14px', fontStyle: 'italic', color: '#D1D5DB', margin: '0 0 8px' }}>
-                  "{currentHero.tagline}"
+                  "{currentSpotlight.tagline}"
                 </p>
               )}
 
               <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 12px', lineHeight: 1.5, maxWidth: '750px' }}>
-                {currentHero.description}
+                {currentSpotlight.description}
               </p>
 
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {currentHero.genres?.map(genre => (
+                {currentSpotlight.genres?.map(genre => (
                   <span
                     key={genre}
                     style={{
@@ -344,10 +338,10 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
           >
             <AlertCircle size={32} style={{ color: '#6B7280', margin: '0 auto 12px' }} />
             <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 6px' }}>
-              No Active Main Hero
+              No Active Cinematic Spotlight
             </h3>
             <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0, maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
-              The Discover page premiere Hero banner is currently hidden. Select any published movie or series below to designate it as the Main Hero.
+              The Discover page full-width cinematic spotlight banner is currently hidden. Select any published movie or series below to spotlight it.
             </p>
           </div>
         )}
@@ -488,7 +482,7 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
               </thead>
               <tbody>
                 {filteredCatalog.map(item => {
-                  const isHeroActive = currentHero?.id === item.id;
+                  const isSpotlightActive = currentSpotlight?.id === item.id;
                   const isBeingUpdated = updatingId === item.id;
 
                   return (
@@ -496,7 +490,7 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
                       key={item.id}
                       style={{
                         borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-                        backgroundColor: isHeroActive ? 'rgba(245, 197, 24, 0.05)' : 'transparent',
+                        backgroundColor: isSpotlightActive ? 'rgba(245, 197, 24, 0.05)' : 'transparent',
                         transition: 'background-color 0.15s ease'
                       }}
                     >
@@ -523,7 +517,7 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
                               <span style={{ fontSize: '15px', fontWeight: 700, color: '#FFFFFF' }}>
                                 {item.title}
                               </span>
-                              {isHeroActive && (
+                              {isSpotlightActive && (
                                 <span
                                   style={{
                                     fontSize: '10px',
@@ -535,7 +529,7 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
                                     border: '1px solid var(--brand-gold, #F5C518)'
                                   }}
                                 >
-                                  ★ ACTIVE MAIN HERO
+                                  ★ ACTIVE SPOTLIGHT
                                 </span>
                               )}
                             </div>
@@ -580,7 +574,7 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
 
                       {/* Action */}
                       <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                        {isHeroActive ? (
+                        {isSpotlightActive ? (
                           <span
                             style={{
                               display: 'inline-flex',
@@ -596,12 +590,12 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
                             }}
                           >
                             <Check size={16} />
-                            <span>Current Main Hero</span>
+                            <span>Current Spotlight</span>
                           </span>
                         ) : (
                           <button
                             type="button"
-                            onClick={() => handleSetHero(item)}
+                            onClick={() => handleSetSpotlight(item)}
                             disabled={isBeingUpdated}
                             style={{
                               display: 'inline-flex',
@@ -635,9 +629,9 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
                             {isBeingUpdated ? (
                               <Loader2 size={16} className="animate-spin" />
                             ) : (
-                              <Crown size={16} />
+                              <Sparkles size={16} />
                             )}
-                            <span>Set as Main Hero</span>
+                            <span>Set as Cinematic Spotlight</span>
                           </button>
                         )}
                       </td>

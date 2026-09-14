@@ -226,6 +226,15 @@ export const api = {
       }
     },
 
+    async getSpotlight(): Promise<ContentItem | null> {
+      try {
+        const data = await request<{ spotlight: any | null }>('/content/spotlight');
+        return data.spotlight ? adaptDbContentToFrontend(data.spotlight) : null;
+      } catch {
+        return null;
+      }
+    },
+
     async getAdsConfig(): Promise<{
       enabled: boolean;
       type: 'IMAGE' | 'VIDEO';
@@ -681,6 +690,27 @@ export const api = {
         success: data.success,
         message: data.message,
         hero: data.hero ? adaptDbContentToFrontend(data.hero) : null
+      };
+    },
+
+    async getSpotlight(): Promise<ContentItem | null> {
+      try {
+        const data = await request<{ success: boolean; spotlight: any | null }>('/admin/spotlight');
+        return data.spotlight ? adaptDbContentToFrontend(data.spotlight) : null;
+      } catch {
+        return null;
+      }
+    },
+
+    async setSpotlight(contentId: string | null): Promise<{ success: boolean; message: string; spotlight: ContentItem | null }> {
+      const data = await request<{ success: boolean; message: string; spotlight: any | null }>('/admin/spotlight', {
+        method: 'PUT',
+        body: JSON.stringify({ contentId })
+      });
+      return {
+        success: data.success,
+        message: data.message,
+        spotlight: data.spotlight ? adaptDbContentToFrontend(data.spotlight) : null
       };
     },
 

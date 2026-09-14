@@ -230,7 +230,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const navItems = [
     { id: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'admin-content', label: 'Content & Media / Catalog', icon: Film },
-    { id: 'admin-hero', label: 'Home Hero Control', icon: Crown },
+    { id: 'admin-hero', label: 'Main Hero', icon: Crown },
+    { id: 'admin-spotlight', label: 'Cinematic Spotlight', icon: Sparkles },
     { id: 'admin-ads', label: 'Advertisement / Ads', icon: Megaphone },
     { id: 'admin-quick-add', label: 'Quick Add / Auto Import', icon: Sparkles },
     { id: 'admin-users', label: 'Users', icon: Users },

@@ -19,6 +19,7 @@ import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { AdminDesignPage } from './pages/admin/AdminDesignPage';
 import { AdminQuickAddPage } from './pages/admin/AdminQuickAddPage';
 import { AdminHeroPage } from './pages/admin/AdminHeroPage';
+import { AdminSpotlightPage } from './pages/admin/AdminSpotlightPage';
 import { AdminAdsPage } from './pages/admin/AdminAdsPage';
 import { PurchaseModal } from './components/purchase/PurchaseModal';
 import { RechargeModal } from './components/wallet/RechargeModal';
@@ -44,6 +45,9 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   }
   if (cleanPath === '/admin/hero') {
     return { tab: 'admin-hero' };
+  }
+  if (cleanPath === '/admin/spotlight') {
+    return { tab: 'admin-spotlight' };
   }
   if (cleanPath === '/admin/ads') {
     return { tab: 'admin-ads' };
@@ -102,6 +106,8 @@ function tabToPath(tab: string, param?: string): string {
       return '/admin/content';
     case 'admin-hero':
       return '/admin/hero';
+    case 'admin-spotlight':
+      return '/admin/spotlight';
     case 'admin-ads':
       return '/admin/ads';
     case 'admin-quick-add':
@@ -238,6 +244,7 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-dashboard' && <AdminDashboardPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-content' && <AdminContentPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-hero' && <AdminHeroPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-spotlight' && <AdminSpotlightPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-ads' && <AdminAdsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-editor' && (
             <AdminContentEditorPage contentId={adminParam} onNavigateTab={handleNavigate} />
@@ -248,7 +255,7 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-design' && <AdminDesignPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-hero', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings'].includes(currentTab) && (
+          {!['admin-dashboard', 'admin-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>

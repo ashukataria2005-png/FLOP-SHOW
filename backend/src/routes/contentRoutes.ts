@@ -61,11 +61,21 @@ contentRouter.get('/', async (req, res, next) => {
   }
 });
 
-// GET /api/content/hero (Dedicated Home Hero)
+// GET /api/content/hero (Dedicated Main Hero)
 contentRouter.get('/hero', async (_req, res, next) => {
   try {
     const hero = await contentService.getHero();
     res.json({ hero });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/content/spotlight (Dedicated Cinematic Spotlight)
+contentRouter.get('/spotlight', async (_req, res, next) => {
+  try {
+    const spotlight = await contentService.getSpotlight();
+    res.json({ spotlight });
   } catch (err) {
     next(err);
   }

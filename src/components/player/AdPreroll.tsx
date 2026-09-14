@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ArrowLeft,
   FastForward,
@@ -6,6 +6,8 @@ import {
   Volume2,
   VolumeX
 } from 'lucide-react';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { API_BASE_URL } from '../../services/api';
 
 export interface AdConfig {
   enabled: boolean;
@@ -29,51 +31,70 @@ export const AdPreroll: React.FC<AdPrerollProps> = ({
   onComplete,
   onClose
 }) => {
-  const duration = Math.max(1, adConfig.durationSeconds || 10);
-  const skipDelay = Math.max(0, adConfig.skipAfterSeconds || 0);
+  const duration = Math.max(1, Number(adConfig.durationSeconds) || 10);
+  const skipDelay = Math.max(0, Number(adConfig.skipAfterSeconds) || 0);
 
-  const [remaining, setRemaining] = useState(duration);
-  const [elapsed, setElapsed] = useState(0);
-  const [isMuted, setIsMuted] = useState(true);
+  const [remaining, setRemaining] = useState<number>(duration);
+  const [elapsed, setElapsed] = useState<number>(0);
+  const [isMuted, setIsMuted] = useState<boolean>(true);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const hasFinishedRef = useRef(false);
+  const hasFinishedRef = useRef<boolean>(false);
+  const onCompleteRef = useRef(onComplete);
 
-  // Safe completion trigger
-  const handleFinished = () => {
+  // Keep latest onComplete callback ref without triggering effect re-runs
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  // Safe completion trigger: single-shot invocation
+  const handleFinished = useCallback(() => {
     if (!hasFinishedRef.current) {
       hasFinishedRef.current = true;
-      onComplete();
+      onCompleteRef.current();
     }
-  };
+  }, []);
 
-  // If no media URL, fail gracefully and start content immediately
+  // If no media URL or disabled, fail gracefully and start content immediately
   useEffect(() => {
     if (!adConfig.enabled || !adConfig.mediaUrl || !adConfig.mediaUrl.trim()) {
       handleFinished();
     }
-  }, [adConfig]);
+  }, [adConfig.enabled, adConfig.mediaUrl, handleFinished]);
 
-  // Countdown timer
+  // Stable Wall-Clock Countdown Timer
   useEffect(() => {
+    if (hasFinishedRef.current) return;
+
+    const startTime = Date.now();
+    const totalDurationMs = duration * 1000;
+
     const timer = window.setInterval(() => {
-      setElapsed(prev => {
-        const next = prev + 1;
-        const rem = duration - next;
-        if (rem <= 0) {
-          clearInterval(timer);
-          handleFinished();
-        } else {
-          setRemaining(rem);
-        }
-        return next;
-      });
+      if (hasFinishedRef.current) {
+        clearInterval(timer);
+        return;
+      }
+
+      const elapsedMs = Date.now() - startTime;
+      const elapsedSec = Math.floor(elapsedMs / 1000);
+      const remainingSec = Math.max(0, duration - elapsedSec);
+
+      setElapsed(elapsedSec);
+      setRemaining(remainingSec);
+
+      if (remainingSec <= 0 || elapsedMs >= totalDurationMs) {
+        clearInterval(timer);
+        handleFinished();
+      }
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [duration]);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [duration, handleFinished]);
 
-  const canSkip = adConfig.skipEnabled && elapsed >= skipDelay;
+  const canSkip = Boolean(adConfig.skipEnabled && elapsed >= skipDelay);
   const skipCountdown = Math.max(0, skipDelay - elapsed);
+  const resolvedMediaUrl = resolveMediaUrl(adConfig.mediaUrl, API_BASE_URL);
 
   return (
     <div
@@ -174,7 +195,7 @@ export const AdPreroll: React.FC<AdPrerollProps> = ({
       >
         {adConfig.type === 'IMAGE' ? (
           <img
-            src={adConfig.mediaUrl}
+            src={resolvedMediaUrl}
             alt="Advertisement"
             style={{
               maxWidth: '90vw',
@@ -192,7 +213,7 @@ export const AdPreroll: React.FC<AdPrerollProps> = ({
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
             <video
               ref={videoRef}
-              src={adConfig.mediaUrl}
+              src={resolvedMediaUrl}
               autoPlay
               muted={isMuted}
               playsInline

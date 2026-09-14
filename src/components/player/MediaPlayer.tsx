@@ -180,6 +180,11 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Stable callback when preroll ad completes or is skipped
+  const handleAdComplete = useCallback(() => {
+    setAdFinished(true);
+  }, []);
+
   // ─── END UNCONDITIONAL HOOKS ─────────────────────────────────────────────────
 
   if (!source) return null;
@@ -239,7 +244,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     return (
       <AdPreroll
         adConfig={adConfig}
-        onComplete={() => setAdFinished(true)}
+        onComplete={handleAdComplete}
         onClose={onClose}
       />
     );

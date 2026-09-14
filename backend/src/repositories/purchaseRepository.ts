@@ -42,8 +42,13 @@ export const purchaseRepository = {
   async isOwned(userId: string, contentId: string, adapter?: DbAdapter): Promise<boolean> {
     const db = adapter || getAdapter();
     const { rows } = await db.query(
-      `SELECT 1 FROM purchases WHERE user_id = ? AND content_id = ? AND status = 'COMPLETED';`,
-      [userId, contentId]
+      `SELECT 1 FROM purchases p
+       LEFT JOIN content c ON (p.content_id = c.id OR p.content_id = c.slug)
+       WHERE p.user_id = ?
+         AND (p.content_id = ? OR c.id = ? OR c.slug = ?)
+         AND p.status = 'COMPLETED'
+       LIMIT 1;`,
+      [userId, contentId, contentId, contentId]
     );
     return rows.length > 0;
   },
@@ -51,9 +56,9 @@ export const purchaseRepository = {
   async getPurchasesByUser(userId: string): Promise<PurchaseRecord[]> {
     const db = getAdapter();
     const { rows } = await db.query(
-      `SELECT p.*, c.title, c.poster, c.type
+      `SELECT p.*, c.title, c.poster, c.type, c.slug
        FROM purchases p
-       JOIN content c ON p.content_id = c.id
+       JOIN content c ON (p.content_id = c.id OR p.content_id = c.slug)
        WHERE p.user_id = ? AND p.status = 'COMPLETED'
        ORDER BY p.purchased_at DESC;`,
       [userId]

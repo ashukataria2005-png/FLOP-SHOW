@@ -49,7 +49,7 @@ interface AppContextType {
   // Purchases & Library
   purchases: PurchaseRecord[];
   isOwned: (contentId: string) => boolean;
-  buyContent: (item: ContentItem) => { success: boolean; message: string };
+  buyContent: (item: ContentItem) => Promise<{ success: boolean; message: string }>;
 
   // My List
   myList: string[];
@@ -75,7 +75,7 @@ interface AppContextType {
   activePlayerContent: ContentItem | null;
   activeEpisode: Episode | null;
   activeMediaSource: MediaPlayerSource | null;
-  startPlaying: (content: ContentItem, episode?: Episode) => Promise<void>;
+  startPlaying: (content: ContentItem, episode?: Episode, skipOwnershipCheck?: boolean) => Promise<void>;
   playTrailer: (content: ContentItem) => Promise<void>;
   playMedia: (source: MediaPlayerSource) => void;
   closePlayer: () => void;
@@ -158,7 +158,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const token = tokenStorage.get();
     if (token) {
-      api.auth.me().then(({ user: serverUser }) => {
+      api.auth.me().then(({ user: serverUser, wallet: serverWallet }) => {
         if (serverUser) {
           setUser(prev => ({
             ...prev,
@@ -166,7 +166,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             email: serverUser.email,
             role: serverUser.role
           }));
+          setWalletBalance(serverWallet.balanceRupees);
           setIsAuthenticated(true);
+          // Fetch purchases
+          api.library.getPurchases().then((backendPurchases) => {
+            const localPurchases = backendPurchases.map((p: any) => ({
+              id: p.id,
+              contentId: p.content_id,
+              title: p.title,
+              price: p.amount_paid / 100,
+              purchasedAt: new Date(p.purchased_at).toLocaleString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true
+              })
+            }));
+            setPurchases(localPurchases);
+          }).catch((err) => {
+            console.warn('Failed to sync purchases from backend', err);
+          });
         }
       }).catch(() => {
         // Token invalid/expired
@@ -247,16 +268,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Purchases & Library
   const isOwned = (contentId: string): boolean => {
-    const catalogItem = catalog.find(c => c.id === contentId);
+    const catalogItem = catalog.find(c => c.id === contentId || (c as any).slug === contentId);
     if (catalogItem && catalogItem.price === 0) return true; // Free items are always owned
-    return purchases.some(p => p.contentId === contentId);
+    return purchases.some(p => {
+      if (p.contentId === contentId) return true;
+      if (catalogItem && (p.contentId === catalogItem.id || (catalogItem as any).slug === p.contentId)) return true;
+      return false;
+    });
   };
 
-  const buyContent = (item: ContentItem): { success: boolean; message: string } => {
+  const buyContent = async (item: ContentItem): Promise<{ success: boolean; message: string }> => {
+    // Prevent double charge if already owned
     if (isOwned(item.id)) {
-      return { success: false, message: 'You already own this title.' };
+      return {
+        success: true,
+        message: 'You already own this title.'
+      };
     }
 
+    // Optimistic check for insufficient balance to avoid unnecessary API call
     if (walletBalance < item.price) {
       return {
         success: false,
@@ -264,35 +294,80 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       };
     }
 
-    // Deduct balance
-    const newBalance = walletBalance - item.price;
-    setWalletBalance(newBalance);
+    try {
+      const result = await api.purchases.buy(item.id);
+      // Update wallet balance from backend
+      if (typeof result.remainingBalanceRupees === 'number') {
+        setWalletBalance(result.remainingBalanceRupees);
+      }
 
-    // Record purchase
-    const newPurchase: PurchaseRecord = {
-      id: `pur-${Date.now()}`,
-      contentId: item.id,
-      title: item.title,
-      price: item.price,
-      purchasedAt: formatCurrentDate()
-    };
-    setPurchases(prev => [newPurchase, ...prev]);
+      // Format purchase entry
+      const newPurchaseEntry: PurchaseRecord = {
+        id: (result as any).purchase?.id || `pur-${item.id}-${Date.now()}`,
+        contentId: item.id,
+        title: item.title,
+        price: item.price,
+        purchasedAt: new Date().toLocaleString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true
+        })
+      };
 
-    // Record transaction
-    const newTx: WalletTransaction = {
-      id: `tx-${Date.now()}`,
-      timestamp: formatCurrentDate(),
-      title: `Purchased: ${item.title}`,
-      amount: item.price,
-      type: 'debit',
-      contentId: item.id,
-      status: 'success'
-    };
-    setTransactions(prev => [newTx, ...prev]);
+      // Refetch purchases to get the updated list from backend
+      try {
+        const backendPurchases = await api.library.getPurchases();
+        const localPurchases = backendPurchases.map((p: any) => ({
+          id: p.id,
+          contentId: p.content_id || p.contentId,
+          title: p.title,
+          price: typeof p.amount_paid === 'number' ? p.amount_paid / 100 : (p.price || item.price),
+          purchasedAt: new Date(p.purchased_at || Date.now()).toLocaleString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true
+          })
+        }));
 
-    closePurchaseModal();
-    showToast(`Unlocked "${item.title}"! Enjoy streaming.`, 'success');
-    return { success: true, message: 'Purchase complete.' };
+        if (!localPurchases.some(p => p.contentId === item.id)) {
+          localPurchases.unshift(newPurchaseEntry);
+        }
+        setPurchases(localPurchases);
+      } catch {
+        setPurchases(prev => [newPurchaseEntry, ...prev.filter(p => p.contentId !== item.id)]);
+      }
+
+      showToast(`Unlocked "${item.title}"! Enjoy streaming.`, 'success');
+      return { success: true, message: 'Purchase complete.' };
+    } catch (err: any) {
+      if (err.status === 409) {
+        // Backend confirms already owned - update local state without deducting wallet
+        if (!purchases.some(p => p.contentId === item.id)) {
+          setPurchases(prev => [{
+            id: `pur-${item.id}`,
+            contentId: item.id,
+            title: item.title,
+            price: item.price,
+            purchasedAt: new Date().toLocaleString("en-IN", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true
+            })
+          }, ...prev]);
+        }
+        return { success: true, message: 'You already own this title.' };
+      }
+      return { success: false, message: err.message || 'Purchase failed' };
+    }
   };
 
   // My List
@@ -375,7 +450,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Real Media Player controls
-  const startPlaying = async (content: ContentItem, episode?: Episode) => {
+  const startPlaying = async (content: ContentItem, episode?: Episode, skipOwnershipCheck?: boolean) => {
     setActivePlayerContent(content);
 
     let ep = episode;
@@ -429,8 +504,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       } catch (err: any) {
         if (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403) {
-          openPurchaseModal(content);
-          return;
+          // skipOwnershipCheck is set when called immediately after a purchase (before React re-renders
+          // the purchases state), so we trust the caller that the content is now owned.
+          if (!skipOwnershipCheck && !isOwned(content.id) && !content.isFree) {
+            openPurchaseModal(content);
+            return;
+          }
         }
         if (ep.videoUrl && ep.videoUrl.trim() !== '') {
           sourceUrl = ep.videoUrl;
@@ -457,8 +536,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       } catch (err: any) {
         if (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403) {
-          openPurchaseModal(content);
-          return;
+          // skipOwnershipCheck is set when called immediately after a purchase (before React re-renders
+          // the purchases state), so we trust the caller that the content is now owned.
+          if (!skipOwnershipCheck && !isOwned(content.id) && !content.isFree) {
+            openPurchaseModal(content);
+            return;
+          }
         }
         if (content.videoUrl && content.videoUrl.trim() !== '') {
           sourceUrl = content.videoUrl;

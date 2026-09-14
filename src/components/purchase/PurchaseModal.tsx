@@ -22,13 +22,23 @@ export const PurchaseModal: React.FC = () => {
   const hasSufficientBalance = walletBalance >= price;
   const remainingBalance = walletBalance - price;
 
-  const handleConfirm = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleConfirm = async () => {
+    if (isSubmitting || !purchaseTarget) return;
     setErrorMessage(null);
-    const result = buyContent(purchaseTarget);
-    if (result.success) {
-      setPurchasedSuccess(true);
-    } else {
-      setErrorMessage(result.message);
+    setIsSubmitting(true);
+    try {
+      const result = await buyContent(purchaseTarget);
+      if (result.success) {
+        setPurchasedSuccess(true);
+      } else {
+        setErrorMessage(result.message);
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Purchase transaction failed.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -41,7 +51,10 @@ export const PurchaseModal: React.FC = () => {
   const handleWatchNow = () => {
     const item = purchaseTarget;
     handleClose();
-    startPlaying(item);
+    // Pass skipOwnershipCheck=true: we know the content is now owned, but React may not have
+    // re-rendered the purchases state yet (buyContent updated state asynchronously).
+    // Without this flag, startPlaying's stale isOwned() closure could re-open the purchase modal.
+    startPlaying(item, undefined, true);
   };
 
   return (
@@ -244,11 +257,11 @@ export const PurchaseModal: React.FC = () => {
               {/* Actions */}
               {hasSufficientBalance ? (
                 <div style={{ display: 'flex', gap: '12px' }}>
-                  <button onClick={handleClose} className="btn btn-secondary" style={{ flex: 1 }}>
+                  <button onClick={handleClose} disabled={isSubmitting} className="btn btn-secondary" style={{ flex: 1 }}>
                     Cancel
                   </button>
-                  <button onClick={handleConfirm} className="btn btn-primary" style={{ flex: 2 }}>
-                    Confirm Purchase
+                  <button onClick={handleConfirm} disabled={isSubmitting} className="btn btn-primary" style={{ flex: 2 }}>
+                    {isSubmitting ? 'Processing...' : 'Confirm Purchase'}
                   </button>
                 </div>
               ) : (

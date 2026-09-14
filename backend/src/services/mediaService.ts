@@ -172,7 +172,8 @@ export const mediaService = {
   async getPlayableContentMedia(
     contentId: string,
     mediaType: 'MAIN' | 'TRAILER',
-    userId?: string
+    userId?: string,
+    userRole?: string
   ): Promise<MediaPlayableResponse> {
     const content = await contentRepository.findByIdOrSlug(contentId);
     if (!content) {
@@ -209,7 +210,8 @@ export const mediaService = {
 
     // 2. Main video access control
     const isFree = content.price === 0;
-    const isOwned = userId ? await purchaseRepository.isOwned(userId, content.id) : false;
+    const isAdmin = userRole === 'ADMIN';
+    const isOwned = isAdmin || (userId ? await purchaseRepository.isOwned(userId, content.id) : false);
 
     if (!isFree && !isOwned) {
       const err = new Error('Purchase required to watch this movie.');
@@ -255,7 +257,8 @@ export const mediaService = {
   async getPlayableEpisodeMedia(
     episodeId: string,
     mediaType: 'MAIN' | 'TRAILER',
-    userId?: string
+    userId?: string,
+    userRole?: string
   ): Promise<MediaPlayableResponse> {
     const db = getAdapter();
     const { rows } = await db.query(
@@ -301,7 +304,8 @@ export const mediaService = {
 
     // Main episode access control
     const isFree = episode.price === 0;
-    const isOwned = userId ? await purchaseRepository.isOwned(userId, episode.content_id) : false;
+    const isAdmin = userRole === 'ADMIN';
+    const isOwned = isAdmin || (userId ? await purchaseRepository.isOwned(userId, episode.content_id) : false);
 
     if (!isFree && !isOwned) {
       const err = new Error('Purchase required to watch this series episode.');

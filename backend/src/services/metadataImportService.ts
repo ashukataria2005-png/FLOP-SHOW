@@ -159,7 +159,62 @@ export const metadataImportService = {
       }
     }
 
-    // 2. Search OMDb API (works for both movies and series, returns IMDb IDs)
+    // 2. If Movie, search Cinemeta public catalog (instant, high accuracy, free, returns IMDb IDs)
+    if (type === 'MOVIE') {
+      const parseCinemetaResults = (cData: any, yearFilter?: number) => {
+        if (!cData.metas || !Array.isArray(cData.metas)) return;
+        for (const item of cData.metas) {
+          const rawYear = String(item.releaseInfo || item.year || '');
+          const itemYear = parseInt(rawYear.split('-')[0], 10) || 0;
+          if (yearFilter && itemYear && Math.abs(itemYear - yearFilter) > 1) {
+            continue;
+          }
+
+          const imdbId = item.imdb_id || item.id;
+          if (!imdbId) continue;
+          const providerId = `imdb:${imdbId}`;
+          if (candidatesMap.has(providerId)) continue; // Already added
+          const candidateYear = itemYear || yearFilter || new Date().getFullYear();
+          const poster = item.poster && !item.poster.includes('null') ? item.poster : '';
+          const backdrop = item.background && !item.background.includes('null') ? item.background : '';
+
+          candidatesMap.set(providerId, {
+            providerId,
+            title: item.name || item.title,
+            year: candidateYear,
+            type: 'MOVIE',
+            poster,
+            backdrop,
+            rating: item.imdbRating ? parseFloat(item.imdbRating) : 8.0,
+            overview: item.description || '',
+            alreadyInFlopshow: false
+          });
+        }
+      };
+
+      try {
+        const cinemetaSearchUrl = `https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(trimmedQuery)}.json`;
+        const cinemetaRes = await fetch(cinemetaSearchUrl, {
+          headers: { 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(6000)
+        });
+        if (cinemetaRes.ok) {
+          const cData = await cinemetaRes.json() as any;
+          const beforeCount = candidatesMap.size;
+          parseCinemetaResults(cData, year);
+
+          // If year was specified but filtered everything out, retry without year constraint
+          // (same fallback pattern used by OMDb below)
+          if (year && candidatesMap.size === beforeCount && cData.metas?.length > 0) {
+            parseCinemetaResults(cData, undefined);
+          }
+        }
+      } catch (err) {
+        console.warn('Cinemeta movie search skipped or failed:', (err as any).message);
+      }
+    }
+
+    // 3. Search OMDb API (works for both movies and series, returns IMDb IDs)
     if (config.omdbApiKey) {
       const omdbApiKey = config.omdbApiKey;
       try {
@@ -169,13 +224,33 @@ export const metadataImportService = {
           omdbUrl += `&y=${year}`;
         }
 
-        const omdbRes = await fetch(omdbUrl, { signal: AbortSignal.timeout(5000) });
-        if (omdbRes.ok) {
-          const omdbData = await omdbRes.json() as any;
-        if (omdbData.Search && Array.isArray(omdbData.Search)) {
+        let omdbRes = await fetch(omdbUrl, { signal: AbortSignal.timeout(5000) });
+        let omdbData = omdbRes.ok ? (await omdbRes.json() as any) : null;
+
+        // If specific year query returned no matches on OMDb, retry without &y= to prevent losing famous movies
+        if ((!omdbData || !omdbData.Search) && year) {
+          try {
+            const fallbackUrl = `https://www.omdbapi.com/?s=${encodeURIComponent(trimmedQuery)}&type=${omdbType}&apikey=${omdbApiKey}`;
+            const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(5000) });
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json() as any;
+              if (fallbackData.Search) {
+                omdbData = fallbackData;
+              }
+            }
+          } catch {
+            // Ignore fallback failure
+          }
+        }
+
+        if (omdbData?.Search && Array.isArray(omdbData.Search)) {
           for (const item of omdbData.Search) {
             const providerId = `imdb:${item.imdbID}`;
             const itemYear = parseInt(item.Year, 10) || year || new Date().getFullYear();
+            if (year && itemYear && Math.abs(itemYear - year) > 2) {
+              continue;
+            }
+
             const poster = item.Poster && item.Poster !== 'N/A' ? item.Poster : '';
 
             if (candidatesMap.has(providerId)) {
@@ -194,10 +269,9 @@ export const metadataImportService = {
             }
           }
         }
+      } catch (err) {
+        console.warn('OMDb search skipped or failed:', (err as any).message);
       }
-    } catch (err) {
-      console.warn('OMDb search skipped or failed:', (err as any).message);
-    }
     }
 
     // 3. If TMDB API key is configured, query TMDB

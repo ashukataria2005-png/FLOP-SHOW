@@ -179,7 +179,7 @@ export const contentRepository = {
   ): Promise<ContentRecord[]> {
     const db = getAdapter();
     const joinParams: (string | number)[] = [];
-    const whereConditions: string[] = ["c.status = 'PUBLISHED'"];
+    const whereConditions: string[] = ["UPPER(c.status) = 'PUBLISHED'"];
     const whereParams: (string | number)[] = [];
 
     let genreJoin = '';
@@ -645,7 +645,7 @@ export const contentRepository = {
 
       for (const id of uniqueIds) {
         const item = await contentRepository.findByIdOrSlug(id);
-        if (item && item.status === 'PUBLISHED') {
+        if (item && item.status?.toUpperCase() === 'PUBLISHED') {
           if (!item.genres || item.genres.length === 0) {
             item.genres = await contentRepository.getGenresForContent(item.id);
           }

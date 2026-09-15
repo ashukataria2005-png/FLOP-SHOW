@@ -5,6 +5,7 @@ import { requireAuth } from '../middlewares/authMiddleware.js';
 import { requireAdmin } from '../middlewares/adminMiddleware.js';
 import { uploadMediaMiddleware, isVideoFile } from '../middlewares/uploadMiddleware.js';
 import { metadataImportService } from '../services/metadataImportService.js';
+import { cloudinaryService, isCloudinaryConfigured, cleanupLocalFile } from '../services/cloudinaryService.js';
 
 export const adminRouter = Router();
 
@@ -90,7 +91,7 @@ adminRouter.get('/users/:id/transactions', async (req, res, next) => {
 // 2. FILE UPLOADS (Videos & Images)
 // ----------------------------------------------------------------------------
 adminRouter.post('/upload', (req: Request, res: Response, next) => {
-  uploadMediaMiddleware.single('file')(req, res, (err: any) => {
+  uploadMediaMiddleware.single('file')(req, res, async (err: any) => {
     if (err) {
       if (err.name === 'MulterError') {
         if (err.code === 'LIMIT_FILE_SIZE') {
@@ -116,25 +117,56 @@ adminRouter.post('/upload', (req: Request, res: Response, next) => {
       });
     }
 
+    if (!req.file) {
+      return res.status(400).json({ error: { code: 'NO_FILE', message: 'No file was uploaded.' } });
+    }
+
+    const isVid = isVideoFile(req.file);
+    const localFilePath = req.file.path;
+
     try {
-      if (!req.file) {
-        return res.status(400).json({ error: { code: 'NO_FILE', message: 'No file was uploaded.' } });
+      if (isCloudinaryConfigured()) {
+        const uploadResult = isVid
+          ? await cloudinaryService.uploadVideo(localFilePath, req.file.originalname)
+          : await cloudinaryService.uploadImage(localFilePath, req.file.originalname);
+
+        // Clean up temporary local staging file after successful Cloudinary upload
+        await cleanupLocalFile(localFilePath);
+
+        return res.status(201).json({
+          success: true,
+          url: uploadResult.url,
+          filename: req.file.filename,
+          originalName: req.file.originalname,
+          mimeType: req.file.mimetype || (isVid ? 'video/mp4' : 'image/jpeg'),
+          size: uploadResult.bytes || req.file.size,
+          provider: 'CLOUDINARY',
+          publicId: uploadResult.publicId,
+        });
       }
 
-      const isVid = isVideoFile(req.file);
+      // Safe fallback to local storage if Cloudinary credentials are not configured
       const subfolder = isVid ? 'videos' : 'images';
       const relativeUrl = `/uploads/${subfolder}/${req.file.filename}`;
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         url: relativeUrl,
         filename: req.file.filename,
         originalName: req.file.originalname,
         mimeType: req.file.mimetype || (isVid ? 'video/mp4' : 'image/jpeg'),
         size: req.file.size,
+        provider: 'LOCAL',
       });
-    } catch (innerErr) {
-      next(innerErr);
+    } catch (innerErr: any) {
+      // Clean up temporary local file if Cloudinary upload fails
+      await cleanupLocalFile(localFilePath);
+      return res.status(500).json({
+        error: {
+          code: 'UPLOAD_FAILED',
+          message: innerErr.message || 'Failed to upload media file to Cloudinary.',
+        },
+      });
     }
   });
 });

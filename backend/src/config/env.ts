@@ -69,7 +69,10 @@ export const config = {
   devAdminEmail: process.env.DEV_ADMIN_EMAIL || 'admin@flopshow.tv',
   devAdminPassword: process.env.DEV_ADMIN_PASSWORD || '',
   tmdbApiKey: process.env.TMDB_API_KEY || '',
-  omdbApiKey: process.env.OMDB_API_KEY || ''
+  omdbApiKey: process.env.OMDB_API_KEY || '',
+  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
+  cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || '',
+  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || ''
 };
 
 

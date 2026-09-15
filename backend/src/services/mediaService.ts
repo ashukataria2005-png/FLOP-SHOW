@@ -58,6 +58,9 @@ export const mediaService = {
     } else if (cleanUrl.startsWith('/uploads/') || cleanUrl.startsWith('uploads/')) {
       // Relative upload paths from the file upload endpoint — treat as UPLOAD
       detectedSource = 'UPLOAD';
+    } else if (cleanUrl.includes('cloudinary.com') || params.sourceType === 'UPLOAD') {
+      // Cloudinary hosted uploaded media — keep existing UPLOAD sourceType model
+      detectedSource = 'UPLOAD';
     } else if (detectedSource !== 'UPLOAD' && !isValidMediaUrl(cleanUrl)) {
       const err = new Error('Invalid URL. Please provide a valid http or https URL, or upload a file.');
       (err as any).statusCode = 400;
@@ -130,6 +133,9 @@ export const mediaService = {
       detectedSource = 'YOUTUBE';
     } else if (cleanUrl.startsWith('/uploads/') || cleanUrl.startsWith('uploads/')) {
       // Relative upload paths from the file upload endpoint — treat as UPLOAD
+      detectedSource = 'UPLOAD';
+    } else if (cleanUrl.includes('cloudinary.com') || params.sourceType === 'UPLOAD') {
+      // Cloudinary hosted uploaded media — keep existing UPLOAD sourceType model
       detectedSource = 'UPLOAD';
     } else if (detectedSource !== 'UPLOAD' && !isValidMediaUrl(cleanUrl)) {
       const err = new Error('Invalid URL. Please provide a valid http or https URL, or upload a file.');

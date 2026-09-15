@@ -1,0 +1,2 @@
+# Ignore legacy/cached redirect files in Cloudflare static assets
+_redirects

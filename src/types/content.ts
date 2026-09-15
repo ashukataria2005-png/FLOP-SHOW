@@ -47,4 +47,5 @@ export interface ContentItem {
   trendingPosition?: number; // 1 = Trending #1
   displayPriority?: number;
   seasons?: Season[]; // present if series
+  status?: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED';
 }

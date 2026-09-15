@@ -612,44 +612,86 @@ export const contentRepository = {
     });
   },
 
-  async getSpotlight(): Promise<ContentRecord | null> {
+  async getSpotlights(): Promise<ContentRecord[]> {
     const db = getAdapter();
     try {
       const { rows: settingRows } = await db.query(
-        `SELECT value FROM app_settings WHERE key = 'cinematic_spotlight_id';`
+        `SELECT key, value FROM app_settings WHERE key IN ('cinematic_spotlight_ids', 'cinematic_spotlight_id');`
       );
-      const spotlightId = (settingRows[0] as { value: string } | undefined)?.value?.trim();
-      if (spotlightId) {
-        const item = await contentRepository.findByIdOrSlug(spotlightId);
-        if (item && item.status === 'PUBLISHED') {
-          return item;
+      const rowsMap = new Map((settingRows as { key: string; value: string }[]).map(r => [r.key, r.value]));
+
+      let ids: string[] = [];
+      const multiVal = rowsMap.get('cinematic_spotlight_ids');
+      if (multiVal) {
+        try {
+          const parsed = JSON.parse(multiVal);
+          if (Array.isArray(parsed)) {
+            ids = parsed.map(id => String(id).trim()).filter(Boolean);
+          }
+        } catch {
+          ids = multiVal.split(',').map(s => s.trim()).filter(Boolean);
         }
       }
+
+      if (ids.length === 0) {
+        const singleId = rowsMap.get('cinematic_spotlight_id')?.trim();
+        if (singleId) {
+          ids = [singleId];
+        }
+      }
+
+      const uniqueIds = Array.from(new Set(ids));
+      const items: ContentRecord[] = [];
+
+      for (const id of uniqueIds) {
+        const item = await contentRepository.findByIdOrSlug(id);
+        if (item && item.status === 'PUBLISHED') {
+          if (!item.genres || item.genres.length === 0) {
+            item.genres = await contentRepository.getGenresForContent(item.id);
+          }
+          items.push(item);
+        }
+      }
+
+      return items;
     } catch {
-      // Return null on missing tables or errors
+      return [];
     }
-    return null;
   },
 
-  async setSpotlight(contentId: string | null): Promise<void> {
+  async setSpotlights(contentIds: string[]): Promise<void> {
     const db = getAdapter();
     const now = new Date().toISOString();
 
+    const uniqueIds = Array.from(new Set(contentIds.map(id => String(id).trim()).filter(Boolean)));
+    const primaryId = uniqueIds[0] || '';
+    const jsonValue = JSON.stringify(uniqueIds);
+
+    await db.run(
+      `INSERT INTO app_settings (key, value, updated_at)
+       VALUES ('cinematic_spotlight_ids', ?, ?)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
+      [jsonValue, now]
+    );
+
+    await db.run(
+      `INSERT INTO app_settings (key, value, updated_at)
+       VALUES ('cinematic_spotlight_id', ?, ?)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
+      [primaryId, now]
+    );
+  },
+
+  async getSpotlight(): Promise<ContentRecord | null> {
+    const spotlights = await this.getSpotlights();
+    return spotlights[0] || null;
+  },
+
+  async setSpotlight(contentId: string | null): Promise<void> {
     if (contentId && contentId.trim() !== '') {
-      const cleanId = contentId.trim();
-      await db.run(
-        `INSERT INTO app_settings (key, value, updated_at)
-         VALUES ('cinematic_spotlight_id', ?, ?)
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
-        [cleanId, now]
-      );
+      await this.setSpotlights([contentId.trim()]);
     } else {
-      await db.run(
-        `INSERT INTO app_settings (key, value, updated_at)
-         VALUES ('cinematic_spotlight_id', '', ?)
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at;`,
-        [now]
-      );
+      await this.setSpotlights([]);
     }
   },
 };

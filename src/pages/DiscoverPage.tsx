@@ -28,16 +28,28 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
   const { watchProgress, catalog } = useApp();
   const activeCatalog = catalog || [];
   const [dedicatedHero, setDedicatedHero] = useState<ContentItem | null>(null);
-  const [spotlightItem, setSpotlightItem] = useState<ContentItem | null>(null);
+  const [spotlights, setSpotlights] = useState<ContentItem[]>([]);
 
   useEffect(() => {
     let mounted = true;
     api.content.getHero().then(h => {
       if (mounted) setDedicatedHero(h);
     }).catch(() => {});
-    api.content.getSpotlight().then(s => {
-      if (mounted) setSpotlightItem(s);
-    }).catch(() => {});
+    api.content.getSpotlights().then(items => {
+      if (mounted) {
+        if (items && items.length > 0) {
+          setSpotlights(items);
+        } else {
+          api.content.getSpotlight().then(s => {
+            if (mounted && s) setSpotlights([s]);
+          }).catch(() => {});
+        }
+      }
+    }).catch(() => {
+      api.content.getSpotlight().then(s => {
+        if (mounted && s) setSpotlights([s]);
+      }).catch(() => {});
+    });
     return () => { mounted = false; };
   }, [catalog]);
 
@@ -118,8 +130,8 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
         />
       )}
 
-      {/* Large Full-Width Cinematic Spotlight Banner */}
-      <CinematicSpotlight item={spotlightItem} onViewDetails={onSelectItem} />
+      {/* Cinematic Spotlight 1: Placed naturally between Trending and Top Rated */}
+      {spotlights[0] && <CinematicSpotlight item={spotlights[0]} />}
 
       {/* Row: Top Rated — sorted by real rating field */}
       {topRated.length > 0 && (
@@ -143,6 +155,9 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
         />
       )}
 
+      {/* Cinematic Spotlight 2: Placed naturally between New Releases and Popular Movies */}
+      {spotlights[1] && <CinematicSpotlight item={spotlights[1]} />}
+
       {/* Row: Popular Movies */}
       {movieItems.length > 0 && (
         <ContentSection
@@ -164,6 +179,9 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
           onSeeAll={() => onNavigate('search')}
         />
       )}
+
+      {/* Cinematic Spotlight 3: Placed naturally between Popular Series and Genre rows */}
+      {spotlights[2] && <CinematicSpotlight item={spotlights[2]} />}
 
       {/* Row: Drama — genre-based, real metadata only */}
       {dramaItems.length > 0 && (

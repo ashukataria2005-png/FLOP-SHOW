@@ -228,10 +228,19 @@ export const api = {
 
     async getSpotlight(): Promise<ContentItem | null> {
       try {
-        const data = await request<{ spotlight: any | null }>('/content/spotlight');
+        const data = await request<{ spotlight: any | null; spotlights?: any[] }>('/content/spotlight');
         return data.spotlight ? adaptDbContentToFrontend(data.spotlight) : null;
       } catch {
         return null;
+      }
+    },
+
+    async getSpotlights(): Promise<ContentItem[]> {
+      try {
+        const data = await request<{ spotlights: any[] }>('/content/spotlights');
+        return (data.spotlights || []).map(adaptDbContentToFrontend);
+      } catch {
+        return [];
       }
     },
 
@@ -702,6 +711,15 @@ export const api = {
       }
     },
 
+    async getSpotlights(): Promise<ContentItem[]> {
+      try {
+        const data = await request<{ success: boolean; spotlights: any[] }>('/admin/spotlights');
+        return (data.spotlights || []).map(adaptDbContentToFrontend);
+      } catch {
+        return [];
+      }
+    },
+
     async setSpotlight(contentId: string | null): Promise<{ success: boolean; message: string; spotlight: ContentItem | null }> {
       const data = await request<{ success: boolean; message: string; spotlight: any | null }>('/admin/spotlight', {
         method: 'PUT',
@@ -711,6 +729,41 @@ export const api = {
         success: data.success,
         message: data.message,
         spotlight: data.spotlight ? adaptDbContentToFrontend(data.spotlight) : null
+      };
+    },
+
+    async setSpotlights(contentIds: string[]): Promise<{ success: boolean; message: string; spotlights: ContentItem[] }> {
+      const data = await request<{ success: boolean; message: string; spotlights: any[] }>('/admin/spotlights', {
+        method: 'PUT',
+        body: JSON.stringify({ contentIds })
+      });
+      return {
+        success: data.success,
+        message: data.message,
+        spotlights: (data.spotlights || []).map(adaptDbContentToFrontend)
+      };
+    },
+
+    async addSpotlight(contentId: string): Promise<{ success: boolean; message: string; spotlights: ContentItem[] }> {
+      const data = await request<{ success: boolean; message: string; spotlights: any[] }>('/admin/spotlights/add', {
+        method: 'POST',
+        body: JSON.stringify({ contentId })
+      });
+      return {
+        success: data.success,
+        message: data.message,
+        spotlights: (data.spotlights || []).map(adaptDbContentToFrontend)
+      };
+    },
+
+    async removeSpotlight(contentId: string): Promise<{ success: boolean; message: string; spotlights: ContentItem[] }> {
+      const data = await request<{ success: boolean; message: string; spotlights: any[] }>(`/admin/spotlights/${encodeURIComponent(contentId)}`, {
+        method: 'DELETE'
+      });
+      return {
+        success: data.success,
+        message: data.message,
+        spotlights: (data.spotlights || []).map(adaptDbContentToFrontend)
       };
     },
 

@@ -74,8 +74,18 @@ contentRouter.get('/hero', async (_req, res, next) => {
 // GET /api/content/spotlight (Dedicated Cinematic Spotlight)
 contentRouter.get('/spotlight', async (_req, res, next) => {
   try {
-    const spotlight = await contentService.getSpotlight();
-    res.json({ spotlight });
+    const spotlights = await contentService.getSpotlights();
+    res.json({ spotlight: spotlights[0] || null, spotlights });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/content/spotlights (Multiple Cinematic Spotlights)
+contentRouter.get('/spotlights', async (_req, res, next) => {
+  try {
+    const spotlights = await contentService.getSpotlights();
+    res.json({ spotlights });
   } catch (err) {
     next(err);
   }

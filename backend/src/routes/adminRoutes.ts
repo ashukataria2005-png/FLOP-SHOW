@@ -549,7 +549,17 @@ adminRouter.put('/hero', async (req, res, next) => {
 adminRouter.get('/spotlight', async (_req, res, next) => {
   try {
     const spotlight = await adminService.getSpotlight();
-    res.json({ success: true, spotlight });
+    const spotlights = await adminService.getSpotlights();
+    res.json({ success: true, spotlight, spotlights });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.get('/spotlights', async (_req, res, next) => {
+  try {
+    const spotlights = await adminService.getSpotlights();
+    res.json({ success: true, spotlights });
   } catch (err) {
     next(err);
   }
@@ -557,13 +567,70 @@ adminRouter.get('/spotlight', async (_req, res, next) => {
 
 adminRouter.put('/spotlight', async (req, res, next) => {
   try {
-    const { contentId } = req.body;
-    await adminService.setSpotlight(contentId ?? null);
+    const { contentId, contentIds } = req.body;
+    if (Array.isArray(contentIds)) {
+      await adminService.setSpotlights(contentIds);
+    } else {
+      await adminService.setSpotlight(contentId ?? null);
+    }
     const spotlight = await adminService.getSpotlight();
+    const spotlights = await adminService.getSpotlights();
     res.json({
       success: true,
-      message: contentId ? 'Cinematic Spotlight updated successfully.' : 'Cinematic Spotlight cleared successfully.',
+      message: contentId || (contentIds && contentIds.length > 0)
+        ? 'Cinematic Spotlight updated successfully.'
+        : 'Cinematic Spotlight cleared successfully.',
       spotlight,
+      spotlights,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.put('/spotlights', async (req, res, next) => {
+  try {
+    const { contentIds } = req.body;
+    const ids = Array.isArray(contentIds) ? contentIds : [];
+    await adminService.setSpotlights(ids);
+    const spotlights = await adminService.getSpotlights();
+    res.json({
+      success: true,
+      message: 'Cinematic Spotlight selections updated successfully.',
+      spotlights,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/spotlights/add', async (req, res, next) => {
+  try {
+    const { contentId } = req.body;
+    if (!contentId) {
+      return res.status(400).json({ success: false, message: 'contentId is required.' });
+    }
+    await adminService.addSpotlight(contentId);
+    const spotlights = await adminService.getSpotlights();
+    res.json({
+      success: true,
+      message: 'Added to Cinematic Spotlight successfully.',
+      spotlights,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/spotlights/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await adminService.removeSpotlight(id);
+    const spotlights = await adminService.getSpotlights();
+    res.json({
+      success: true,
+      message: 'Removed from Cinematic Spotlight successfully.',
+      spotlights,
     });
   } catch (err) {
     next(err);

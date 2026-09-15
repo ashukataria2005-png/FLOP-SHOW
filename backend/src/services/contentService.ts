@@ -58,4 +58,8 @@ export const contentService = {
   async getSpotlight(): Promise<ContentRecord | null> {
     return contentRepository.getSpotlight();
   },
+
+  async getSpotlights(): Promise<ContentRecord[]> {
+    return contentRepository.getSpotlights();
+  },
 };

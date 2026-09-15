@@ -551,8 +551,30 @@ export const adminService = {
     return contentRepository.getSpotlight();
   },
 
+  async getSpotlights(): Promise<ContentRecord[]> {
+    return contentRepository.getSpotlights();
+  },
+
   async setSpotlight(contentId: string | null): Promise<void> {
     await contentRepository.setSpotlight(contentId);
+  },
+
+  async setSpotlights(contentIds: string[]): Promise<void> {
+    await contentRepository.setSpotlights(contentIds);
+  },
+
+  async addSpotlight(contentId: string): Promise<void> {
+    const existing = await contentRepository.getSpotlights();
+    const existingIds = existing.map(e => e.id);
+    if (!existingIds.includes(contentId)) {
+      await contentRepository.setSpotlights([...existingIds, contentId]);
+    }
+  },
+
+  async removeSpotlight(contentId: string): Promise<void> {
+    const existing = await contentRepository.getSpotlights();
+    const filteredIds = existing.map(e => e.id).filter(id => id !== contentId);
+    await contentRepository.setSpotlights(filteredIds);
   },
 
   async getAdsConfig() {

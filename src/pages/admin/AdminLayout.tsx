@@ -15,10 +15,12 @@ import {
   Menu,
   X,
   ChevronRight,
+  ChevronDown,
   Crown,
   Megaphone,
   Palette,
-  QrCode
+  QrCode,
+  Wallet
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -27,6 +29,92 @@ interface AdminLayoutProps {
   onExitAdmin: () => void;
   children: React.ReactNode;
 }
+
+interface NavItem {
+  id: string;
+  label: string;
+  icon: any;
+}
+
+interface NavGroup {
+  id: string;
+  title: string;
+  icon: any;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
+  {
+    id: 'group-dashboard',
+    title: 'DASHBOARD',
+    icon: LayoutDashboard,
+    items: [
+      { id: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard }
+    ]
+  },
+  {
+    id: 'group-payments',
+    title: 'PAYMENTS',
+    icon: QrCode,
+    items: [
+      { id: 'admin-upi-settings', label: 'UPI Settings', icon: QrCode },
+      { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck }
+    ]
+  },
+  {
+    id: 'group-content',
+    title: 'CONTENT / CATALOG',
+    icon: Film,
+    items: [
+      { id: 'admin-content', label: 'Catalog & Media', icon: Film },
+      { id: 'admin-quick-add', label: 'Quick Add / Auto Import', icon: Sparkles },
+      { id: 'admin-genres', label: 'Genres & Categories', icon: Tag }
+    ]
+  },
+  {
+    id: 'group-homepage',
+    title: 'HOME PAGE',
+    icon: Crown,
+    items: [
+      { id: 'admin-hero', label: 'Hero Banner', icon: Crown },
+      { id: 'admin-spotlight', label: 'Cinematic Spotlight', icon: Sparkles }
+    ]
+  },
+  {
+    id: 'group-users',
+    title: 'USERS',
+    icon: Users,
+    items: [
+      { id: 'admin-users', label: 'User Management', icon: Users }
+    ]
+  },
+  {
+    id: 'group-finance',
+    title: 'TRANSACTIONS / FINANCE',
+    icon: CreditCard,
+    items: [
+      { id: 'admin-finance', label: 'Finance Overview', icon: Wallet },
+      { id: 'admin-transactions', label: 'All Transactions', icon: CreditCard }
+    ]
+  },
+  {
+    id: 'group-ads',
+    title: 'ADS',
+    icon: Megaphone,
+    items: [
+      { id: 'admin-ads', label: 'Advertisement / Ads', icon: Megaphone }
+    ]
+  },
+  {
+    id: 'group-settings',
+    title: 'SETTINGS',
+    icon: Sliders,
+    items: [
+      { id: 'admin-settings', label: 'General Settings', icon: Sliders },
+      { id: 'admin-design', label: 'App Design & Themes', icon: Palette }
+    ]
+  }
+];
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   currentTab,
@@ -41,11 +129,34 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // ALL hooks must be declared unconditionally before any conditional early return.
-  // Previously isMenuOpen and the Escape-key useEffect were placed AFTER the
-  // non-admin early return, violating React Rules of Hooks and producing a full
-  // black-screen crash the moment the admin successfully logged in (hook count
-  // changed from N to N+2 between renders).
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Track expanded groups in the sidebar drawer
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    'group-dashboard': true,
+    'group-content': true,
+    'group-payments': true,
+    'group-homepage': true,
+    'group-users': true,
+    'group-finance': true,
+    'group-ads': true,
+    'group-settings': true
+  });
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }));
+  };
+
+  // Auto-expand group containing currentTab
+  useEffect(() => {
+    const activeGroup = navGroups.find(g => g.items.some(item => item.id === currentTab));
+    if (activeGroup) {
+      setExpandedGroups(prev => ({ ...prev, [activeGroup.id]: true }));
+    }
+  }, [currentTab]);
 
   // Close drawer on Escape key (always registered; no-op when login screen is shown)
   useEffect(() => {
@@ -228,22 +339,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   }
 
   // Authenticated Admin Shell
-  const navItems = [
-    { id: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'admin-content', label: 'Content & Media / Catalog', icon: Film },
-    { id: 'admin-hero', label: 'Main Hero', icon: Crown },
-    { id: 'admin-spotlight', label: 'Cinematic Spotlight', icon: Sparkles },
-    { id: 'admin-ads', label: 'Advertisement / Ads', icon: Megaphone },
-    { id: 'admin-quick-add', label: 'Quick Add / Auto Import', icon: Sparkles },
-    { id: 'admin-users', label: 'Users', icon: Users },
-    { id: 'admin-payments', label: 'UPI Payments', icon: QrCode },
-    { id: 'admin-transactions', label: 'Transactions', icon: CreditCard },
-    { id: 'admin-genres', label: 'Genres', icon: Tag },
-    { id: 'admin-design', label: 'App Design', icon: Palette },
-    { id: 'admin-settings', label: 'Settings', icon: Sliders }
-  ];
-
-  const activeNavItem = navItems.find(item => item.id === currentTab);
+  const allNavItems = navGroups.flatMap(group => group.items);
+  const activeNavItem = allNavItems.find(item => item.id === currentTab);
   const currentSectionLabel = activeNavItem
     ? activeNavItem.label
     : currentTab === 'admin-editor'
@@ -486,52 +583,158 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 Admin Sections
               </div>
 
-              <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {navItems.map(item => {
-                  const Icon = item.icon;
-                  const isActive = currentTab === item.id;
+              <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {navGroups.map(group => {
+                  const GroupIcon = group.icon;
+                  const isExpanded = !!expandedGroups[group.id];
+                  const hasActiveChild = group.items.some(item => item.id === currentTab);
+
                   return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        onNavigateTab(item.id);
-                        setIsMenuOpen(false);
-                      }}
+                    <div
+                      key={group.id}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px 14px',
-                        borderRadius: '10px',
-                        backgroundColor: isActive ? 'rgba(245, 197, 24, 0.15)' : 'transparent',
-                        border: isActive ? '1px solid rgba(245, 197, 24, 0.35)' : '1px solid transparent',
-                        color: isActive ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
-                        fontSize: '14px',
-                        fontWeight: isActive ? 700 : 600,
-                        cursor: 'pointer',
-                        textAlign: 'left',
+                        borderRadius: '12px',
+                        backgroundColor: hasActiveChild ? 'rgba(255, 255, 255, 0.03)' : 'transparent',
+                        border: hasActiveChild ? '1px solid rgba(245, 197, 24, 0.15)' : '1px solid transparent',
+                        overflow: 'hidden',
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {/* Group Header Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (group.items.length === 1) {
+                            onNavigateTab(group.items[0].id);
+                            setIsMenuOpen(false);
+                          } else {
+                            toggleGroup(group.id);
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          color: hasActiveChild ? 'var(--brand-gold, #F5C518)' : '#9CA3AF',
+                          fontSize: '11.5px',
+                          fontWeight: 800,
+                          letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div
+                            style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '7px',
+                              backgroundColor: hasActiveChild ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: hasActiveChild ? 'var(--brand-gold, #F5C518)' : '#6B7280'
+                            }}
+                          >
+                            <GroupIcon size={14} />
+                          </div>
+                          <span>{group.title}</span>
+                        </div>
+
+                        {group.items.length > 1 && (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleGroup(group.id);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '4px',
+                              color: hasActiveChild ? 'var(--brand-gold, #F5C518)' : '#6B7280'
+                            }}
+                          >
+                            {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                          </div>
+                        )}
+                      </button>
+
+                      {/* Group Child Items (Expandable) */}
+                      {isExpanded && (
                         <div
                           style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
-                            backgroundColor: isActive ? 'rgba(245, 197, 24, 0.25)' : 'rgba(255, 255, 255, 0.05)',
                             display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: isActive ? 'var(--brand-gold, #F5C518)' : '#9CA3AF'
+                            flexDirection: 'column',
+                            gap: '3px',
+                            padding: group.items.length > 1 ? '4px 8px 10px 24px' : '2px 8px 8px 8px',
+                            borderLeft: group.items.length > 1 ? '2px solid rgba(245, 197, 24, 0.2)' : 'none',
+                            marginLeft: group.items.length > 1 ? '18px' : '0',
+                            marginTop: '2px'
                           }}
                         >
-                          <Icon size={18} />
+                          {group.items.map(item => {
+                            const ItemIcon = item.icon;
+                            const isActive = currentTab === item.id;
+
+                            return (
+                              <button
+                                key={item.id}
+                                onClick={() => {
+                                  onNavigateTab(item.id);
+                                  setIsMenuOpen(false);
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '9px 12px',
+                                  borderRadius: '8px',
+                                  backgroundColor: isActive ? 'rgba(245, 197, 24, 0.18)' : 'rgba(255, 255, 255, 0.02)',
+                                  border: isActive ? '1px solid rgba(245, 197, 24, 0.4)' : '1px solid transparent',
+                                  color: isActive ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                                  fontSize: '13px',
+                                  fontWeight: isActive ? 700 : 500,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <ItemIcon
+                                    size={15}
+                                    style={{
+                                      color: isActive ? 'var(--brand-gold, #F5C518)' : '#9CA3AF',
+                                      flexShrink: 0
+                                    }}
+                                  />
+                                  <span>{item.label}</span>
+                                </div>
+
+                                {isActive && (
+                                  <div
+                                    style={{
+                                      width: '6px',
+                                      height: '6px',
+                                      borderRadius: '50%',
+                                      backgroundColor: 'var(--brand-gold, #F5C518)',
+                                      boxShadow: '0 0 8px var(--brand-gold, #F5C518)'
+                                    }}
+                                  />
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
-                        <span>{item.label}</span>
-                      </div>
-                      <ChevronRight size={16} style={{ color: isActive ? 'var(--brand-gold, #F5C518)' : '#4B5563' }} />
-                    </button>
+                      )}
+                    </div>
                   );
                 })}
               </nav>

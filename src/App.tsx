@@ -22,6 +22,8 @@ import { AdminHeroPage } from './pages/admin/AdminHeroPage';
 import { AdminSpotlightPage } from './pages/admin/AdminSpotlightPage';
 import { AdminAdsPage } from './pages/admin/AdminAdsPage';
 import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage';
+import { AdminUpiSettingsPage } from './pages/admin/AdminUpiSettingsPage';
+import { AdminFinancePage } from './pages/admin/AdminFinancePage';
 import { PurchaseModal } from './components/purchase/PurchaseModal';
 import { RechargeModal } from './components/wallet/RechargeModal';
 import { AuthModal } from './components/auth/AuthModal';
@@ -66,6 +68,12 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   }
   if (cleanPath === '/admin/payments') {
     return { tab: 'admin-payments' };
+  }
+  if (cleanPath === '/admin/upi-settings') {
+    return { tab: 'admin-upi-settings' };
+  }
+  if (cleanPath === '/admin/finance') {
+    return { tab: 'admin-finance' };
   }
   if (cleanPath === '/admin/transactions') {
     return { tab: 'admin-transactions' };
@@ -120,6 +128,12 @@ function tabToPath(tab: string, param?: string): string {
       return param ? `/admin/editor/${param}` : '/admin/editor';
     case 'admin-users':
       return '/admin/users';
+    case 'admin-payments':
+      return '/admin/payments';
+    case 'admin-upi-settings':
+      return '/admin/upi-settings';
+    case 'admin-finance':
+      return '/admin/finance';
     case 'admin-transactions':
       return '/admin/transactions';
     case 'admin-genres':
@@ -255,12 +269,14 @@ const AppContent: React.FC = () => {
           )}
           {currentTab === 'admin-users' && <AdminUsersPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-payments' && <AdminPaymentsPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-upi-settings' && <AdminUpiSettingsPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-finance' && <AdminFinancePage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-transactions' && <AdminTransactionsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-genres' && <AdminGenresPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-design' && <AdminDesignPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings'].includes(currentTab) && (
+          {!['admin-dashboard', 'admin-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>

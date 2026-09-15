@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
-import { useApp } from '../../context/AppContext';
-import { ContentItem } from '../../types/content';
 import {
   Users,
   Film,
@@ -9,25 +7,40 @@ import {
   DollarSign,
   Plus,
   ArrowUpRight,
-  AlertCircle,
   Loader2,
   Sparkles,
   TrendingUp,
-  Eye,
-  EyeOff,
   Wallet,
-  Tag,
   Sliders,
   CreditCard,
   Edit3,
   Crown,
-  Trash2,
   X,
   Search,
-  ChevronUp,
-  ChevronDown,
+  Clock,
+  ShieldCheck,
+  AlertCircle,
+  Calendar,
+  ChevronRight,
+  Copy,
   Check
 } from 'lucide-react';
+
+interface TodayStats {
+  todayRevenueRupees: number;
+  todayPurchasesRevenueRupees: number;
+  todayUpiRevenueRupees: number;
+  todayNewMembersCount: number;
+  todayPurchasesCount: number;
+  todayUpiApprovedCount: number;
+  pendingPaymentRequestsCount: number;
+  pendingPaymentAmountRupees: number;
+  todayProfitRupees: number;
+  profitNote: string;
+  calendarDate: string;
+  windowStart: string;
+  windowEnd: string;
+}
 
 interface DashboardStats {
   totalUsers: number;
@@ -41,6 +54,7 @@ interface DashboardStats {
     totalRechargeRupees: number;
     totalTransactions: number;
   };
+  todayStats: TodayStats;
   currentTrending1: {
     id: string;
     title: string;
@@ -50,32 +64,6 @@ interface DashboardStats {
     priceRupees: number;
     releaseYear: number;
   } | null;
-  recentlyAddedContent: Array<{
-    id: string;
-    title: string;
-    type: string;
-    status: string;
-    poster: string;
-    priceRupees: number;
-    releaseYear: number;
-    createdAt: string;
-  }>;
-  recentPurchases: Array<{
-    id: string;
-    userName: string;
-    userEmail: string;
-    contentTitle: string;
-    amountRupees: number;
-    purchasedAt: string;
-  }>;
-  recentUsers: Array<{
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    status: string;
-    createdAt: string;
-  }>;
 }
 
 interface AdminDashboardPageProps {
@@ -83,43 +71,23 @@ interface AdminDashboardPageProps {
 }
 
 export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNavigateTab }) => {
-  const { catalog, refreshCatalog, showToast } = useApp();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [currentHero, setCurrentHero] = useState<ContentItem | null>(null);
-  const [currentSpotlights, setCurrentSpotlights] = useState<ContentItem[]>([]);
-  const [heroModalOpen, setHeroModalOpen] = useState(false);
-  const [spotlightModalOpen, setSpotlightModalOpen] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState<ContentItem | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [targetSlotIndex, setTargetSlotIndex] = useState<number | null>(null);
-  const [modalCatalog, setModalCatalog] = useState<ContentItem[]>([]);
+  // Clickable Today Analytics Modal State
+  const [activeModal, setActiveModal] = useState<'revenue' | 'members' | 'purchases' | 'upi' | 'profit' | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
-  const [spotlightSaving, setSpotlightSaving] = useState(false);
-  const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null);
-
-  const fetchHeroAndSpotlights = async () => {
-    try {
-      const [hero, spots] = await Promise.all([
-        api.admin.getHero(),
-        api.admin.getSpotlights()
-      ]);
-      setCurrentHero(hero);
-      setCurrentSpotlights(spots || []);
-    } catch {
-      // ignore
-    }
-  };
+  const [modalData, setModalData] = useState<any>(null);
+  const [modalSearch, setModalSearch] = useState('');
+  const [copiedUtr, setCopiedUtr] = useState<string | null>(null);
 
   const fetchStats = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.admin.getDashboard();
+      const data = await api.admin.getDashboard(new Date().getTimezoneOffset());
       setStats(data as DashboardStats);
-      await fetchHeroAndSpotlights();
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard metrics.');
     } finally {
@@ -131,147 +99,79 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     fetchStats();
   }, []);
 
-  const handleSelectHero = async (item: ContentItem) => {
-    try {
-      const res = await api.admin.setHero(item.id);
-      if (res.success) {
-        setCurrentHero(res.hero || item);
-        showToast(`"${item.title}" is now designated as Home Hero!`, 'success');
-        refreshCatalog();
-        setHeroModalOpen(false);
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to update Home Hero.', 'error');
-    }
-  };
+  // CRITICAL DAILY TIMER / DATA RULE:
+  // Automatically check for calendar midnight rollover every 15 seconds.
+  // At 12:00:00 AM, previous day's metrics stop showing and new day's metrics calculate automatically.
+  useEffect(() => {
+    let lastDate = new Date().toLocaleDateString();
 
-  const handleClearHero = async () => {
-    try {
-      const res = await api.admin.setHero(null);
-      if (res.success) {
-        setCurrentHero(null);
-        showToast('Home Hero removed. No title is currently active as Home Hero.', 'info');
-        refreshCatalog();
+    const interval = setInterval(() => {
+      const currentDate = new Date().toLocaleDateString();
+      if (currentDate !== lastDate) {
+        lastDate = currentDate;
+        fetchStats();
       }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to clear Home Hero.', 'error');
-    }
-  };
+    }, 15000);
 
-  const openSpotlightModalForSlot = async (slotIdx: number | null) => {
-    setTargetSlotIndex(slotIdx);
-    setSelectedCandidate(null);
-    setSearchQuery('');
-    setSpotlightModalOpen(true);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Open Today Detail Modal & Fetch authoritatively
+  const openMetricModal = async (metricType: 'revenue' | 'members' | 'purchases' | 'upi' | 'profit') => {
+    setActiveModal(metricType);
+    setModalSearch('');
+    setModalLoading(true);
     try {
-      setModalLoading(true);
-      const items = await api.admin.listContent({ status: 'PUBLISHED', limit: 100 });
-      setModalCatalog(items || []);
-    } catch {
-      setModalCatalog(catalog.filter(c => !c.status || c.status === 'PUBLISHED'));
+      const data = await api.admin.getTodayDetails(metricType, new Date().getTimezoneOffset());
+      setModalData(data);
+    } catch (err) {
+      // Fallback
+      setModalData(null);
     } finally {
       setModalLoading(false);
     }
   };
 
-  const handleSetSlotSpotlight = async (slotIdx: number, item: ContentItem) => {
-    try {
-      setSpotlightSaving(true);
-      const newItems = [...currentSpotlights];
-      if (slotIdx < newItems.length) {
-        newItems[slotIdx] = item;
-      } else {
-        newItems.push(item);
-      }
-      // Deduplicate keeping first occurrence, UNLIMITED dynamic spotlights
-      const deduplicated: ContentItem[] = [];
-      const seenIds = new Set<string>();
-      for (const spot of newItems) {
-        if (!seenIds.has(spot.id)) {
-          seenIds.add(spot.id);
-          deduplicated.push(spot);
-        }
-      }
-      const res = await api.admin.setSpotlights(deduplicated.map(s => s.id));
-      if (res.success) {
-        setCurrentSpotlights(res.spotlights || deduplicated);
-        setLastSavedTimestamp(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        showToast(`Cinematic Spotlight #${slotIdx + 1} saved successfully as "${item.title}"!`, 'success');
-        setSpotlightModalOpen(false);
-        setSelectedCandidate(null);
-        refreshCatalog();
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to update Cinematic Spotlight.', 'error');
-    } finally {
-      setSpotlightSaving(false);
-    }
+  const handleCopyUtr = (utr: string) => {
+    navigator.clipboard.writeText(utr);
+    setCopiedUtr(utr);
+    setTimeout(() => setCopiedUtr(null), 2000);
   };
 
-  const handleClearSlotSpotlight = async (slotIdx: number) => {
-    try {
-      setSpotlightSaving(true);
-      const newItems = currentSpotlights.filter((_, idx) => idx !== slotIdx);
-      const res = await api.admin.setSpotlights(newItems.map(s => s.id));
-      if (res.success) {
-        setCurrentSpotlights(res.spotlights || newItems);
-        setLastSavedTimestamp(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        showToast(`Spotlight #${slotIdx + 1} deleted and remaining slots reordered.`, 'info');
-        refreshCatalog();
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to clear spotlight slot.', 'error');
-    } finally {
-      setSpotlightSaving(false);
-    }
-  };
-
-  const handleMoveSpotlight = async (index: number, direction: 'up' | 'down') => {
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= currentSpotlights.length) return;
-    const newOrder = [...currentSpotlights];
-    const temp = newOrder[index];
-    newOrder[index] = newOrder[targetIndex];
-    newOrder[targetIndex] = temp;
-    try {
-      setSpotlightSaving(true);
-      const res = await api.admin.setSpotlights(newOrder.map(s => s.id));
-      if (res.success) {
-        setCurrentSpotlights(res.spotlights || newOrder);
-        setLastSavedTimestamp(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        showToast('Spotlight order updated and saved.', 'success');
-        refreshCatalog();
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to reorder spotlights.', 'error');
-    } finally {
-      setSpotlightSaving(false);
-    }
-  };
-
-  if (loading) {
+  if (loading && !stats) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '12px', color: '#9CA3AF' }}>
         <Loader2 className="animate-spin" size={28} style={{ color: 'var(--brand-gold, #F5C518)' }} />
-        <span style={{ fontSize: '15px' }}>Loading administrator analytics...</span>
+        <span>Loading Mission Control Dashboard...</span>
       </div>
     );
   }
 
   if (error || !stats) {
     return (
-      <div style={{ padding: '40px 24px', maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-        <AlertCircle size={40} style={{ color: '#EF4444', margin: '0 auto 16px' }} />
-        <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF', marginBottom: '8px' }}>Failed to Load Dashboard</h3>
-        <p style={{ color: '#9CA3AF', fontSize: '14px', marginBottom: '20px' }}>{error}</p>
+      <div
+        style={{
+          padding: '24px',
+          borderRadius: '14px',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          color: '#F87171',
+          maxWidth: '600px',
+          margin: '40px auto',
+          textAlign: 'center'
+        }}
+      >
+        <AlertCircle size={32} style={{ margin: '0 auto 12px' }} />
+        <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 8px' }}>Dashboard Offline</h3>
+        <p style={{ fontSize: '14px', margin: '0 0 16px' }}>{error || 'Unable to retrieve real-time analytics.'}</p>
         <button
           onClick={fetchStats}
           style={{
             padding: '10px 20px',
-            backgroundColor: 'var(--brand-gold, #F5C518)',
-            color: '#0E0E12',
-            fontWeight: 700,
             borderRadius: '8px',
+            backgroundColor: '#EF4444',
+            color: '#FFFFFF',
+            fontWeight: 700,
             border: 'none',
             cursor: 'pointer'
           }}
@@ -282,111 +182,68 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     );
   }
 
-  const metricCards = [
-    {
-      label: 'Gross Platform Revenue',
-      value: `₹${stats.totalRevenueRupees.toLocaleString('en-IN')}`,
-      subtext: `${stats.totalPurchases} completed unlocks`,
-      icon: DollarSign,
-      color: '#10B981',
-      bg: 'rgba(16, 185, 129, 0.12)'
-    },
-    {
-      label: 'Registered Audience',
-      value: stats.totalUsers.toString(),
-      subtext: 'Active user accounts',
-      icon: Users,
-      color: '#3B82F6',
-      bg: 'rgba(59, 130, 246, 0.12)'
-    },
-    {
-      label: 'Catalog Movies',
-      value: stats.totalMovies.toString(),
-      subtext: 'Feature films in database',
-      icon: Film,
-      color: '#F59E0B',
-      bg: 'rgba(245, 158, 11, 0.12)'
-    },
-    {
-      label: 'Episodic Series',
-      value: stats.totalSeries.toString(),
-      subtext: 'Multi-season shows',
-      icon: Tv,
-      color: '#8B5CF6',
-      bg: 'rgba(139, 92, 246, 0.12)'
-    },
-    {
-      label: 'Published Content',
-      value: stats.totalPublished.toString(),
-      subtext: 'Live on public app',
-      icon: Eye,
-      color: '#10B981',
-      bg: 'rgba(16, 185, 129, 0.12)'
-    },
-    {
-      label: 'Unpublished / Drafts',
-      value: stats.totalUnpublished.toString(),
-      subtext: 'Hidden from public app',
-      icon: EyeOff,
-      color: '#EF4444',
-      bg: 'rgba(239, 68, 68, 0.12)'
-    },
-    {
-      label: 'Wallet Recharges',
-      value: `₹${(stats.walletActivity?.totalRechargeRupees || 0).toLocaleString('en-IN')}`,
-      subtext: `${stats.walletActivity?.totalTransactions || 0} wallet ledger entries`,
-      icon: Wallet,
-      color: '#EC4899',
-      bg: 'rgba(236, 72, 153, 0.12)'
-    }
-  ];
+  const today = stats.todayStats;
+  const formattedTodayDate = new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 
-  const quickActions = [
+  // Quick Action navigation cards
+  const quickNavItems = [
     {
       label: 'Add Movie',
-      desc: 'Create new feature film with poster, backdrop, trailer & main video',
+      desc: 'Publish a single cinematic film',
       action: () => onNavigateTab('admin-editor', 'new_movie'),
       icon: Film,
       color: '#F59E0B'
     },
     {
       label: 'Add Series',
-      desc: 'Create episodic series with seasons, episodes & video sources',
+      desc: 'Create multi-season episodic content',
       action: () => onNavigateTab('admin-editor', 'new_series'),
       icon: Tv,
       color: '#8B5CF6'
     },
     {
-      label: 'Manage Content',
-      desc: 'Browse catalog, toggle publish status, manage pricing & Trending #1',
-      action: () => onNavigateTab('admin-content'),
-      icon: Eye,
-      color: '#3B82F6'
-    },
-    {
-      label: 'Manage Users',
-      desc: 'Inspect user directory, activate/suspend accounts & audit purchases',
-      action: () => onNavigateTab('admin-users'),
-      icon: Users,
+      label: 'Verify Payments',
+      desc: 'Inspect pending UTR submissions & approve',
+      action: () => onNavigateTab('admin-payments'),
+      icon: ShieldCheck,
       color: '#10B981'
     },
     {
-      label: 'Manage Transactions',
-      desc: 'Inspect content purchase audit trail and wallet recharge ledger',
-      action: () => onNavigateTab('admin-transactions'),
-      icon: CreditCard,
-      color: '#EC4899'
-    },
-    {
-      label: 'Manage Genres',
-      desc: 'Create, rename, inspect usage, and safely unlink taxonomy genres',
-      action: () => onNavigateTab('admin-genres'),
-      icon: Tag,
+      label: 'UPI Settings',
+      desc: 'Configure receiver UPI ID & preview QR',
+      action: () => onNavigateTab('admin-upi-settings'),
+      icon: Wallet,
       color: '#F5C518'
     },
     {
-      label: 'Settings',
-      desc: 'Configure platform name, currency symbol, resolution & system mode',
+      label: 'Hero Banner',
+      desc: 'Configure Discover page top hero',
+      action: () => onNavigateTab('admin-hero'),
+      icon: Crown,
+      color: '#EC4899'
+    },
+    {
+      label: 'Cinematic Spotlight',
+      desc: 'Manage promotional catalog banners',
+      action: () => onNavigateTab('admin-spotlight'),
+      icon: Sparkles,
+      color: '#3B82F6'
+    },
+    {
+      label: 'All Transactions',
+      desc: 'Complete credit and debit ledger',
+      action: () => onNavigateTab('admin-transactions'),
+      icon: CreditCard,
+      color: '#14B8A6'
+    },
+    {
+      label: 'General Settings',
+      desc: 'Platform identity and system controls',
       action: () => onNavigateTab('admin-settings'),
       icon: Sliders,
       color: '#6366F1'
@@ -394,15 +251,32 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   ];
 
   return (
-    <div style={{ padding: '32px 24px', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header Section */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+    <div style={{ padding: '8px 0 40px', maxWidth: '1400px', margin: '0 auto' }}>
+      {/* Page Title & Actions */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em', marginBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 800,
+                color: 'var(--brand-gold, #F5C518)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                backgroundColor: 'rgba(245, 197, 24, 0.12)',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                border: '1px solid rgba(245, 197, 24, 0.25)'
+              }}
+            >
+              ADMINISTRATION
+            </span>
+          </div>
+          <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', margin: 0 }}>
             Mission Control Dashboard
           </h1>
-          <p style={{ fontSize: '14px', color: '#9CA3AF' }}>
-            Real-time catalog distribution, revenue telemetry, user accounts, and media control.
+          <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0' }}>
+            Real-time telemetry, today's revenue breakdown, user registrations, and platform operations.
           </p>
         </div>
 
@@ -413,18 +287,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '12px 18px',
+              padding: '10px 18px',
               backgroundColor: 'var(--brand-gold, #F5C518)',
               color: '#0E0E12',
               fontWeight: 800,
-              fontSize: '14px',
+              fontSize: '13px',
               borderRadius: '10px',
               border: 'none',
               cursor: 'pointer',
               boxShadow: '0 4px 14px rgba(245, 197, 24, 0.25)'
             }}
           >
-            <Plus size={18} />
+            <Plus size={16} />
             <span>Add Movie</span>
           </button>
           <button
@@ -433,843 +307,452 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '12px 18px',
+              padding: '10px 18px',
               backgroundColor: 'rgba(255, 255, 255, 0.08)',
               border: '1px solid rgba(255, 255, 255, 0.15)',
               color: '#FFFFFF',
               fontWeight: 700,
-              fontSize: '14px',
+              fontSize: '13px',
               borderRadius: '10px',
               cursor: 'pointer'
             }}
           >
-            <Plus size={18} />
+            <Plus size={16} />
             <span>Add Series</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Metric Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '16px',
-          marginBottom: '36px'
-        }}
-      >
-        {metricCards.map(card => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={card.label}
-              style={{
-                backgroundColor: 'var(--bg-surface, #12121A)',
-                borderRadius: '16px',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                padding: '20px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                justifyContent: 'space-between',
-                position: 'relative',
-                overflow: 'hidden'
-              }}
-            >
-              <div>
-                <p style={{ fontSize: '12px', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px', textTransform: 'uppercase' }}>
-                  {card.label}
-                </p>
-                <p style={{ fontSize: '26px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: '6px' }}>
-                  {card.value}
-                </p>
-                <p style={{ fontSize: '11px', color: '#6B7280', margin: 0 }}>
-                  {card.subtext}
-                </p>
-              </div>
-
-              <div
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '10px',
-                  backgroundColor: card.bg,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: card.color
-                }}
-              >
-                <Icon size={20} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Current Trending #1 Showcase Banner */}
-      <div
-        style={{
-          marginBottom: '36px',
-          padding: '24px',
-          borderRadius: '18px',
-          background: stats.currentTrending1
-            ? `linear-gradient(90deg, rgba(245, 197, 24, 0.12) 0%, rgba(18, 18, 26, 0.95) 100%), url(${stats.currentTrending1.backdrop || stats.currentTrending1.poster}) center/cover no-repeat`
-            : 'var(--bg-surface, #12121A)',
-          border: '1px solid rgba(245, 197, 24, 0.35)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '20px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div
-            style={{
-              padding: '10px 14px',
-              borderRadius: '12px',
-              backgroundColor: 'var(--brand-gold, #F5C518)',
-              color: '#0E0E12',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontWeight: 900,
-              fontSize: '14px',
-              letterSpacing: '0.04em'
-            }}
-          >
-            <TrendingUp size={20} />
-            <span>TRENDING #1</span>
-          </div>
-
-          <div>
-            {stats.currentTrending1 ? (
-              <>
-                <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 4px' }}>
-                  {stats.currentTrending1.title}
-                </h3>
-                <p style={{ fontSize: '13px', color: '#D1D5DB', margin: 0 }}>
-                  {stats.currentTrending1.type} • {stats.currentTrending1.releaseYear} • {stats.currentTrending1.priceRupees === 0 ? 'FREE' : `₹${stats.currentTrending1.priceRupees}`}
-                </p>
-              </>
-            ) : (
-              <>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 4px' }}>
-                  No Trending #1 Assigned
-                </h3>
-                <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>
-                  Select a title in Content Management to highlight it as the #1 spotlight on FLOPSHOW.
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-
-        <button
-          onClick={() => {
-            if (stats.currentTrending1) {
-              onNavigateTab('admin-editor', stats.currentTrending1.id);
-            } else {
-              onNavigateTab('admin-content');
-            }
-          }}
+      {/* ========================================================================= */}
+      {/* MILESTONE 3: TODAY ANALYTICS (00:00:00 -> 23:59:59 Automatic Rollover)   */}
+      {/* ========================================================================= */}
+      <div style={{ marginBottom: '36px' }}>
+        {/* Today Section Banner */}
+        <div
           style={{
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            padding: '10px 18px',
-            borderRadius: '8px',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            color: '#FFFFFF',
-            fontSize: '13px',
-            fontWeight: 700,
-            cursor: 'pointer'
+            justifyContent: 'space-between',
+            marginBottom: '16px',
+            flexWrap: 'wrap',
+            gap: '12px'
           }}
         >
-          <Edit3 size={15} />
-          <span>{stats.currentTrending1 ? 'Edit Trending #1' : 'Select Trending #1'}</span>
-        </button>
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--brand-gold, #F5C518)'
+              }}
+            >
+              <Calendar size={18} />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                Today's Performance
+              </h2>
+              <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                Active window: <strong>12:00:00 AM → 11:59:59 PM</strong> ({formattedTodayDate}) • Auto-rolls over at midnight
+              </span>
+            </div>
+          </div>
 
-      {/* Dedicated HOME HERO Control Block */}
-      <div
-        style={{
-          marginBottom: '28px',
-          padding: '24px',
-          borderRadius: '18px',
-          background: currentHero
-            ? `linear-gradient(90deg, rgba(168, 85, 247, 0.15) 0%, rgba(18, 18, 26, 0.96) 100%), url(${currentHero.backdropUrl || currentHero.posterUrl}) center/cover no-repeat`
-            : 'var(--bg-surface, #12121A)',
-          border: '1px solid rgba(168, 85, 247, 0.35)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '20px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div
-            style={{
-              padding: '10px 14px',
-              borderRadius: '12px',
-              backgroundColor: '#A855F7',
-              color: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontWeight: 900,
-              fontSize: '14px',
-              letterSpacing: '0.04em'
-            }}
-          >
-            <Crown size={20} />
-            <span>HOME HERO</span>
-          </div>
-
-          <div>
-            {currentHero ? (
-              <>
-                <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 4px' }}>
-                  {currentHero.title}
-                </h3>
-                <p style={{ fontSize: '13px', color: '#D1D5DB', margin: 0 }}>
-                  {currentHero.type.toUpperCase()} • {currentHero.releaseYear} • {currentHero.price === 0 ? 'FREE' : `₹${currentHero.price}`}
-                  {currentHero.tagline ? ` • "${currentHero.tagline}"` : ''}
-                </p>
-              </>
-            ) : (
-              <>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 4px' }}>
-                  No Home Hero Assigned
-                </h3>
-                <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>
-                  Designate the premier banner displayed at the very top of the Discover page.
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            onClick={() => {
-              setSearchQuery('');
-              setHeroModalOpen(true);
-            }}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '999px',
+              backgroundColor: 'rgba(16, 185, 129, 0.12)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              color: '#34D399',
+              fontSize: '12px',
+              fontWeight: 700
+            }}
+          >
+            <Clock size={13} />
+            <span>Live Calendar Sync Active</span>
+          </div>
+        </div>
+
+        {/* 6 Clickable Today Cards (Milestone 4) */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '16px'
+          }}
+        >
+          {/* Card 1: Today's Revenue */}
+          <div
+            onClick={() => openMetricModal('revenue')}
+            style={{
+              backgroundColor: 'var(--bg-surface, #12121A)',
+              borderRadius: '16px',
+              border: '1.5px solid rgba(245, 197, 24, 0.35)',
+              padding: '22px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              position: 'relative',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Today's Revenue
+              </span>
+              <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(245, 197, 24, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-gold, #F5C518)' }}>
+                <DollarSign size={18} />
+              </div>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '6px' }}>
+              ₹{today.todayRevenueRupees}
+            </div>
+            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
+              ₹{today.todayPurchasesRevenueRupees} purchases + ₹{today.todayUpiRevenueRupees} UPI
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
+              <span>Inspect today's sales</span>
+              <ChevronRight size={13} />
+            </div>
+          </div>
+
+          {/* Card 2: Today's New Members */}
+          <div
+            onClick={() => openMetricModal('members')}
+            style={{
+              backgroundColor: 'var(--bg-surface, #12121A)',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '22px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              position: 'relative'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Today's New Members
+              </span>
+              <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60A5FA' }}>
+                <Users size={18} />
+              </div>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '6px' }}>
+              {today.todayNewMembersCount}
+            </div>
+            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
+              New registrations today
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#60A5FA' }}>
+              <span>View new accounts</span>
+              <ChevronRight size={13} />
+            </div>
+          </div>
+
+          {/* Card 3: Today's Purchases */}
+          <div
+            onClick={() => openMetricModal('purchases')}
+            style={{
+              backgroundColor: 'var(--bg-surface, #12121A)',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '22px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              position: 'relative'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Today's Purchases
+              </span>
+              <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34D399' }}>
+                <Film size={18} />
+              </div>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '6px' }}>
+              {today.todayPurchasesCount}
+            </div>
+            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
+              ₹{today.todayPurchasesRevenueRupees} content revenue
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#34D399' }}>
+              <span>View purchase log</span>
+              <ChevronRight size={13} />
+            </div>
+          </div>
+
+          {/* Card 4: Today's UPI Recharge Revenue */}
+          <div
+            onClick={() => openMetricModal('upi')}
+            style={{
+              backgroundColor: 'var(--bg-surface, #12121A)',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '22px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              position: 'relative'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Today's UPI Payments
+              </span>
+              <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(168, 85, 247, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C084FC' }}>
+                <Wallet size={18} />
+              </div>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '6px' }}>
+              ₹{today.todayUpiRevenueRupees}
+            </div>
+            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
+              {today.todayUpiApprovedCount} approved UPI recharges
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#C084FC' }}>
+              <span>View UPI requests</span>
+              <ChevronRight size={13} />
+            </div>
+          </div>
+
+          {/* Card 5: Today's Profit */}
+          <div
+            onClick={() => openMetricModal('profit')}
+            style={{
+              backgroundColor: 'var(--bg-surface, #12121A)',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '22px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              position: 'relative'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Today's Profit
+              </span>
+              <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(245, 197, 24, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-gold, #F5C518)' }}>
+                <TrendingUp size={18} />
+              </div>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '6px' }}>
+              ₹{today.todayProfitRupees}
+            </div>
+            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
+              Gross 100% (Hosting costs unconfigured)
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
+              <span>Audit calculation</span>
+              <ChevronRight size={13} />
+            </div>
+          </div>
+
+          {/* Card 6: Pending Payment Requests */}
+          <div
+            onClick={() => onNavigateTab('admin-payments')}
+            style={{
+              backgroundColor: today.pendingPaymentRequestsCount > 0 ? 'rgba(245, 197, 24, 0.1)' : 'var(--bg-surface, #12121A)',
+              borderRadius: '16px',
+              border: today.pendingPaymentRequestsCount > 0 ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '22px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              position: 'relative'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: today.pendingPaymentRequestsCount > 0 ? 'var(--brand-gold, #F5C518)' : '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Pending Payments
+              </span>
+              <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(245, 197, 24, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-gold, #F5C518)' }}>
+                <Clock size={18} />
+              </div>
+            </div>
+            <div style={{ fontSize: '30px', fontWeight: 900, color: today.pendingPaymentRequestsCount > 0 ? 'var(--brand-gold, #F5C518)' : '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '6px' }}>
+              {today.pendingPaymentRequestsCount}
+            </div>
+            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
+              ₹{today.pendingPaymentAmountRupees} awaiting approval
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)' }}>
+              <span>Go to Verify Panel</span>
+              <ChevronRight size={13} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* ALL-TIME PLATFORM METRICS                                                 */}
+      {/* ========================================================================= */}
+      <div style={{ marginBottom: '36px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', marginBottom: '16px' }}>
+          All-Time Platform Summary
+        </h2>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Total Registered Users</span>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalUsers}</div>
+          </div>
+
+          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Lifetime Content Sales</span>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>₹{stats.totalRevenueRupees}</div>
+          </div>
+
+          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Published Titles</span>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalPublished} ({stats.totalMovies} Movies • {stats.totalSeries} Series)</div>
+          </div>
+
+          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Total Purchases</span>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalPurchases} completed</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Current Trending #1 Showcase Banner */}
+      {stats.currentTrending1 && (
+        <div
+          style={{
+            marginBottom: '36px',
+            padding: '24px',
+            borderRadius: '16px',
+            background: `linear-gradient(90deg, rgba(245, 197, 24, 0.12) 0%, rgba(18, 18, 26, 0.95) 100%), url(${stats.currentTrending1.backdrop || stats.currentTrending1.poster}) center/cover no-repeat`,
+            border: '1px solid rgba(245, 197, 24, 0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div
+              style={{
+                padding: '8px 12px',
+                borderRadius: '10px',
+                backgroundColor: 'var(--brand-gold, #F5C518)',
+                color: '#0E0E12',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontWeight: 900,
+                fontSize: '13px'
+              }}
+            >
+              <TrendingUp size={16} />
+              <span>TRENDING #1</span>
+            </div>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 2px' }}>
+                {stats.currentTrending1.title}
+              </h3>
+              <p style={{ fontSize: '12px', color: '#D1D5DB', margin: 0 }}>
+                {stats.currentTrending1.type} • {stats.currentTrending1.releaseYear} • {stats.currentTrending1.priceRupees === 0 ? 'FREE' : `₹${stats.currentTrending1.priceRupees}`}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onNavigateTab('admin-content')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 16px',
               borderRadius: '8px',
-              backgroundColor: 'rgba(168, 85, 247, 0.2)',
-              border: '1px solid rgba(168, 85, 247, 0.4)',
-              color: '#E9D5FF',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#FFFFFF',
               fontSize: '13px',
               fontWeight: 700,
               cursor: 'pointer'
             }}
           >
-            <Edit3 size={15} />
-            <span>{currentHero ? 'Change Hero' : 'Select Hero'}</span>
+            <Edit3 size={14} />
+            <span>Manage in Catalog</span>
           </button>
-
-          {currentHero && (
-            <button
-              onClick={handleClearHero}
-              title="Remove Home Hero"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#F87171',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              <Trash2 size={15} />
-              <span>Clear</span>
-            </button>
-          )}
         </div>
-      </div>
+      )}
 
-      {/* Dedicated CINEMATIC SPOTLIGHT Control Block */}
-      <div
-        style={{
-          marginBottom: '36px',
-          padding: '24px',
-          borderRadius: '18px',
-          backgroundColor: 'var(--bg-surface, #12121A)',
-          border: '1px solid rgba(245, 197, 24, 0.35)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '20px'
-        }}
-      >
-        {/* Spotlight Block Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-            <div
-              style={{
-                padding: '10px 14px',
-                borderRadius: '12px',
-                backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                border: '1.5px solid var(--brand-gold, #F5C518)',
-                color: 'var(--brand-gold, #F5C518)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontWeight: 900,
-                fontSize: '14px',
-                letterSpacing: '0.04em'
-              }}
-            >
-              <Sparkles size={20} />
-              <span>CINEMATIC SPOTLIGHT</span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <span
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  padding: '4px 10px',
-                  borderRadius: '999px',
-                  backgroundColor: currentSpotlights.length > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-                  color: currentSpotlights.length > 0 ? '#34D399' : '#9CA3AF',
-                  border: currentSpotlights.length > 0 ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)'
-                }}
-              >
-                {currentSpotlights.length} Spotlight{currentSpotlights.length !== 1 ? 's' : ''} Configured
-              </span>
-              <span style={{ fontSize: '13px', color: '#9CA3AF' }}>
-                Promotional banners interleaved naturally across Discover catalog (2 normal rows between consecutive spotlights)
-              </span>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            {/* Unmistakable Saved State Indicator */}
-            {spotlightSaving ? (
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                  border: '1px solid rgba(245, 197, 24, 0.3)',
-                  color: 'var(--brand-gold, #F5C518)',
-                  fontSize: '12px',
-                  fontWeight: 700
-                }}
-              >
-                <Loader2 className="animate-spin" size={14} />
-                <span>Saving to Database...</span>
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                  border: '1px solid rgba(16, 185, 129, 0.25)',
-                  color: '#34D399',
-                  fontSize: '12px',
-                  fontWeight: 700
-                }}
-              >
-                <Check size={14} />
-                <span>Database Synced {lastSavedTimestamp ? `(${lastSavedTimestamp})` : '✓'}</span>
-              </div>
-            )}
-
-            <button
-              onClick={() => openSpotlightModalForSlot(null)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--brand-gold, #F5C518)',
-                color: '#0E0E12',
-                border: 'none',
-                fontSize: '13px',
-                fontWeight: 800,
-                cursor: 'pointer'
-              }}
-            >
-              <Plus size={15} />
-              <span>Add More Spotlight</span>
-            </button>
-
-            <button
-              onClick={() => onNavigateTab('admin-spotlight')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: '#E5E7EB',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              <span>Full Spotlight Manager</span>
-              <ArrowUpRight size={13} />
-            </button>
-          </div>
+      {/* Quick Action Navigation Shortcuts */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Sparkles size={18} style={{ color: 'var(--brand-gold, #F5C518)' }} />
+            <span>Administrative Navigation Hub</span>
+          </h2>
+          <span style={{ fontSize: '12px', color: '#9CA3AF' }}>All systems accessible directly or via 3-line Menu</span>
         </div>
-
-        {/* Dynamic Unlimited Spotlight List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {currentSpotlights.length === 0 ? (
-            <div
-              style={{
-                borderRadius: '14px',
-                border: '1px dashed rgba(255, 255, 255, 0.15)',
-                backgroundColor: 'rgba(255, 255, 255, 0.01)',
-                padding: '32px 20px',
-                textAlign: 'center',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '12px'
-              }}
-            >
-              <Sparkles size={32} style={{ color: 'var(--brand-gold, #F5C518)', opacity: 0.6 }} />
-              <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
-                No Cinematic Spotlights Configured Yet
-              </h4>
-              <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0, maxWidth: '440px' }}>
-                Add unlimited promotional spotlight banners to interleave between content rows on the Discover home page.
-              </p>
-              <button
-                onClick={() => openSpotlightModalForSlot(null)}
-                style={{
-                  marginTop: '6px',
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  backgroundColor: 'var(--brand-gold, #F5C518)',
-                  color: '#0E0E12',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Plus size={16} />
-                <span>Add First Spotlight</span>
-              </button>
-            </div>
-          ) : (
-            currentSpotlights.map((spot, slotIdx) => (
-              <div
-                key={spot.id}
-                style={{
-                  borderRadius: '14px',
-                  border: '1px solid rgba(245, 197, 24, 0.3)',
-                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                  padding: '16px 20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '16px',
-                  flexWrap: 'wrap'
-                }}
-              >
-                {/* Spotlight Info */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: '280px', flex: 1 }}>
-                  <span
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                      border: '1px solid var(--brand-gold, #F5C518)',
-                      color: 'var(--brand-gold, #F5C518)',
-                      fontWeight: 900,
-                      fontSize: '12px',
-                      letterSpacing: '0.04em',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    SPOTLIGHT #{slotIdx + 1}
-                  </span>
-
-                  <img
-                    src={spot.posterUrl || spot.backdropUrl}
-                    alt={spot.title}
-                    style={{ width: '44px', height: '62px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
-                  />
-
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
-                        {spot.title}
-                      </h4>
-                      <span
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: 800,
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          backgroundColor: spot.type === 'series' ? 'rgba(96, 165, 250, 0.2)' : 'rgba(245, 197, 24, 0.2)',
-                          color: spot.type === 'series' ? '#60A5FA' : '#F5C518',
-                          border: spot.type === 'series' ? '1px solid rgba(96, 165, 250, 0.3)' : '1px solid rgba(245, 197, 24, 0.3)'
-                        }}
-                      >
-                        {spot.type.toUpperCase()}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                          color: '#34D399',
-                          border: '1px solid rgba(16, 185, 129, 0.3)'
-                        }}
-                      >
-                        Saved & Active ✓
-                      </span>
-                    </div>
-                    <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '3px 0 0' }}>
-                      {spot.releaseYear} • {spot.genres?.slice(0, 2).join(', ')}
-                      {spot.tagline ? ` • Slogan: "${spot.tagline}"` : ''}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Slot Action Controls */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => handleMoveSpotlight(slotIdx, 'up')}
-                    disabled={slotIdx === 0}
-                    title="Move Up"
-                    style={{
-                      padding: '7px 10px',
-                      borderRadius: '6px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      color: slotIdx === 0 ? '#4B5563' : '#E5E7EB',
-                      cursor: slotIdx === 0 ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    <ChevronUp size={14} />
-                  </button>
-                  <button
-                    onClick={() => handleMoveSpotlight(slotIdx, 'down')}
-                    disabled={slotIdx >= currentSpotlights.length - 1}
-                    title="Move Down"
-                    style={{
-                      padding: '7px 10px',
-                      borderRadius: '6px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      color: slotIdx >= currentSpotlights.length - 1 ? '#4B5563' : '#E5E7EB',
-                      cursor: slotIdx >= currentSpotlights.length - 1 ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    <ChevronDown size={14} />
-                  </button>
-                  <button
-                    onClick={() => openSpotlightModalForSlot(slotIdx)}
-                    style={{
-                      padding: '7px 14px',
-                      borderRadius: '6px',
-                      backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                      border: '1px solid var(--brand-gold, #F5C518)',
-                      color: 'var(--brand-gold, #F5C518)',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Edit3 size={13} />
-                    <span>Change Movie/Series</span>
-                  </button>
-                  <button
-                    onClick={() => handleClearSlotSpotlight(slotIdx)}
-                    style={{
-                      padding: '7px 12px',
-                      borderRadius: '6px',
-                      backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      color: '#F87171',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Trash2 size={13} />
-                    <span>Delete Spotlight</span>
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-
-          {/* Bottom Add Button */}
-          {currentSpotlights.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '4px' }}>
-              <button
-                onClick={() => openSpotlightModalForSlot(null)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 22px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(245, 197, 24, 0.12)',
-                  border: '1.5px dashed var(--brand-gold, #F5C518)',
-                  color: 'var(--brand-gold, #F5C518)',
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  cursor: 'pointer'
-                }}
-              >
-                <Plus size={16} />
-                <span>+ Add More Spotlight (Spotlight #{currentSpotlights.length + 1})</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Quick Action Hub */}
-      <div style={{ marginBottom: '36px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Sparkles size={18} style={{ color: 'var(--brand-gold, #F5C518)' }} />
-          <span>Quick Actions & Shortcuts</span>
-        </h2>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
-          {quickActions.map(qa => {
-            const Icon = qa.icon;
+          {quickNavItems.map(item => {
+            const Icon = item.icon;
             return (
               <div
-                key={qa.label}
-                onClick={qa.action}
+                key={item.label}
+                onClick={item.action}
                 style={{
-                  padding: '18px',
+                  padding: '16px 18px',
                   backgroundColor: 'var(--bg-surface, #12121A)',
-                  borderRadius: '14px',
+                  borderRadius: '12px',
                   border: '1px solid rgba(255, 255, 255, 0.07)',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.15s ease',
                   display: 'flex',
-                  flexDirection: 'column',
+                  alignItems: 'center',
                   justifyContent: 'space-between'
                 }}
               >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '8px',
-                          backgroundColor: `${qa.color}20`,
-                          color: qa.color,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <Icon size={16} />
-                      </div>
-                      <span style={{ fontSize: '15px', fontWeight: 700, color: '#FFFFFF' }}>{qa.label}</span>
-                    </div>
-                    <ArrowUpRight size={16} style={{ color: '#9CA3AF' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      backgroundColor: `${item.color}20`,
+                      color: item.color,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Icon size={18} />
                   </div>
-                  <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0, lineHeight: 1.4 }}>
-                    {qa.desc}
-                  </p>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF' }}>{item.label}</div>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>{item.desc}</div>
+                  </div>
                 </div>
+
+                <ArrowUpRight size={16} color="#6B7280" />
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Two Column Layout: Recently Added Content & Recent Purchases */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '24px' }}>
-        {/* Recently Added Content */}
-        <div
-          style={{
-            backgroundColor: 'var(--bg-surface, #12121A)',
-            borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            padding: '24px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>Recently Added Content</h3>
-            <span
-              onClick={() => onNavigateTab('admin-content')}
-              style={{ fontSize: '13px', color: 'var(--brand-gold, #F5C518)', cursor: 'pointer', fontWeight: 600 }}
-            >
-              View catalog
-            </span>
-          </div>
-
-          {stats.recentlyAddedContent?.length === 0 ? (
-            <p style={{ color: '#6B7280', fontSize: '14px', textAlign: 'center', padding: '32px 0' }}>
-              No content added yet.
-            </p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {stats.recentlyAddedContent?.map(item => (
-                <div
-                  key={item.id}
-                  onClick={() => onNavigateTab('admin-editor', item.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    borderRadius: '10px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <img
-                      src={item.poster}
-                      alt={item.title}
-                      style={{ width: '38px', height: '54px', objectFit: 'cover', borderRadius: '6px' }}
-                    />
-                    <div>
-                      <p style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 2px' }}>
-                        {item.title}
-                      </p>
-                      <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
-                        {item.type} • {item.releaseYear} • {item.priceRupees === 0 ? 'FREE' : `₹${item.priceRupees}`}
-                      </p>
-                    </div>
-                  </div>
-
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      backgroundColor: item.status === 'PUBLISHED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                      color: item.status === 'PUBLISHED' ? '#10B981' : '#F87171'
-                    }}
-                  >
-                    {item.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Recent Purchases */}
-        <div
-          style={{
-            backgroundColor: 'var(--bg-surface, #12121A)',
-            borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            padding: '24px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>Recent Completed Purchases</h3>
-            <span
-              onClick={() => onNavigateTab('admin-transactions')}
-              style={{ fontSize: '13px', color: 'var(--brand-gold, #F5C518)', cursor: 'pointer', fontWeight: 600 }}
-            >
-              View ledger
-            </span>
-          </div>
-
-          {stats.recentPurchases.length === 0 ? (
-            <p style={{ color: '#6B7280', fontSize: '14px', textAlign: 'center', padding: '32px 0' }}>
-              No purchases recorded yet.
-            </p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {stats.recentPurchases.slice(0, 6).map((item, idx) => (
-                <div
-                  key={item.id || idx}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px',
-                    borderRadius: '10px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.05)'
-                  }}
-                >
-                  <div>
-                    <p style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 2px' }}>
-                      {item.contentTitle || 'Content Unlock'}
-                    </p>
-                    <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
-                      {item.userEmail} • {item.purchasedAt ? new Date(item.purchasedAt).toLocaleDateString() : 'Recent'}
-                    </p>
-                  </div>
-
-                  <div style={{ textAlign: 'right' }}>
-                    <span
-                      style={{
-                        fontSize: '14px',
-                        fontWeight: 800,
-                        color: '#10B981',
-                        display: 'block'
-                      }}
-                    >
-                      ₹{item.amountRupees || 0}
-                    </span>
-                    <span style={{ fontSize: '11px', color: '#9CA3AF' }}>CONFIRMED</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Title Selection Modal for Hero / Spotlight */}
-      {(heroModalOpen || spotlightModalOpen) && (
+      {/* ========================================================================= */}
+      {/* MILESTONE 4: TODAY ANALYTICS INTERACTIVE MODALS                           */}
+      {/* ========================================================================= */}
+      {activeModal && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.82)',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
             backdropFilter: 'blur(8px)',
             display: 'flex',
             alignItems: 'center',
@@ -1277,337 +760,355 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
             zIndex: 9999,
             padding: '20px'
           }}
-          onClick={() => {
-            setHeroModalOpen(false);
-            setSpotlightModalOpen(false);
-          }}
+          onClick={() => setActiveModal(null)}
         >
           <div
             style={{
               width: '100%',
-              maxWidth: '640px',
-              maxHeight: '82vh',
+              maxWidth: '820px',
+              maxHeight: '85vh',
               backgroundColor: '#12121A',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '16px',
+              border: '1px solid rgba(245, 197, 24, 0.3)',
+              borderRadius: '18px',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)'
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8)'
             }}
             onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div
               style={{
-                padding: '18px 24px',
+                padding: '20px 24px',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                    {activeModal === 'revenue' && "Today's Revenue Breakdown"}
+                    {activeModal === 'members' && "Today's New Members"}
+                    {activeModal === 'purchases' && "Today's Content Purchases"}
+                    {activeModal === 'upi' && "Today's UPI Payment Requests"}
+                    {activeModal === 'profit' && "Today's Profit & Margin Analysis"}
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                      color: 'var(--brand-gold, #F5C518)'
+                    }}
+                  >
+                    {today.calendarDate}
+                  </span>
+                </div>
+                <span style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px', display: 'block' }}>
+                  Records strictly within <strong>00:00:00 AM → 11:59:59 PM</strong> calendar day
+                </span>
+              </div>
+
+              <button
+                onClick={() => setActiveModal(null)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#9CA3AF',
+                  cursor: 'pointer',
+                  padding: '8px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+              {modalLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0', gap: '10px', color: '#9CA3AF' }}>
+                  <Loader2 size={20} className="animate-spin" color="var(--brand-gold, #F5C518)" />
+                  <span>Loading today's itemized records...</span>
+                </div>
+              ) : activeModal === 'profit' ? (
+                /* Profit Breakdown Content */
+                <div>
+                  <div
+                    style={{
+                      padding: '20px',
+                      borderRadius: '14px',
+                      backgroundColor: 'rgba(245, 197, 24, 0.06)',
+                      border: '1px solid rgba(245, 197, 24, 0.25)',
+                      marginBottom: '20px'
+                    }}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                      Operating Profit Mathematical Derivation
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
+                        <span>Content Purchases Revenue (Paise to INR):</span>
+                        <strong style={{ color: '#10B981' }}>+₹{today.todayPurchasesRevenueRupees}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
+                        <span>Approved UPI Wallet Recharge Deposits:</span>
+                        <strong style={{ color: '#10B981' }}>+₹{today.todayUpiRevenueRupees}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
+                        <span>External Bandwidth / Hosting / CDN Expenses:</span>
+                        <strong style={{ color: '#9CA3AF' }}>₹0.00 (Unconfigured in platform)</strong>
+                      </div>
+                      <div
+                        style={{
+                          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                          paddingTop: '10px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: '18px',
+                          fontWeight: 900,
+                          color: '#FFFFFF'
+                        }}
+                      >
+                        <span>Net Calculated Operating Profit:</span>
+                        <span style={{ color: 'var(--brand-gold, #F5C518)' }}>₹{today.todayProfitRupees}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: '14px 18px',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      fontSize: '13px',
+                      color: '#9CA3AF',
+                      lineHeight: 1.5
+                    }}
+                  >
+                    <strong style={{ color: '#FFFFFF' }}>Transparency Notice: </strong>
+                    {today.profitNote}
+                  </div>
+                </div>
+              ) : (
+                /* Itemized Lists for Members, Revenue, Purchases, UPI */
+                <div>
+                  {/* Search filter in modal */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                      }}
+                    >
+                      <Search size={16} color="#9CA3AF" />
+                      <input
+                        type="text"
+                        placeholder="Search records by name, email, title, or UTR..."
+                        value={modalSearch}
+                        onChange={e => setModalSearch(e.target.value)}
+                        style={{
+                          width: '100%',
+                          background: 'transparent',
+                          border: 'none',
+                          outline: 'none',
+                          color: '#FFFFFF',
+                          fontSize: '13px'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Empty state */}
+                  {(!modalData?.records || modalData.records.length === 0) ? (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: '#6B7280' }}>
+                      <AlertCircle size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
+                      <p style={{ fontSize: '14px', margin: 0 }}>No records recorded yet for today ({today.calendarDate}).</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {modalData.records
+                        .filter((r: any) => {
+                          if (!modalSearch.trim()) return true;
+                          const q = modalSearch.toLowerCase();
+                          return (
+                            (r.name && r.name.toLowerCase().includes(q)) ||
+                            (r.email && r.email.toLowerCase().includes(q)) ||
+                            (r.userName && r.userName.toLowerCase().includes(q)) ||
+                            (r.userEmail && r.userEmail.toLowerCase().includes(q)) ||
+                            (r.title && r.title.toLowerCase().includes(q)) ||
+                            (r.contentTitle && r.contentTitle.toLowerCase().includes(q)) ||
+                            (r.utr && r.utr.toLowerCase().includes(q))
+                          );
+                        })
+                        .map((record: any, idx: number) => (
+                          <div
+                            key={record.id || idx}
+                            style={{
+                              padding: '12px 16px',
+                              borderRadius: '10px',
+                              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                              border: '1px solid rgba(255, 255, 255, 0.06)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: '10px'
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF' }}>
+                                {record.name || record.userName || record.title || record.contentTitle || 'Member'}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
+                                {record.email || record.userEmail || ''}
+                                {record.contentType ? ` • ${record.contentType}` : ''}
+                                {record.utr && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyUtr(record.utr)}
+                                    title="Click to copy UTR"
+                                    style={{
+                                      marginLeft: '8px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      backgroundColor: 'rgba(245, 197, 24, 0.12)',
+                                      border: '1px solid rgba(245, 197, 24, 0.25)',
+                                      color: 'var(--brand-gold, #F5C518)',
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      fontFamily: 'monospace'
+                                    }}
+                                  >
+                                    {copiedUtr === record.utr ? <Check size={11} color="#10B981" /> : <Copy size={11} />}
+                                    <span>UTR: {record.utr}</span>
+                                    {copiedUtr === record.utr && <span style={{ color: '#10B981', fontSize: '10px' }}>(Copied!)</span>}
+                                  </button>
+                                )}
+                              </div>
+                              {record.adminNote && (
+                                <div style={{ fontSize: '11px', color: '#F87171', marginTop: '2px' }}>
+                                  Admin Note: {record.adminNote}
+                                </div>
+                              )}
+                            </div>
+
+                            <div style={{ textAlign: 'right' }}>
+                              {record.amountRupees !== undefined && (
+                                <div style={{ fontSize: '15px', fontWeight: 800, color: '#10B981' }}>
+                                  ₹{record.amountRupees}
+                                </div>
+                              )}
+                              {record.status && (
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    fontWeight: 800,
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    backgroundColor:
+                                      record.status === 'APPROVED' || record.status === 'ACTIVE'
+                                        ? 'rgba(16, 185, 129, 0.15)'
+                                        : record.status === 'PENDING'
+                                        ? 'rgba(245, 197, 24, 0.15)'
+                                        : 'rgba(239, 68, 68, 0.15)',
+                                    color:
+                                      record.status === 'APPROVED' || record.status === 'ACTIVE'
+                                        ? '#10B981'
+                                        : record.status === 'PENDING'
+                                        ? 'var(--brand-gold, #F5C518)'
+                                        : '#EF4444'
+                                  }}
+                                >
+                                  {record.status}
+                                </span>
+                              )}
+                              <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '2px' }}>
+                                {record.createdAt || record.submittedAt || record.purchasedAt || record.timestamp
+                                  ? new Date(record.createdAt || record.submittedAt || record.purchasedAt || record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                  : 'Today'}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: '14px 24px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                backgroundColor: 'rgba(0, 0, 0, 0.25)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {heroModalOpen ? <Crown size={20} color="#A855F7" /> : <Sparkles size={20} color="#F5C518" />}
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#FFFFFF' }}>
-                  {heroModalOpen
-                    ? 'Select Home Hero Title'
-                    : `Select Movie / Series for Spotlight Slot #${(targetSlotIndex !== null ? targetSlotIndex : currentSpotlights.length) + 1}`}
-                </h3>
-              </div>
-              <button
-                onClick={() => {
-                  setHeroModalOpen(false);
-                  setSpotlightModalOpen(false);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#9CA3AF',
-                  cursor: 'pointer',
-                  padding: '4px'
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
+              <span style={{ fontSize: '12px', color: '#6B7280' }}>
+                Window: 00:00:00 AM → 11:59:59 PM ({today.calendarDate})
+              </span>
 
-            {/* Modal Search Input */}
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-              <div style={{ position: 'relative' }}>
-                <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#6B7280' }} />
-                <input
-                  type="text"
-                  placeholder="Search central catalog by title, genre, director or movie/series..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {activeModal === 'upi' && (
+                  <button
+                    onClick={() => {
+                      setActiveModal(null);
+                      onNavigateTab('admin-payments');
+                    }}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--brand-gold, #F5C518)',
+                      color: '#000000',
+                      fontSize: '12px',
+                      fontWeight: 800,
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Open Payment Verifier
+                  </button>
+                )}
+                <button
+                  onClick={() => setActiveModal(null)}
                   style={{
-                    width: '100%',
-                    padding: '10px 14px 10px 38px',
+                    padding: '8px 14px',
                     borderRadius: '8px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
                     color: '#FFFFFF',
-                    fontSize: '14px',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Content List / Candidate Preview */}
-            <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* If candidate selected for Spotlight, show clear preview & explicit SAVE button */}
-              {selectedCandidate && !heroModalOpen && (
-                <div
-                  style={{
-                    padding: '20px',
-                    borderRadius: '12px',
-                    backgroundColor: 'rgba(245, 197, 24, 0.08)',
-                    border: '1.5px solid var(--brand-gold, #F5C518)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px'
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: 'pointer'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                    <span
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        backgroundColor: 'rgba(245, 197, 24, 0.2)',
-                        color: 'var(--brand-gold, #F5C518)',
-                        fontWeight: 900,
-                        fontSize: '12px',
-                        letterSpacing: '0.04em'
-                      }}
-                    >
-                      SELECTED FOR SPOTLIGHT #{(targetSlotIndex !== null ? targetSlotIndex : currentSpotlights.length) + 1}
-                    </span>
-                    <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                      Pending explicit confirmation — click Save below
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                    <img
-                      src={selectedCandidate.posterUrl || selectedCandidate.backdropUrl}
-                      alt={selectedCandidate.title}
-                      style={{ width: '60px', height: '88px', objectFit: 'cover', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' }}
-                    />
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <h4 style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
-                          {selectedCandidate.title}
-                        </h4>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: 800,
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            backgroundColor: selectedCandidate.type === 'series' ? 'rgba(96, 165, 250, 0.2)' : 'rgba(245, 197, 24, 0.2)',
-                            color: selectedCandidate.type === 'series' ? '#60A5FA' : '#F5C518',
-                            border: selectedCandidate.type === 'series' ? '1px solid rgba(96, 165, 250, 0.3)' : '1px solid rgba(245, 197, 24, 0.3)'
-                          }}
-                        >
-                          {selectedCandidate.type.toUpperCase()}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0' }}>
-                        {selectedCandidate.releaseYear} • {selectedCandidate.genres?.join(', ')}
-                      </p>
-                      {selectedCandidate.tagline && (
-                        <p style={{ fontSize: '12px', color: 'var(--brand-gold, #F5C518)', margin: '4px 0 0', fontStyle: 'italic' }}>
-                          &ldquo;{selectedCandidate.tagline}&rdquo;
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '6px' }}>
-                    <button
-                      onClick={() => handleSetSlotSpotlight(targetSlotIndex !== null ? targetSlotIndex : currentSpotlights.length, selectedCandidate)}
-                      disabled={spotlightSaving}
-                      style={{
-                        flex: 1,
-                        padding: '12px 20px',
-                        borderRadius: '8px',
-                        backgroundColor: 'var(--brand-gold, #F5C518)',
-                        color: '#0E0E12',
-                        border: 'none',
-                        fontSize: '14px',
-                        fontWeight: 900,
-                        letterSpacing: '0.04em',
-                        cursor: spotlightSaving ? 'wait' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px'
-                      }}
-                    >
-                      {spotlightSaving ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}
-                      <span>
-                        {targetSlotIndex !== null && targetSlotIndex < currentSpotlights.length ? 'SAVE CHANGES' : 'SAVE SPOTLIGHT'}
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => setSelectedCandidate(null)}
-                      style={{
-                        padding: '12px 18px',
-                        borderRadius: '8px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                        color: '#E5E7EB',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Choose Different Title
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {modalLoading ? (
-                <div style={{ padding: '36px', textAlign: 'center', color: '#9CA3AF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                  <Loader2 className="animate-spin" size={20} style={{ color: 'var(--brand-gold, #F5C518)' }} />
-                  <span>Loading catalog items from central database...</span>
-                </div>
-              ) : null}
-
-              {(() => {
-                const baseList = modalCatalog.length > 0 ? modalCatalog : catalog;
-                const publishedList = baseList.filter(item => !item.status || item.status === 'PUBLISHED');
-                const q = searchQuery.toLowerCase().trim();
-                const filtered = publishedList.filter(item => {
-                  if (!q) return true;
-                  return (
-                    item.title.toLowerCase().includes(q) ||
-                    (item.type && item.type.toLowerCase().includes(q)) ||
-                    (item.director && item.director.toLowerCase().includes(q)) ||
-                    (item.genres && item.genres.some(g => g.toLowerCase().includes(q)))
-                  );
-                });
-
-                if (filtered.length === 0 && !modalLoading) {
-                  return (
-                    <div style={{ padding: '32px', textAlign: 'center', color: '#9CA3AF' }}>
-                      <p style={{ margin: 0, fontSize: '14px' }}>
-                        No published titles found matching &quot;{searchQuery}&quot;.
-                      </p>
-                    </div>
-                  );
-                }
-
-                return filtered.map(item => {
-                  const isCurrentHero = currentHero?.id === item.id;
-                  const existingSpotlightSlot = currentSpotlights.findIndex(s => s.id === item.id);
-                  const isAlreadySpotlight = existingSpotlightSlot !== -1;
-                  const isTrending1 = stats?.currentTrending1?.id === item.id;
-                  const isCandidate = selectedCandidate?.id === item.id;
-
-                  return (
-                    <div
-                      key={item.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 14px',
-                        borderRadius: '10px',
-                        backgroundColor: isCandidate ? 'rgba(245, 197, 24, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-                        border: isCandidate ? '1px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.06)',
-                        gap: '12px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <img
-                          src={item.posterUrl || item.backdropUrl}
-                          alt={item.title}
-                          style={{ width: '38px', height: '52px', objectFit: 'cover', borderRadius: '4px' }}
-                        />
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF' }}>
-                              {item.title}
-                            </span>
-                            {isTrending1 && (
-                              <span style={{ fontSize: '10px', fontWeight: 800, color: '#F5C518', backgroundColor: 'rgba(245, 197, 24, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
-                                #1 TRENDING
-                              </span>
-                            )}
-                            {isCurrentHero && (
-                              <span style={{ fontSize: '10px', fontWeight: 800, color: '#C084FC', backgroundColor: 'rgba(168, 85, 247, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
-                                HERO
-                              </span>
-                            )}
-                            {isAlreadySpotlight && (
-                              <span style={{ fontSize: '10px', fontWeight: 800, color: '#60A5FA', backgroundColor: 'rgba(96, 165, 250, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
-                                SPOTLIGHT #{existingSpotlightSlot + 1}
-                              </span>
-                            )}
-                          </div>
-                          <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '2px 0 0' }}>
-                            {item.type.toUpperCase()} • {item.releaseYear} • {item.genres?.slice(0, 2).join(', ')}
-                          </p>
-                        </div>
-                      </div>
-
-                      {heroModalOpen ? (
-                        <button
-                          onClick={() => handleSelectHero(item)}
-                          disabled={isCurrentHero}
-                          style={{
-                            padding: '8px 14px',
-                            borderRadius: '6px',
-                            backgroundColor: isCurrentHero ? 'rgba(255, 255, 255, 0.05)' : 'rgba(168, 85, 247, 0.25)',
-                            border: isCurrentHero ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #A855F7',
-                            color: isCurrentHero ? '#6B7280' : '#E9D5FF',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            cursor: isCurrentHero ? 'default' : 'pointer'
-                          }}
-                        >
-                          {isCurrentHero ? 'Active Hero' : 'Select as Hero'}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setSelectedCandidate(item)}
-                          disabled={isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot}
-                          style={{
-                            padding: '8px 14px',
-                            borderRadius: '6px',
-                            backgroundColor: isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot
-                              ? 'rgba(255, 255, 255, 0.05)'
-                              : isCandidate
-                              ? 'var(--brand-gold, #F5C518)'
-                              : 'rgba(245, 197, 24, 0.2)',
-                            border: isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot
-                              ? '1px solid rgba(255, 255, 255, 0.1)'
-                              : '1px solid var(--brand-gold, #F5C518)',
-                            color: isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot
-                              ? '#6B7280'
-                              : isCandidate
-                              ? '#0E0E12'
-                              : 'var(--brand-gold, #F5C518)',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            cursor: isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot ? 'not-allowed' : 'pointer'
-                          }}
-                        >
-                          {isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot
-                            ? `In Spotlight #${existingSpotlightSlot + 1}`
-                            : isCandidate
-                            ? '✓ Candidate Selected'
-                            : 'Select Title'}
-                        </button>
-                      )}
-                    </div>
-                  );
-                });
-              })()}
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

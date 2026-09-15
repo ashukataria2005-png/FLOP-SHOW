@@ -1,6 +1,22 @@
 import { contentRepository, ContentRecord } from '../repositories/contentRepository.js';
 import { getAdapter } from '../db/adapter.js';
 
+export interface TodayStats {
+  todayRevenueRupees: number;
+  todayPurchasesRevenueRupees: number;
+  todayUpiRevenueRupees: number;
+  todayNewMembersCount: number;
+  todayPurchasesCount: number;
+  todayUpiApprovedCount: number;
+  pendingPaymentRequestsCount: number;
+  pendingPaymentAmountRupees: number;
+  todayProfitRupees: number;
+  profitNote: string;
+  calendarDate: string;
+  windowStart: string;
+  windowEnd: string;
+}
+
 export interface DashboardStats {
   totalUsers: number;
   totalMovies: number;
@@ -13,6 +29,7 @@ export interface DashboardStats {
     totalRechargeRupees: number;
     totalTransactions: number;
   };
+  todayStats: TodayStats;
   currentTrending1: {
     id: string;
     title: string;
@@ -50,9 +67,40 @@ export interface DashboardStats {
   }>;
 }
 
+function getDayBounds(clientTzOffsetMinutes?: number) {
+  const now = new Date();
+  let start: Date;
+  let end: Date;
+
+  if (typeof clientTzOffsetMinutes === 'number' && !isNaN(clientTzOffsetMinutes)) {
+    // clientTzOffsetMinutes is from Date.prototype.getTimezoneOffset()
+    const clientLocalNow = new Date(now.getTime() - clientTzOffsetMinutes * 60 * 1000);
+    const y = clientLocalNow.getUTCFullYear();
+    const m = clientLocalNow.getUTCMonth();
+    const d = clientLocalNow.getUTCDate();
+    start = new Date(Date.UTC(y, m, d, 0, 0, 0, 0) + clientTzOffsetMinutes * 60 * 1000);
+    end = new Date(Date.UTC(y, m, d, 23, 59, 59, 999) + clientTzOffsetMinutes * 60 * 1000);
+  } else {
+    // Fall back to server calendar day
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  }
+
+  const y = start.getFullYear();
+  const m = String(start.getMonth() + 1).padStart(2, '0');
+  const d = String(start.getDate()).padStart(2, '0');
+
+  return {
+    startISO: start.toISOString(),
+    endISO: end.toISOString(),
+    calendarDate: `${y}-${m}-${d}`,
+  };
+}
+
 export const adminService = {
-  async getDashboardStats(): Promise<DashboardStats> {
+  async getDashboardStats(tzOffsetMinutes?: number): Promise<DashboardStats> {
     const db = getAdapter();
+    const { startISO, endISO, calendarDate } = getDayBounds(tzOffsetMinutes);
 
     const [
       { rows: [userCountRow] },
@@ -64,6 +112,10 @@ export const adminService = {
       { rows: [revenueRow] },
       { rows: [rechargeRow] },
       { rows: [txCountRow] },
+      { rows: [todayPurchasesRow] },
+      { rows: [todayUpiRow] },
+      { rows: [todayUsersRow] },
+      { rows: [pendingUpiRow] },
       { rows: trending1Rows },
       { rows: recentlyAddedRows },
       { rows: recentPurchasesRaw },
@@ -78,6 +130,19 @@ export const adminService = {
       db.query("SELECT COALESCE(SUM(amount_paid), 0) as s FROM purchases WHERE status = 'COMPLETED'"),
       db.query("SELECT COALESCE(SUM(amount), 0) as s FROM wallet_transactions WHERE type = 'RECHARGE'"),
       db.query("SELECT COUNT(*) as c FROM wallet_transactions"),
+      db.query(
+        "SELECT COUNT(*) as c, COALESCE(SUM(amount_paid), 0) as s FROM purchases WHERE status = 'COMPLETED' AND purchased_at >= ? AND purchased_at <= ?",
+        [startISO, endISO]
+      ),
+      db.query(
+        "SELECT COUNT(*) as c, COALESCE(SUM(amount), 0) as s FROM upi_payment_requests WHERE status = 'APPROVED' AND ((processed_at >= ? AND processed_at <= ?) OR (processed_at IS NULL AND created_at >= ? AND created_at <= ?))",
+        [startISO, endISO, startISO, endISO]
+      ),
+      db.query(
+        "SELECT COUNT(*) as c FROM users WHERE role = 'USER' AND created_at >= ? AND created_at <= ?",
+        [startISO, endISO]
+      ),
+      db.query("SELECT COUNT(*) as c, COALESCE(SUM(amount), 0) as s FROM upi_payment_requests WHERE status = 'PENDING'"),
       db.query("SELECT id, title, type, poster, backdrop, price, release_year FROM content WHERE trending_position = 1 LIMIT 1"),
       db.query("SELECT id, title, type, status, poster, price, release_year, created_at FROM content ORDER BY created_at DESC LIMIT 6"),
       db.query(`
@@ -108,6 +173,28 @@ export const adminService = {
         }
       : null;
 
+    const todayPurchasesRevenue = Math.round(getSum(todayPurchasesRow) / 100);
+    const todayUpiRevenue = Math.round(getSum(todayUpiRow) / 100);
+    const todayTotalRevenue = todayPurchasesRevenue + todayUpiRevenue;
+    const pendingRequestsCount = getCount(pendingUpiRow);
+    const pendingAmountRupees = Math.round(getSum(pendingUpiRow) / 100);
+
+    const todayStats: TodayStats = {
+      todayRevenueRupees: todayTotalRevenue,
+      todayPurchasesRevenueRupees: todayPurchasesRevenue,
+      todayUpiRevenueRupees: todayUpiRevenue,
+      todayNewMembersCount: getCount(todayUsersRow),
+      todayPurchasesCount: getCount(todayPurchasesRow),
+      todayUpiApprovedCount: getCount(todayUpiRow),
+      pendingPaymentRequestsCount: pendingRequestsCount,
+      pendingPaymentAmountRupees: pendingAmountRupees,
+      todayProfitRupees: todayTotalRevenue,
+      profitNote: 'External infrastructure and bandwidth expenses are not tracked in platform records. Profit reflects 100% gross operating margin.',
+      calendarDate,
+      windowStart: startISO,
+      windowEnd: endISO,
+    };
+
     return {
       totalUsers: getCount(userCountRow),
       totalMovies: getCount(movieCountRow),
@@ -120,6 +207,7 @@ export const adminService = {
         totalRechargeRupees: Math.round(getSum(rechargeRow) / 100),
         totalTransactions: getCount(txCountRow),
       },
+      todayStats,
       currentTrending1,
       recentlyAddedContent: (recentlyAddedRows as any[]).map(r => ({
         id: r.id,
@@ -148,6 +236,166 @@ export const adminService = {
         createdAt: u.created_at,
       })),
     };
+  },
+
+  async getTodayDetails(type: string, tzOffsetMinutes?: number) {
+    const db = getAdapter();
+    const { startISO, endISO, calendarDate } = getDayBounds(tzOffsetMinutes);
+
+    switch (type) {
+      case 'members':
+      case 'users': {
+        const { rows } = await db.query(
+          "SELECT id, name, email, role, status, created_at FROM users WHERE role = 'USER' AND created_at >= ? AND created_at <= ? ORDER BY created_at DESC;",
+          [startISO, endISO]
+        );
+        return {
+          type: 'members',
+          calendarDate,
+          windowStart: startISO,
+          windowEnd: endISO,
+          records: rows
+        };
+      }
+      case 'purchases': {
+        const { rows } = await db.query(
+          `SELECT p.id, p.amount_paid, p.purchased_at, u.name as user_name, u.email as user_email, c.title as content_title, c.type as content_type
+           FROM purchases p
+           JOIN users u ON p.user_id = u.id
+           JOIN content c ON p.content_id = c.id
+           WHERE p.status = 'COMPLETED' AND p.purchased_at >= ? AND p.purchased_at <= ?
+           ORDER BY p.purchased_at DESC;`,
+          [startISO, endISO]
+        );
+        return {
+          type: 'purchases',
+          calendarDate,
+          windowStart: startISO,
+          windowEnd: endISO,
+          records: (rows as any[]).map(r => ({
+            id: r.id,
+            userName: r.user_name,
+            userEmail: r.user_email,
+            contentTitle: r.content_title,
+            contentType: r.content_type,
+            amountRupees: Math.round(r.amount_paid / 100),
+            purchasedAt: r.purchased_at
+          }))
+        };
+      }
+      case 'upi': {
+        const { rows } = await db.query(
+          `SELECT id, user_id, user_name, user_email, amount, utr, status, submitted_at, processed_at, admin_note, created_at
+           FROM upi_payment_requests
+           WHERE (created_at >= ? AND created_at <= ?) OR (status = 'PENDING')
+           ORDER BY created_at DESC;`,
+          [startISO, endISO]
+        );
+        return {
+          type: 'upi',
+          calendarDate,
+          windowStart: startISO,
+          windowEnd: endISO,
+          records: (rows as any[]).map(r => ({
+            id: r.id,
+            userName: r.user_name,
+            userEmail: r.user_email,
+            amountRupees: Math.round(r.amount / 100),
+            utr: r.utr,
+            status: r.status,
+            submittedAt: r.submitted_at || r.created_at,
+            processedAt: r.processed_at,
+            adminNote: r.admin_note
+          }))
+        };
+      }
+      case 'revenue': {
+        const [{ rows: purchaseRows }, { rows: upiRows }] = await Promise.all([
+          db.query(
+            `SELECT p.id, p.amount_paid, p.purchased_at, u.name as user_name, u.email as user_email, c.title as content_title
+             FROM purchases p
+             JOIN users u ON p.user_id = u.id
+             JOIN content c ON p.content_id = c.id
+             WHERE p.status = 'COMPLETED' AND p.purchased_at >= ? AND p.purchased_at <= ?
+             ORDER BY p.purchased_at DESC;`,
+            [startISO, endISO]
+          ),
+          db.query(
+            `SELECT id, user_name, user_email, amount, utr, processed_at, created_at
+             FROM upi_payment_requests
+             WHERE status = 'APPROVED' AND ((processed_at >= ? AND processed_at <= ?) OR (processed_at IS NULL AND created_at >= ? AND created_at <= ?))
+             ORDER BY created_at DESC;`,
+            [startISO, endISO, startISO, endISO]
+          )
+        ]);
+
+        const purchaseRecords = (purchaseRows as any[]).map(r => ({
+          id: r.id,
+          source: 'PURCHASE',
+          title: `Content: ${r.content_title}`,
+          userName: r.user_name,
+          userEmail: r.user_email,
+          amountRupees: Math.round(r.amount_paid / 100),
+          timestamp: r.purchased_at
+        }));
+
+        const upiRecords = (upiRows as any[]).map(r => ({
+          id: r.id,
+          source: 'UPI_RECHARGE',
+          title: `UPI Recharge (UTR: ${r.utr})`,
+          userName: r.user_name,
+          userEmail: r.user_email,
+          amountRupees: Math.round(r.amount / 100),
+          timestamp: r.processed_at || r.created_at
+        }));
+
+        const combined = [...purchaseRecords, ...upiRecords].sort(
+          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+
+        return {
+          type: 'revenue',
+          calendarDate,
+          windowStart: startISO,
+          windowEnd: endISO,
+          records: combined
+        };
+      }
+      case 'profit': {
+        const [{ rows: purchaseSumRow }, { rows: upiSumRow }] = await Promise.all([
+          db.query(
+            "SELECT COALESCE(SUM(amount_paid), 0) as s, COUNT(*) as c FROM purchases WHERE status = 'COMPLETED' AND purchased_at >= ? AND purchased_at <= ?",
+            [startISO, endISO]
+          ),
+          db.query(
+            "SELECT COALESCE(SUM(amount), 0) as s, COUNT(*) as c FROM upi_payment_requests WHERE status = 'APPROVED' AND ((processed_at >= ? AND processed_at <= ?) OR (processed_at IS NULL AND created_at >= ? AND created_at <= ?))",
+            [startISO, endISO, startISO, endISO]
+          )
+        ]);
+
+        const purchasesRupees = Math.round(Number((purchaseSumRow[0] as any)?.s || 0) / 100);
+        const upiRupees = Math.round(Number((upiSumRow[0] as any)?.s || 0) / 100);
+        const grossRevenue = purchasesRupees + upiRupees;
+
+        return {
+          type: 'profit',
+          calendarDate,
+          windowStart: startISO,
+          windowEnd: endISO,
+          breakdown: {
+            contentPurchasesRevenue: purchasesRupees,
+            walletRechargeRevenue: upiRupees,
+            totalGrossRevenue: grossRevenue,
+            operatingExpensesRecorded: 0,
+            netCalculatedProfit: grossRevenue,
+            isCostConfigured: false,
+            explanation: 'FLOPSHOW currently does not track external server, CDN, or hosting expenses. Profit reflects 100% gross operating revenue.'
+          }
+        };
+      }
+      default:
+        throw new Error(`Unknown today metric type: ${type}`);
+    }
   },
 
   async getAllUsers(): Promise<any[]> {

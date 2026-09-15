@@ -508,7 +508,8 @@ export const api = {
   // ADMIN MANAGEMENT
   // --------------------------------------------------------------------------
   admin: {
-    async getDashboard() {
+    async getDashboard(tzOffset?: number) {
+      const qs = tzOffset !== undefined ? `?tzOffset=${tzOffset}` : '';
       return request<{
         totalUsers: number;
         totalMovies: number;
@@ -521,11 +522,31 @@ export const api = {
           totalRechargeRupees: number;
           totalTransactions: number;
         };
+        todayStats?: {
+          todayRevenueRupees: number;
+          todayPurchasesRevenueRupees: number;
+          todayUpiRevenueRupees: number;
+          todayNewMembersCount: number;
+          todayPurchasesCount: number;
+          todayUpiApprovedCount: number;
+          pendingPaymentRequestsCount: number;
+          pendingPaymentAmountRupees: number;
+          todayProfitRupees: number;
+          profitNote: string;
+          calendarDate: string;
+          windowStart: string;
+          windowEnd: string;
+        };
         currentTrending1: any | null;
         recentlyAddedContent: any[];
         recentPurchases: any[];
         recentUsers: any[];
-      }>('/admin/dashboard');
+      }>(`/admin/dashboard${qs}`);
+    },
+
+    async getTodayDetails(type: string, tzOffset?: number) {
+      const offset = tzOffset !== undefined ? tzOffset : new Date().getTimezoneOffset();
+      return request<any>(`/admin/today-details?type=${encodeURIComponent(type)}&tzOffset=${offset}`);
     },
 
     async listContent(filters: {

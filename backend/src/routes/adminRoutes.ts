@@ -16,10 +16,22 @@ adminRouter.use(requireAdmin);
 // ----------------------------------------------------------------------------
 // 1. DASHBOARD & STATS
 // ----------------------------------------------------------------------------
-adminRouter.get('/dashboard', async (_req, res, next) => {
+adminRouter.get('/dashboard', async (req, res, next) => {
   try {
-    const stats = await adminService.getDashboardStats();
+    const tzOffset = req.query.tzOffset ? parseInt(req.query.tzOffset as string, 10) : undefined;
+    const stats = await adminService.getDashboardStats(tzOffset);
     res.json(stats);
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.get('/today-details', async (req, res, next) => {
+  try {
+    const type = String(req.query.type || 'revenue');
+    const tzOffset = req.query.tzOffset ? parseInt(req.query.tzOffset as string, 10) : undefined;
+    const details = await adminService.getTodayDetails(type, tzOffset);
+    res.json({ success: true, ...details });
   } catch (err) {
     next(err);
   }

@@ -7,10 +7,8 @@ import {
   Save,
   Loader2,
   Shield,
-  HelpCircle,
-  QrCode
+  HelpCircle
 } from 'lucide-react';
-import { generateUpiQrDataUrl } from '../../utils/upiQr';
 
 interface AdminSettingsPageProps {
   onNavigateTab: (tab: string, param?: string) => void;
@@ -30,12 +28,6 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = () => {
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [allowGuestBrowsing, setAllowGuestBrowsing] = useState(true);
 
-  // UPI Payment Settings State
-  const [upiId, setUpiId] = useState('flopshow@upi');
-  const [upiEnabled, setUpiEnabled] = useState(true);
-  const [merchantName, setMerchantName] = useState('FLOPSHOW');
-  const [qrPreviewUrl, setQrPreviewUrl] = useState<string>('');
-
   const fetchSettings = async () => {
     try {
       setLoading(true);
@@ -48,9 +40,6 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = () => {
         if (res.settings.default_resolution) setDefaultResolution(res.settings.default_resolution);
         if (res.settings.maintenance_mode !== undefined) setMaintenanceMode(res.settings.maintenance_mode === 'true');
         if (res.settings.allow_guest_browsing !== undefined) setAllowGuestBrowsing(res.settings.allow_guest_browsing === 'true');
-        if (res.settings.payment_upi_id) setUpiId(res.settings.payment_upi_id);
-        if (res.settings.payment_upi_enabled !== undefined) setUpiEnabled(res.settings.payment_upi_enabled !== 'false');
-        if (res.settings.payment_upi_merchant_name) setMerchantName(res.settings.payment_upi_merchant_name);
         if (res.settings.app_theme && (res.settings.app_theme === 'netflix-red' || res.settings.app_theme === 'flopshow-gold')) {
           setTheme(res.settings.app_theme as any);
         }
@@ -66,16 +55,6 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = () => {
     fetchSettings();
   }, []);
 
-  useEffect(() => {
-    if (upiId && upiId.includes('@')) {
-      generateUpiQrDataUrl(upiId, 100, merchantName)
-        .then(url => setQrPreviewUrl(url))
-        .catch(() => setQrPreviewUrl(''));
-    } else {
-      setQrPreviewUrl('');
-    }
-  }, [upiId, merchantName]);
-
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -88,12 +67,9 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = () => {
         default_resolution: defaultResolution,
         maintenance_mode: String(maintenanceMode),
         allow_guest_browsing: String(allowGuestBrowsing),
-        app_theme: theme,
-        payment_upi_id: upiId.trim(),
-        payment_upi_enabled: String(upiEnabled),
-        payment_upi_merchant_name: merchantName.trim()
+        app_theme: theme
       });
-      showToast('Application & UPI payment settings saved successfully!', 'success');
+      showToast('Application settings saved successfully!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to save settings.', 'error');
     } finally {
@@ -351,176 +327,6 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = () => {
                 style={{ width: '18px', height: '18px', accentColor: 'var(--brand-gold, #F5C518)', cursor: 'pointer' }}
               />
             </label>
-          </div>
-        </div>
-
-        {/* 5. UPI Payment Settings */}
-        <div
-          style={{
-            backgroundColor: 'var(--bg-surface, #12121A)',
-            border: '1.5px solid rgba(245, 197, 24, 0.25)',
-            borderRadius: '16px',
-            padding: '28px',
-            marginBottom: '24px',
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.5)'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <QrCode size={20} color="var(--brand-gold, #F5C518)" />
-              </div>
-              <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
-                  Payment Settings / UPI Payment
-                </h2>
-                <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                  Configure receiver UPI ID for manual wallet recharges. The QR code is generated dynamically per recharge amount.
-                </span>
-              </div>
-            </div>
-
-            {/* Enable/Disable Toggle Pill */}
-            <label
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 14px',
-                borderRadius: '9999px',
-                backgroundColor: upiEnabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                border: `1px solid ${upiEnabled ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                cursor: 'pointer'
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={upiEnabled}
-                onChange={e => setUpiEnabled(e.target.checked)}
-                style={{ accentColor: '#10B981', cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: '12px', fontWeight: 700, color: upiEnabled ? '#10B981' : '#EF4444' }}>
-                {upiEnabled ? 'UPI Payments Enabled' : 'UPI Payments Disabled'}
-              </span>
-            </label>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', alignItems: 'start' }}>
-            {/* Form Inputs */}
-            <div>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '13px', fontWeight: 700, color: '#E0E0E0', display: 'block', marginBottom: '6px' }}>
-                  Receiver UPI ID <span style={{ color: '#EF4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  value={upiId}
-                  onChange={e => setUpiId(e.target.value)}
-                  placeholder="e.g. flopshow@upi or username@okhdfcbank"
-                  style={{
-                    width: '100%',
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    color: '#FFFFFF',
-                    fontSize: '14px',
-                    fontFamily: 'monospace',
-                    fontWeight: 600
-                  }}
-                  required
-                />
-                <span style={{ fontSize: '11px', color: '#9CA3AF', display: 'block', marginTop: '4px' }}>
-                  Money paid by users will go directly to this UPI ID. You can update this anytime.
-                </span>
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ fontSize: '13px', fontWeight: 700, color: '#E0E0E0', display: 'block', marginBottom: '6px' }}>
-                  Merchant / Business Name
-                </label>
-                <input
-                  type="text"
-                  value={merchantName}
-                  onChange={e => setMerchantName(e.target.value)}
-                  placeholder="e.g. FLOPSHOW"
-                  style={{
-                    width: '100%',
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    color: '#FFFFFF',
-                    fontSize: '14px'
-                  }}
-                />
-                <span style={{ fontSize: '11px', color: '#9CA3AF', display: 'block', marginTop: '4px' }}>
-                  Displayed inside UPI apps (GPay, PhonePe, Paytm, BHIM) when scanning QR.
-                </span>
-              </div>
-
-              <div
-                style={{
-                  padding: '12px 14px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(245, 197, 24, 0.08)',
-                  border: '1px solid rgba(245, 197, 24, 0.2)',
-                  fontSize: '12px',
-                  color: '#D1D5DB',
-                  lineHeight: 1.5
-                }}
-              >
-                <strong style={{ color: 'var(--brand-gold, #F5C518)' }}>Automatic Dynamic QR:</strong> When a user selects ₹100, ₹200, or ₹500, the system automatically builds the official UPI URI and encodes the exact amount into the QR. No static image upload is needed.
-              </div>
-            </div>
-
-            {/* Live QR Preview Box */}
-            <div
-              style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '14px',
-                padding: '20px',
-                textAlign: 'center'
-              }}
-            >
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '12px' }}>
-                Live QR Preview (Sample ₹100)
-              </span>
-
-              {qrPreviewUrl ? (
-                <div style={{ display: 'inline-block', padding: '10px', backgroundColor: '#FFFFFF', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)' }}>
-                  <img
-                    src={qrPreviewUrl}
-                    alt="Dynamic UPI QR Code Preview"
-                    style={{ width: '180px', height: '180px', display: 'block' }}
-                  />
-                </div>
-              ) : (
-                <div style={{ height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', fontSize: '13px' }}>
-                  Enter a valid UPI ID to generate preview
-                </div>
-              )}
-
-              <div style={{ marginTop: '12px' }}>
-                <div style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
-                  {upiId || 'No UPI ID configured'}
-                </div>
-                <span style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  Encodes: upi://pay?pa={upiId}&pn={encodeURIComponent(merchantName)}&am=100.00&cu=INR
-                </span>
-              </div>
-            </div>
           </div>
         </div>
 

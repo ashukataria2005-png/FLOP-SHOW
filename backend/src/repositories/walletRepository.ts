@@ -84,4 +84,24 @@ export const walletRepository = {
     );
     return rows as WalletTransactionRecord[];
   },
+
+  async isReferenceProcessed(referenceId: string, adapter?: DbAdapter): Promise<boolean> {
+    if (!referenceId) return false;
+    const db = adapter || getAdapter();
+    const { rows } = await db.query(
+      `SELECT 1 FROM wallet_transactions WHERE reference_id = ? LIMIT 1;`,
+      [referenceId]
+    );
+    return rows.length > 0;
+  },
+
+  async getTransactionByReference(referenceId: string, adapter?: DbAdapter): Promise<WalletTransactionRecord | null> {
+    if (!referenceId) return null;
+    const db = adapter || getAdapter();
+    const { rows } = await db.query(
+      `SELECT * FROM wallet_transactions WHERE reference_id = ? LIMIT 1;`,
+      [referenceId]
+    );
+    return rows[0] ? (rows[0] as WalletTransactionRecord) : null;
+  },
 };

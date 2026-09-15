@@ -21,6 +21,7 @@ import { AdminQuickAddPage } from './pages/admin/AdminQuickAddPage';
 import { AdminHeroPage } from './pages/admin/AdminHeroPage';
 import { AdminSpotlightPage } from './pages/admin/AdminSpotlightPage';
 import { AdminAdsPage } from './pages/admin/AdminAdsPage';
+import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage';
 import { PurchaseModal } from './components/purchase/PurchaseModal';
 import { RechargeModal } from './components/wallet/RechargeModal';
 import { AuthModal } from './components/auth/AuthModal';
@@ -62,6 +63,9 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   }
   if (cleanPath === '/admin/users') {
     return { tab: 'admin-users' };
+  }
+  if (cleanPath === '/admin/payments') {
+    return { tab: 'admin-payments' };
   }
   if (cleanPath === '/admin/transactions') {
     return { tab: 'admin-transactions' };
@@ -250,12 +254,13 @@ const AppContent: React.FC = () => {
             <AdminContentEditorPage contentId={adminParam} onNavigateTab={handleNavigate} />
           )}
           {currentTab === 'admin-users' && <AdminUsersPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-payments' && <AdminPaymentsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-transactions' && <AdminTransactionsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-genres' && <AdminGenresPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-design' && <AdminDesignPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings'].includes(currentTab) && (
+          {!['admin-dashboard', 'admin-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>

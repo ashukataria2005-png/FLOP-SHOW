@@ -1,9 +1,48 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, ShieldCheck, Clock } from 'lucide-react';
+import { api } from '../services/api';
+import {
+  Wallet,
+  Plus,
+  ArrowUpRight,
+  ArrowDownLeft,
+  ShieldCheck,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  QrCode
+} from 'lucide-react';
+
+interface UserPaymentRequest {
+  id: string;
+  amount: number;
+  upi_id_snapshot: string;
+  utr: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  admin_note: string | null;
+  submitted_at: string;
+  processed_at: string | null;
+}
 
 export const WalletPage: React.FC = () => {
-  const { walletBalance, transactions, openRechargeModal } = useApp();
+  const { walletBalance, transactions, openRechargeModal, isAuthenticated } = useApp();
+  const [rechargeRequests, setRechargeRequests] = useState<UserPaymentRequest[]>([]);
+
+  const fetchUserRequests = async () => {
+    if (!isAuthenticated) return;
+    try {
+      const res = await api.payments.getMyRequests();
+      if (res && res.requests) {
+        setRechargeRequests(res.requests);
+      }
+    } catch {
+      // Graceful fallback
+    }
+  };
+
+  useEffect(() => {
+    fetchUserRequests();
+  }, [isAuthenticated, walletBalance]);
 
   return (
     <div style={{ padding: '24px 20px', maxWidth: '840px', margin: '0 auto' }}>
@@ -48,7 +87,7 @@ export const WalletPage: React.FC = () => {
         />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--brand-gold)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--brand-gold, #F5C518)' }}>
             <Wallet size={20} />
             <span style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
               Available Balance
@@ -87,10 +126,151 @@ export const WalletPage: React.FC = () => {
         <div style={{ marginTop: '24px' }}>
           <button onClick={openRechargeModal} className="btn btn-primary btn-lg">
             <Plus size={18} />
-            <span>Add Funds / Recharge</span>
+            <span>Add Funds / Recharge via UPI</span>
           </button>
         </div>
       </div>
+
+      {/* UPI Recharge Requests Section (if user has any) */}
+      {rechargeRequests.length > 0 && (
+        <div style={{ marginBottom: '36px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <QrCode size={18} color="var(--brand-gold, #F5C518)" />
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                UPI Recharge Requests
+              </h2>
+            </div>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              {rechargeRequests.length} request{rechargeRequests.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              overflow: 'hidden'
+            }}
+          >
+            {rechargeRequests.map((req, idx) => (
+              <div
+                key={req.id}
+                style={{
+                  padding: '16px 20px',
+                  borderBottom: idx < rechargeRequests.length - 1 ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '12px'
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF' }}>
+                      ₹{(req.amount / 100).toFixed(0)}
+                    </span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>•</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      UTR: {req.utr}
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Clock size={12} />
+                    <span>
+                      Submitted: {new Date(req.submitted_at).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      })}
+                    </span>
+                    {req.processed_at && (
+                      <span>
+                        • {req.status === 'APPROVED' ? 'Approved' : 'Reviewed'}: {new Date(req.processed_at).toLocaleString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true
+                        })}
+                      </span>
+                    )}
+                  </div>
+
+                  {req.admin_note && (
+                    <div style={{ fontSize: '11px', color: req.status === 'REJECTED' ? '#F87171' : '#10B981', marginTop: '4px' }}>
+                      Admin Note: {req.admin_note}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  {req.status === 'PENDING' && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 10px',
+                        borderRadius: '9999px',
+                        backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                        color: 'var(--brand-gold, #F5C518)',
+                        fontSize: '11px',
+                        fontWeight: 800
+                      }}
+                    >
+                      <Clock size={12} />
+                      PENDING VERIFICATION
+                    </span>
+                  )}
+                  {req.status === 'APPROVED' && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 10px',
+                        borderRadius: '9999px',
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        color: '#10B981',
+                        fontSize: '11px',
+                        fontWeight: 800
+                      }}
+                    >
+                      <CheckCircle2 size={12} />
+                      APPROVED & CREDITED
+                    </span>
+                  )}
+                  {req.status === 'REJECTED' && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 10px',
+                        borderRadius: '9999px',
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        color: '#EF4444',
+                        fontSize: '11px',
+                        fontWeight: 800
+                      }}
+                    >
+                      <XCircle size={12} />
+                      DECLINED
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Transaction History Section */}
       <div>

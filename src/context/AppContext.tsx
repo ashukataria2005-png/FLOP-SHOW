@@ -43,6 +43,7 @@ interface AppContextType {
   walletBalance: number;
   transactions: WalletTransaction[];
   rechargeWallet: (amount: number) => Promise<void>;
+  syncTransactions: () => Promise<void>;
 
   // Purchases & Library
   purchases: PurchaseRecord[];
@@ -214,6 +215,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }).catch((err) => {
             console.warn('Failed to sync purchases from backend', err);
           });
+          // Sync wallet transactions from backend
+          syncTransactions();
         }
       }).catch(() => {
         // Token is invalid or expired — clean up completely so the user is
@@ -284,6 +287,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }));
       setPurchases(localPurchases);
     }).catch(() => { /* keep the empty reset */ });
+    // Sync wallet transactions
+    syncTransactions();
   };
 
   const signup = (userId: string, name: string, email: string, serverWalletBalance?: number) => {
@@ -318,45 +323,58 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Profile updated successfully', 'success');
   };
 
+  // Sync transaction audit ledger from backend
+  const syncTransactions = async () => {
+    try {
+      const res = await api.wallet.getTransactions(50);
+      if (res?.transactions && Array.isArray(res.transactions)) {
+        const mapped: WalletTransaction[] = res.transactions.map((t: any) => {
+          const isCredit = t.type === 'RECHARGE' || t.type === 'REFUND';
+          const amtRupees = typeof t.amount === 'number' ? t.amount / 100 : 0;
+          return {
+            id: t.id,
+            timestamp: t.created_at
+              ? new Date(t.created_at).toLocaleString('en-IN', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true,
+                })
+              : formatCurrentDate(),
+            title: t.description || (isCredit ? 'Wallet Recharge' : 'Content Purchase'),
+            amount: amtRupees,
+            type: isCredit ? 'credit' : 'debit',
+            contentId: t.type === 'PURCHASE' ? t.reference_id : undefined,
+            status: 'success',
+          };
+        });
+        setTransactions(mapped);
+      }
+    } catch {
+      // Keep existing transactions in state if network is unavailable
+    }
+  };
+
+
   // Wallet actions
   const rechargeWallet = async (amount: number) => {
     if (amount <= 0) return;
 
     try {
-      // Persist recharge to backend so the authoritative balance is updated in the DB.
-      // The returned wallet object contains the real new balance.
       const res = await api.wallet.recharge(amount);
       const serverBalance = res?.wallet?.balanceRupees ?? res?.wallet?.balance_rupees;
       const newBalance = typeof serverBalance === 'number' ? serverBalance : walletBalance + amount;
       setWalletBalance(newBalance);
-
-      const newTx: WalletTransaction = {
-        id: `tx-${Date.now()}`,
-        timestamp: formatCurrentDate(),
-        title: 'Wallet Recharge',
-        amount,
-        type: 'credit',
-        status: 'success'
-      };
-      setTransactions(prev => [newTx, ...prev]);
+      await syncTransactions();
       showToast(`Added ₹${amount} to wallet. Balance: ₹${newBalance}`, 'success');
     } catch (err: any) {
-      // Graceful fallback: update local balance so UX is not blocked if backend is temporarily unavailable
-      const newBalance = walletBalance + amount;
-      setWalletBalance(newBalance);
-      const newTx: WalletTransaction = {
-        id: `tx-${Date.now()}`,
-        timestamp: formatCurrentDate(),
-        title: 'Wallet Recharge',
-        amount,
-        type: 'credit',
-        status: 'success'
-      };
-      setTransactions(prev => [newTx, ...prev]);
-      showToast(`Added ₹${amount} to wallet. Balance: ₹${newBalance}`, 'success');
+      showToast(err.message || 'Recharge failed', 'error');
     }
     closeRechargeModal();
   };
+
 
   // Purchases & Library
   const isOwned = (contentId: string): boolean => {
@@ -391,6 +409,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (typeof result.remainingBalanceRupees === 'number') {
         setWalletBalance(result.remainingBalanceRupees);
       }
+      syncTransactions();
 
       // Format purchase entry
       const newPurchaseEntry: PurchaseRecord = {
@@ -742,6 +761,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         walletBalance,
         transactions,
         rechargeWallet,
+        syncTransactions,
         purchases,
         isOwned,
         buyContent,

@@ -287,10 +287,44 @@ VALUES
 ON CONFLICT (key) DO NOTHING;
 
 -- ==============================================================================
--- 15. MIGRATION TRACKING TABLE
+-- 15. UPI PAYMENT REQUESTS
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS upi_payment_requests (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  user_name TEXT,
+  user_email TEXT,
+  amount INTEGER NOT NULL CHECK(amount > 0),
+  upi_id_snapshot TEXT NOT NULL,
+  utr TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'APPROVED', 'REJECTED')),
+  admin_id TEXT,
+  admin_note TEXT,
+  submitted_at TEXT NOT NULL,
+  processed_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_upi_payment_status ON upi_payment_requests(status);
+CREATE INDEX IF NOT EXISTS idx_upi_payment_user ON upi_payment_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_upi_payment_utr ON upi_payment_requests(utr);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_upi_approved_utr ON upi_payment_requests(utr) WHERE status = 'APPROVED';
+
+INSERT INTO app_settings (key, value, updated_at)
+VALUES
+  ('payment_upi_id', 'flopshow@upi', NOW()::TEXT),
+  ('payment_upi_enabled', 'true', NOW()::TEXT),
+  ('payment_upi_merchant_name', 'FLOPSHOW', NOW()::TEXT)
+ON CONFLICT (key) DO NOTHING;
+
+-- ==============================================================================
+-- 16. MIGRATION TRACKING TABLE
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   applied_at TEXT NOT NULL
 );
+

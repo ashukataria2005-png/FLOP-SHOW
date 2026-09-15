@@ -39,6 +39,16 @@ export const walletService = {
     const db = getAdapter();
 
     return db.transaction(async txAdapter => {
+      // Idempotency: If this transaction reference has already been executed, do not credit twice
+      if (referenceId && (await walletRepository.isReferenceProcessed(referenceId, txAdapter))) {
+        const existingBalance = await walletRepository.getBalance(userId, txAdapter);
+        return {
+          balancePaise: existingBalance,
+          balanceRupees: existingBalance / 100,
+          formattedBalance: `₹${(existingBalance / 100).toFixed(0)}`,
+        };
+      }
+
       const currentBalance = await walletRepository.getBalance(userId, txAdapter);
       const newBalance = currentBalance + amountPaise;
 

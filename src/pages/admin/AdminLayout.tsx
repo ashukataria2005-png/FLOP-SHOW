@@ -17,7 +17,8 @@ import {
   ChevronRight,
   Crown,
   Megaphone,
-  Palette
+  Palette,
+  QrCode
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -235,6 +236,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     { id: 'admin-ads', label: 'Advertisement / Ads', icon: Megaphone },
     { id: 'admin-quick-add', label: 'Quick Add / Auto Import', icon: Sparkles },
     { id: 'admin-users', label: 'Users', icon: Users },
+    { id: 'admin-payments', label: 'UPI Payments', icon: QrCode },
     { id: 'admin-transactions', label: 'Transactions', icon: CreditCard },
     { id: 'admin-genres', label: 'Genres', icon: Tag },
     { id: 'admin-design', label: 'App Design', icon: Palette },

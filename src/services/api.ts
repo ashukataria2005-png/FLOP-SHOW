@@ -346,6 +346,79 @@ export const api = {
   },
 
   // --------------------------------------------------------------------------
+  // UPI PAYMENTS & UTR VERIFICATION
+  // --------------------------------------------------------------------------
+  payments: {
+    async getConfig() {
+      return request<{ upiId: string; upiEnabled: boolean; merchantName: string }>('/payments/config');
+    },
+
+    async submitRequest(amountRupees: number, utr: string, userName?: string, userEmail?: string) {
+      return request<{
+        success: boolean;
+        message: string;
+        payment: any;
+      }>('/payments/submit-request', {
+        method: 'POST',
+        body: JSON.stringify({ amount: amountRupees, utr, userName, userEmail })
+      });
+    },
+
+    async getMyRequests(limit = 50) {
+      return request<{ count: number; requests: any[] }>(`/payments/my-requests?limit=${limit}`);
+    },
+
+    async getAdminMetrics() {
+      return request<{
+        pendingCount: number;
+        pendingAmountPaise: number;
+        approvedCount: number;
+        approvedAmountPaise: number;
+        rejectedCount: number;
+        rejectedAmountPaise: number;
+      }>('/payments/admin/metrics');
+    },
+
+    async getAdminRequests(status = 'ALL', limit = 100) {
+      return request<{ count: number; requests: any[] }>(`/payments/admin/requests?status=${status}&limit=${limit}`);
+    },
+
+    async getAdminSettings() {
+      return request<{ upiId: string; upiEnabled: boolean; merchantName: string }>('/payments/admin/settings');
+    },
+
+    async updateAdminSettings(data: { upiId: string; enabled: boolean; merchantName?: string }) {
+      return request<{ success: boolean; message: string; config: any }>('/payments/admin/settings', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async approvePayment(id: string, adminNote?: string) {
+      return request<{
+        success: boolean;
+        payment: any;
+        newBalanceRupees: number;
+        message: string;
+      }>(`/payments/admin/requests/${id}/approve`, {
+        method: 'POST',
+        body: JSON.stringify({ adminNote })
+      });
+    },
+
+    async rejectPayment(id: string, adminNote?: string) {
+      return request<{
+        success: boolean;
+        message: string;
+        payment: any;
+      }>(`/payments/admin/requests/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ adminNote })
+      });
+    }
+  },
+
+  // --------------------------------------------------------------------------
   // USER LIBRARY
   // --------------------------------------------------------------------------
   library: {

@@ -28,8 +28,9 @@ walletRouter.get('/transactions', async (req: AuthenticatedRequest, res: Respons
   }
 });
 
+
 // POST /api/wallet/recharge
-// Simulated recharge structure for Phase 2; prepared for real payment gateway webhook integration
+// Direct recharge endpoint; uses atomic ledger transaction with reference tracking
 walletRouter.post('/recharge', async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { amount, referenceId } = req.body;
@@ -51,3 +52,4 @@ walletRouter.post('/recharge', async (req: AuthenticatedRequest, res: Response, 
     next(err);
   }
 });
+

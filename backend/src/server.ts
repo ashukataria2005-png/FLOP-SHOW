@@ -9,6 +9,7 @@ import { walletRouter } from './routes/walletRoutes.js';
 import { libraryRouter } from './routes/libraryRoutes.js';
 import { adminRouter } from './routes/adminRoutes.js';
 import { mediaRouter } from './routes/mediaRoutes.js';
+import { paymentRouter } from './routes/paymentRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
 import { config } from './config/env.js';
@@ -213,6 +214,7 @@ export function createServer(): Express {
   app.use('/api/library', libraryRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/media', mediaRouter);
+  app.use('/api/payments', paymentRouter);
 
   // Direct aliases for admin login
   app.post('/api/admin-login', handleAdminLogin);

@@ -103,184 +103,253 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     return !indianLanguages.includes(lang) && lang !== 'english' && lang !== '';
   });
 
+  // Collect all active catalog content rows in order
+  const contentRows: React.ReactNode[] = [];
+
+  if (inProgressItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="continue-watching"
+        categoryLabel="IN PROGRESS"
+        title="Continue Watching"
+        items={inProgressItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('library')}
+      />
+    );
+  }
+
+  if (trendingItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="trending"
+        categoryLabel="WHAT EVERYONE IS WATCHING"
+        title="Trending Right Now"
+        items={trendingItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (topRated.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="top-rated"
+        categoryLabel="HIGHEST RATED"
+        title="Top Rated Titles"
+        items={topRated}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (newReleases.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="new-releases"
+        categoryLabel="FRESH OFF THE LENS"
+        title="New & Recently Added"
+        items={newReleases}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (movieItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="popular-movies"
+        categoryLabel="BLOCKBUSTER FILMS"
+        title="Popular Movies"
+        items={movieItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (seriesItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="popular-series"
+        categoryLabel="BINGE-WORTHY"
+        title="Popular Series"
+        items={seriesItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (dramaItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-drama"
+        categoryLabel="GENRE"
+        title="Drama"
+        items={dramaItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (thrillerItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-thriller"
+        categoryLabel="GENRE"
+        title="Thriller"
+        items={thrillerItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (crimeItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-crime"
+        categoryLabel="GENRE"
+        title="Crime"
+        items={crimeItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (actionItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-action"
+        categoryLabel="GENRE"
+        title="Action"
+        items={actionItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (sciFiItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-scifi"
+        categoryLabel="GENRE"
+        title="Sci-Fi"
+        items={sciFiItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (mysteryItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-mystery"
+        categoryLabel="GENRE"
+        title="Mystery"
+        items={mysteryItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (comedyItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-comedy"
+        categoryLabel="GENRE"
+        title="Comedy"
+        items={comedyItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (indianItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="desi-indian"
+        categoryLabel="DESI STORIES"
+        title="Indian Cinema"
+        items={indianItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (intlItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="world-cinema"
+        categoryLabel="WORLD CINEMA"
+        title="International Movies & Series"
+        items={intlItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  // Interleave Spotlights with exact rule:
+  // - Spotlight #1 appears after the 3rd normal row (rowIndex === 2)
+  // - Every subsequent spotlight appears with two normal rows between consecutive spotlights
+  // (Spotlight #1 -> 2 rows -> Spotlight #2 -> 2 rows -> Spotlight #3 -> ...)
+  // - Any remaining spotlights placed naturally after available rows without losing them.
+  const interleavedSections: React.ReactNode[] = [];
+  let spotlightIndex = 0;
+
+  for (let rowIndex = 0; rowIndex < contentRows.length; rowIndex++) {
+    interleavedSections.push(contentRows[rowIndex]);
+
+    // Check if a spotlight should be inserted after this row
+    if (
+      spotlightIndex < spotlights.length &&
+      rowIndex === 2 + spotlightIndex * 2
+    ) {
+      const spot = spotlights[spotlightIndex];
+      interleavedSections.push(
+        <CinematicSpotlight
+          key={`cinematic-spotlight-${spot.id}-${spotlightIndex}`}
+          item={spot}
+          onViewDetails={onSelectItem}
+        />
+      );
+      spotlightIndex++;
+    }
+  }
+
+  // If there are more Spotlights than available row insertion points,
+  // place remaining Spotlights naturally after the available rows without losing them.
+  while (spotlightIndex < spotlights.length) {
+    const spot = spotlights[spotlightIndex];
+    interleavedSections.push(
+      <CinematicSpotlight
+        key={`cinematic-spotlight-overflow-${spot.id}-${spotlightIndex}`}
+        item={spot}
+        onViewDetails={onSelectItem}
+      />
+    );
+    spotlightIndex++;
+  }
+
   return (
     <div className="discover-page-container">
       {/* Featured Hero Banner */}
       {heroItem && <HeroBanner item={heroItem} onViewDetails={onSelectItem} />}
 
-      {/* Row: Continue Watching (only if user has progress) */}
-      {inProgressItems.length > 0 && (
-        <ContentSection
-          categoryLabel="IN PROGRESS"
-          title="Continue Watching"
-          items={inProgressItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('library')}
-        />
-      )}
-
-      {/* Row: Trending */}
-      {trendingItems.length > 0 && (
-        <ContentSection
-          categoryLabel="WHAT EVERYONE IS WATCHING"
-          title="Trending Right Now"
-          items={trendingItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Cinematic Spotlight 1: Placed naturally between Trending and Top Rated */}
-      {spotlights[0] && <CinematicSpotlight item={spotlights[0]} onViewDetails={onSelectItem} />}
-
-      {/* Row: Top Rated — sorted by real rating field */}
-      {topRated.length > 0 && (
-        <ContentSection
-          categoryLabel="HIGHEST RATED"
-          title="Top Rated Titles"
-          items={topRated}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Row: New Releases — 2024+ titles sorted by year */}
-      {newReleases.length > 0 && (
-        <ContentSection
-          categoryLabel="FRESH OFF THE LENS"
-          title="New & Recently Added"
-          items={newReleases}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Cinematic Spotlight 2: Placed naturally between New Releases and Popular Movies */}
-      {spotlights[1] && <CinematicSpotlight item={spotlights[1]} onViewDetails={onSelectItem} />}
-
-      {/* Row: Popular Movies */}
-      {movieItems.length > 0 && (
-        <ContentSection
-          categoryLabel="BLOCKBUSTER FILMS"
-          title="Popular Movies"
-          items={movieItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Row: Popular Series */}
-      {seriesItems.length > 0 && (
-        <ContentSection
-          categoryLabel="BINGE-WORTHY"
-          title="Popular Series"
-          items={seriesItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Cinematic Spotlight 3: Placed naturally between Popular Series and Genre rows */}
-      {spotlights[2] && <CinematicSpotlight item={spotlights[2]} onViewDetails={onSelectItem} />}
-
-      {/* Row: Drama — genre-based, real metadata only */}
-      {dramaItems.length > 0 && (
-        <ContentSection
-          categoryLabel="GENRE"
-          title="Drama"
-          items={dramaItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Row: Thriller */}
-      {thrillerItems.length > 0 && (
-        <ContentSection
-          categoryLabel="GENRE"
-          title="Thriller"
-          items={thrillerItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Row: Crime */}
-      {crimeItems.length > 0 && (
-        <ContentSection
-          categoryLabel="GENRE"
-          title="Crime"
-          items={crimeItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Row: Action */}
-      {actionItems.length > 0 && (
-        <ContentSection
-          categoryLabel="GENRE"
-          title="Action"
-          items={actionItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Row: Sci-Fi */}
-      {sciFiItems.length > 0 && (
-        <ContentSection
-          categoryLabel="GENRE"
-          title="Sci-Fi"
-          items={sciFiItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Row: Mystery */}
-      {mysteryItems.length > 0 && (
-        <ContentSection
-          categoryLabel="GENRE"
-          title="Mystery"
-          items={mysteryItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Row: Comedy */}
-      {comedyItems.length > 0 && (
-        <ContentSection
-          categoryLabel="GENRE"
-          title="Comedy"
-          items={comedyItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Row: Indian Cinema — Hindi, Telugu, Tamil etc. */}
-      {indianItems.length > 0 && (
-        <ContentSection
-          categoryLabel="DESI STORIES"
-          title="Indian Cinema"
-          items={indianItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
-
-      {/* Row: International / World Cinema — non-Indian, non-English languages */}
-      {intlItems.length > 0 && (
-        <ContentSection
-          categoryLabel="WORLD CINEMA"
-          title="International Movies & Series"
-          items={intlItems}
-          onSelect={onSelectItem}
-          onSeeAll={() => onNavigate('search')}
-        />
-      )}
+      {/* Dynamic Interleaved Rows and Unlimited Spotlights */}
+      {interleavedSections}
 
       {/* FLOPSHOW Brand Promo Card */}
       <BrandPromoCard />

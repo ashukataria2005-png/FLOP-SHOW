@@ -92,6 +92,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const [currentSpotlights, setCurrentSpotlights] = useState<ContentItem[]>([]);
   const [heroModalOpen, setHeroModalOpen] = useState(false);
   const [spotlightModalOpen, setSpotlightModalOpen] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState<ContentItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [targetSlotIndex, setTargetSlotIndex] = useState<number | null>(null);
   const [modalCatalog, setModalCatalog] = useState<ContentItem[]>([]);
@@ -159,6 +160,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
   const openSpotlightModalForSlot = async (slotIdx: number | null) => {
     setTargetSlotIndex(slotIdx);
+    setSelectedCandidate(null);
     setSearchQuery('');
     setSpotlightModalOpen(true);
     try {
@@ -181,11 +183,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       } else {
         newItems.push(item);
       }
-      // Deduplicate keeping first occurrence, maximum 3 slots
+      // Deduplicate keeping first occurrence, UNLIMITED dynamic spotlights
       const deduplicated: ContentItem[] = [];
       const seenIds = new Set<string>();
       for (const spot of newItems) {
-        if (!seenIds.has(spot.id) && deduplicated.length < 3) {
+        if (!seenIds.has(spot.id)) {
           seenIds.add(spot.id);
           deduplicated.push(spot);
         }
@@ -194,8 +196,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       if (res.success) {
         setCurrentSpotlights(res.spotlights || deduplicated);
         setLastSavedTimestamp(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        showToast(`Cinematic Spotlight #${slotIdx + 1} set to "${item.title}" and saved!`, 'success');
+        showToast(`Cinematic Spotlight #${slotIdx + 1} saved successfully as "${item.title}"!`, 'success');
         setSpotlightModalOpen(false);
+        setSelectedCandidate(null);
         refreshCatalog();
       }
     } catch (err: any) {
@@ -213,7 +216,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       if (res.success) {
         setCurrentSpotlights(res.spotlights || newItems);
         setLastSavedTimestamp(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        showToast(`Cinematic Spotlight #${slotIdx + 1} removed and saved.`, 'info');
+        showToast(`Spotlight #${slotIdx + 1} deleted and remaining slots reordered.`, 'info');
         refreshCatalog();
       }
     } catch (err: any) {
@@ -745,10 +748,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   border: currentSpotlights.length > 0 ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)'
                 }}
               >
-                {currentSpotlights.length} of 3 Slots Active
+                {currentSpotlights.length} Spotlight{currentSpotlights.length !== 1 ? 's' : ''} Configured
               </span>
               <span style={{ fontSize: '13px', color: '#9CA3AF' }}>
-                Promotional banners interleaved naturally between catalog content sections on Discover
+                Promotional banners interleaved naturally across Discover catalog (2 normal rows between consecutive spotlights)
               </span>
             </div>
           </div>
@@ -794,6 +797,26 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
             )}
 
             <button
+              onClick={() => openSpotlightModalForSlot(null)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                backgroundColor: 'var(--brand-gold, #F5C518)',
+                color: '#0E0E12',
+                border: 'none',
+                fontSize: '13px',
+                fontWeight: 800,
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={15} />
+              <span>Add More Spotlight</span>
+            </button>
+
+            <button
               onClick={() => onNavigateTab('admin-spotlight')}
               style={{
                 display: 'inline-flex',
@@ -815,18 +838,58 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
           </div>
         </div>
 
-        {/* Dedicated 3 Slots */}
+        {/* Dynamic Unlimited Spotlight List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {[0, 1, 2].map(slotIdx => {
-            const spot = currentSpotlights[slotIdx] || null;
-
-            return (
+          {currentSpotlights.length === 0 ? (
+            <div
+              style={{
+                borderRadius: '14px',
+                border: '1px dashed rgba(255, 255, 255, 0.15)',
+                backgroundColor: 'rgba(255, 255, 255, 0.01)',
+                padding: '32px 20px',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px'
+              }}
+            >
+              <Sparkles size={32} style={{ color: 'var(--brand-gold, #F5C518)', opacity: 0.6 }} />
+              <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
+                No Cinematic Spotlights Configured Yet
+              </h4>
+              <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0, maxWidth: '440px' }}>
+                Add unlimited promotional spotlight banners to interleave between content rows on the Discover home page.
+              </p>
+              <button
+                onClick={() => openSpotlightModalForSlot(null)}
+                style={{
+                  marginTop: '6px',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--brand-gold, #F5C518)',
+                  color: '#0E0E12',
+                  border: 'none',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Plus size={16} />
+                <span>Add First Spotlight</span>
+              </button>
+            </div>
+          ) : (
+            currentSpotlights.map((spot, slotIdx) => (
               <div
-                key={slotIdx}
+                key={spot.id}
                 style={{
                   borderRadius: '14px',
-                  border: spot ? '1px solid rgba(245, 197, 24, 0.3)' : '1px dashed rgba(255, 255, 255, 0.15)',
-                  backgroundColor: spot ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.01)',
+                  border: '1px solid rgba(245, 197, 24, 0.3)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
                   padding: '16px 20px',
                   display: 'flex',
                   alignItems: 'center',
@@ -835,195 +898,168 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   flexWrap: 'wrap'
                 }}
               >
-                {/* Slot Info / Item */}
-                {spot ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: '280px', flex: 1 }}>
-                    <span
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '8px',
-                        backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                        border: '1px solid var(--brand-gold, #F5C518)',
-                        color: 'var(--brand-gold, #F5C518)',
-                        fontWeight: 900,
-                        fontSize: '12px',
-                        letterSpacing: '0.04em',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      SLOT #{slotIdx + 1}
-                    </span>
+                {/* Spotlight Info */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: '280px', flex: 1 }}>
+                  <span
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                      border: '1px solid var(--brand-gold, #F5C518)',
+                      color: 'var(--brand-gold, #F5C518)',
+                      fontWeight: 900,
+                      fontSize: '12px',
+                      letterSpacing: '0.04em',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    SPOTLIGHT #{slotIdx + 1}
+                  </span>
 
-                    <img
-                      src={spot.posterUrl || spot.backdropUrl}
-                      alt={spot.title}
-                      style={{ width: '44px', height: '62px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
-                    />
+                  <img
+                    src={spot.posterUrl || spot.backdropUrl}
+                    alt={spot.title}
+                    style={{ width: '44px', height: '62px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
+                  />
 
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
-                          {spot.title}
-                        </h4>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: 800,
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            backgroundColor: spot.type === 'series' ? 'rgba(96, 165, 250, 0.2)' : 'rgba(245, 197, 24, 0.2)',
-                            color: spot.type === 'series' ? '#60A5FA' : '#F5C518',
-                            border: spot.type === 'series' ? '1px solid rgba(96, 165, 250, 0.3)' : '1px solid rgba(245, 197, 24, 0.3)'
-                          }}
-                        >
-                          {spot.type.toUpperCase()}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                            color: '#34D399',
-                            border: '1px solid rgba(16, 185, 129, 0.3)'
-                          }}
-                        >
-                          Saved & Active ✓
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '3px 0 0' }}>
-                        {spot.releaseYear} • {spot.genres?.slice(0, 2).join(', ')}
-                        {spot.tagline ? ` • Slogan: "${spot.tagline}"` : ''}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '280px', flex: 1 }}>
-                    <span
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '8px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
-                        color: '#9CA3AF',
-                        fontWeight: 700,
-                        fontSize: '12px',
-                        letterSpacing: '0.04em',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      SLOT #{slotIdx + 1}
-                    </span>
-                    <div>
-                      <h4 style={{ fontSize: '15px', fontWeight: 600, color: '#9CA3AF', margin: 0 }}>
-                        Empty — No Movie or Series Assigned
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
+                        {spot.title}
                       </h4>
-                      <p style={{ fontSize: '12px', color: '#6B7280', margin: '2px 0 0' }}>
-                        Click &quot;Add Movie/Series&quot; to assign a title from the catalog to this slot.
-                      </p>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: spot.type === 'series' ? 'rgba(96, 165, 250, 0.2)' : 'rgba(245, 197, 24, 0.2)',
+                          color: spot.type === 'series' ? '#60A5FA' : '#F5C518',
+                          border: spot.type === 'series' ? '1px solid rgba(96, 165, 250, 0.3)' : '1px solid rgba(245, 197, 24, 0.3)'
+                        }}
+                      >
+                        {spot.type.toUpperCase()}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                          color: '#34D399',
+                          border: '1px solid rgba(16, 185, 129, 0.3)'
+                        }}
+                      >
+                        Saved & Active ✓
+                      </span>
                     </div>
+                    <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '3px 0 0' }}>
+                      {spot.releaseYear} • {spot.genres?.slice(0, 2).join(', ')}
+                      {spot.tagline ? ` • Slogan: "${spot.tagline}"` : ''}
+                    </p>
                   </div>
-                )}
+                </div>
 
                 {/* Slot Action Controls */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  {spot ? (
-                    <>
-                      <button
-                        onClick={() => handleMoveSpotlight(slotIdx, 'up')}
-                        disabled={slotIdx === 0}
-                        title="Move Up"
-                        style={{
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          color: slotIdx === 0 ? '#4B5563' : '#E5E7EB',
-                          cursor: slotIdx === 0 ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        <ChevronUp size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleMoveSpotlight(slotIdx, 'down')}
-                        disabled={slotIdx >= currentSpotlights.length - 1}
-                        title="Move Down"
-                        style={{
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          color: slotIdx >= currentSpotlights.length - 1 ? '#4B5563' : '#E5E7EB',
-                          cursor: slotIdx >= currentSpotlights.length - 1 ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        <ChevronDown size={14} />
-                      </button>
-                      <button
-                        onClick={() => openSpotlightModalForSlot(slotIdx)}
-                        style={{
-                          padding: '7px 14px',
-                          borderRadius: '6px',
-                          backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                          border: '1px solid var(--brand-gold, #F5C518)',
-                          color: 'var(--brand-gold, #F5C518)',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Edit3 size={13} />
-                        <span>Change</span>
-                      </button>
-                      <button
-                        onClick={() => handleClearSlotSpotlight(slotIdx)}
-                        style={{
-                          padding: '7px 12px',
-                          borderRadius: '6px',
-                          backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                          color: '#F87171',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Trash2 size={13} />
-                        <span>Clear</span>
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => openSpotlightModalForSlot(slotIdx)}
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: '6px',
-                        backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                        border: '1px solid var(--brand-gold, #F5C518)',
-                        color: 'var(--brand-gold, #F5C518)',
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <Plus size={15} />
-                      <span>Add Movie/Series</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleMoveSpotlight(slotIdx, 'up')}
+                    disabled={slotIdx === 0}
+                    title="Move Up"
+                    style={{
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      color: slotIdx === 0 ? '#4B5563' : '#E5E7EB',
+                      cursor: slotIdx === 0 ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    <ChevronUp size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleMoveSpotlight(slotIdx, 'down')}
+                    disabled={slotIdx >= currentSpotlights.length - 1}
+                    title="Move Down"
+                    style={{
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      color: slotIdx >= currentSpotlights.length - 1 ? '#4B5563' : '#E5E7EB',
+                      cursor: slotIdx >= currentSpotlights.length - 1 ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+                  <button
+                    onClick={() => openSpotlightModalForSlot(slotIdx)}
+                    style={{
+                      padding: '7px 14px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                      border: '1px solid var(--brand-gold, #F5C518)',
+                      color: 'var(--brand-gold, #F5C518)',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Edit3 size={13} />
+                    <span>Change Movie/Series</span>
+                  </button>
+                  <button
+                    onClick={() => handleClearSlotSpotlight(slotIdx)}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: '#F87171',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Trash2 size={13} />
+                    <span>Delete Spotlight</span>
+                  </button>
                 </div>
               </div>
-            );
-          })}
+            ))
+          )}
+
+          {/* Bottom Add Button */}
+          {currentSpotlights.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '4px' }}>
+              <button
+                onClick={() => openSpotlightModalForSlot(null)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 22px',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(245, 197, 24, 0.12)',
+                  border: '1.5px dashed var(--brand-gold, #F5C518)',
+                  color: 'var(--brand-gold, #F5C518)',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                <Plus size={16} />
+                <span>+ Add More Spotlight (Spotlight #{currentSpotlights.length + 1})</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1319,8 +1355,121 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               </div>
             </div>
 
-            {/* Content List */}
-            <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Content List / Candidate Preview */}
+            <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* If candidate selected for Spotlight, show clear preview & explicit SAVE button */}
+              {selectedCandidate && !heroModalOpen && (
+                <div
+                  style={{
+                    padding: '20px',
+                    borderRadius: '12px',
+                    backgroundColor: 'rgba(245, 197, 24, 0.08)',
+                    border: '1.5px solid var(--brand-gold, #F5C518)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: 'rgba(245, 197, 24, 0.2)',
+                        color: 'var(--brand-gold, #F5C518)',
+                        fontWeight: 900,
+                        fontSize: '12px',
+                        letterSpacing: '0.04em'
+                      }}
+                    >
+                      SELECTED FOR SPOTLIGHT #{(targetSlotIndex !== null ? targetSlotIndex : currentSpotlights.length) + 1}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                      Pending explicit confirmation — click Save below
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <img
+                      src={selectedCandidate.posterUrl || selectedCandidate.backdropUrl}
+                      alt={selectedCandidate.title}
+                      style={{ width: '60px', height: '88px', objectFit: 'cover', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' }}
+                    />
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <h4 style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
+                          {selectedCandidate.title}
+                        </h4>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: selectedCandidate.type === 'series' ? 'rgba(96, 165, 250, 0.2)' : 'rgba(245, 197, 24, 0.2)',
+                            color: selectedCandidate.type === 'series' ? '#60A5FA' : '#F5C518',
+                            border: selectedCandidate.type === 'series' ? '1px solid rgba(96, 165, 250, 0.3)' : '1px solid rgba(245, 197, 24, 0.3)'
+                          }}
+                        >
+                          {selectedCandidate.type.toUpperCase()}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0' }}>
+                        {selectedCandidate.releaseYear} • {selectedCandidate.genres?.join(', ')}
+                      </p>
+                      {selectedCandidate.tagline && (
+                        <p style={{ fontSize: '12px', color: 'var(--brand-gold, #F5C518)', margin: '4px 0 0', fontStyle: 'italic' }}>
+                          &ldquo;{selectedCandidate.tagline}&rdquo;
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '6px' }}>
+                    <button
+                      onClick={() => handleSetSlotSpotlight(targetSlotIndex !== null ? targetSlotIndex : currentSpotlights.length, selectedCandidate)}
+                      disabled={spotlightSaving}
+                      style={{
+                        flex: 1,
+                        padding: '12px 20px',
+                        borderRadius: '8px',
+                        backgroundColor: 'var(--brand-gold, #F5C518)',
+                        color: '#0E0E12',
+                        border: 'none',
+                        fontSize: '14px',
+                        fontWeight: 900,
+                        letterSpacing: '0.04em',
+                        cursor: spotlightSaving ? 'wait' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      {spotlightSaving ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}
+                      <span>
+                        {targetSlotIndex !== null && targetSlotIndex < currentSpotlights.length ? 'SAVE CHANGES' : 'SAVE SPOTLIGHT'}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedCandidate(null)}
+                      style={{
+                        padding: '12px 18px',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        color: '#E5E7EB',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Choose Different Title
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {modalLoading ? (
                 <div style={{ padding: '36px', textAlign: 'center', color: '#9CA3AF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                   <Loader2 className="animate-spin" size={20} style={{ color: 'var(--brand-gold, #F5C518)' }} />
@@ -1357,6 +1506,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   const existingSpotlightSlot = currentSpotlights.findIndex(s => s.id === item.id);
                   const isAlreadySpotlight = existingSpotlightSlot !== -1;
                   const isTrending1 = stats?.currentTrending1?.id === item.id;
+                  const isCandidate = selectedCandidate?.id === item.id;
 
                   return (
                     <div
@@ -1367,8 +1517,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                         justifyContent: 'space-between',
                         padding: '10px 14px',
                         borderRadius: '10px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.06)',
+                        backgroundColor: isCandidate ? 'rgba(245, 197, 24, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                        border: isCandidate ? '1px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.06)',
                         gap: '12px'
                       }}
                     >
@@ -1424,24 +1574,34 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleSetSlotSpotlight(targetSlotIndex !== null ? targetSlotIndex : currentSpotlights.length, item)}
-                          disabled={isAlreadySpotlight}
+                          onClick={() => setSelectedCandidate(item)}
+                          disabled={isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot}
                           style={{
                             padding: '8px 14px',
                             borderRadius: '6px',
-                            backgroundColor: isAlreadySpotlight ? 'rgba(255, 255, 255, 0.05)' : 'rgba(245, 197, 24, 0.2)',
-                            border: isAlreadySpotlight ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid var(--brand-gold, #F5C518)',
-                            color: isAlreadySpotlight ? '#6B7280' : 'var(--brand-gold, #F5C518)',
+                            backgroundColor: isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot
+                              ? 'rgba(255, 255, 255, 0.05)'
+                              : isCandidate
+                              ? 'var(--brand-gold, #F5C518)'
+                              : 'rgba(245, 197, 24, 0.2)',
+                            border: isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot
+                              ? '1px solid rgba(255, 255, 255, 0.1)'
+                              : '1px solid var(--brand-gold, #F5C518)',
+                            color: isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot
+                              ? '#6B7280'
+                              : isCandidate
+                              ? '#0E0E12'
+                              : 'var(--brand-gold, #F5C518)',
                             fontSize: '12px',
                             fontWeight: 700,
-                            cursor: isAlreadySpotlight ? 'not-allowed' : 'pointer'
+                            cursor: isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot ? 'not-allowed' : 'pointer'
                           }}
                         >
-                          {isAlreadySpotlight
-                            ? `In Slot #${existingSpotlightSlot + 1}`
-                            : targetSlotIndex !== null
-                            ? `Select for Slot #${targetSlotIndex + 1}`
-                            : '+ Add to Spotlight'}
+                          {isAlreadySpotlight && targetSlotIndex !== existingSpotlightSlot
+                            ? `In Spotlight #${existingSpotlightSlot + 1}`
+                            : isCandidate
+                            ? '✓ Candidate Selected'
+                            : 'Select Title'}
                         </button>
                       )}
                     </div>

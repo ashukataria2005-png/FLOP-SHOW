@@ -131,7 +131,7 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
       )}
 
       {/* Cinematic Spotlight 1: Placed naturally between Trending and Top Rated */}
-      {spotlights[0] && <CinematicSpotlight item={spotlights[0]} />}
+      {spotlights[0] && <CinematicSpotlight item={spotlights[0]} onViewDetails={onSelectItem} />}
 
       {/* Row: Top Rated — sorted by real rating field */}
       {topRated.length > 0 && (
@@ -156,7 +156,7 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
       )}
 
       {/* Cinematic Spotlight 2: Placed naturally between New Releases and Popular Movies */}
-      {spotlights[1] && <CinematicSpotlight item={spotlights[1]} />}
+      {spotlights[1] && <CinematicSpotlight item={spotlights[1]} onViewDetails={onSelectItem} />}
 
       {/* Row: Popular Movies */}
       {movieItems.length > 0 && (
@@ -181,7 +181,7 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
       )}
 
       {/* Cinematic Spotlight 3: Placed naturally between Popular Series and Genre rows */}
-      {spotlights[2] && <CinematicSpotlight item={spotlights[2]} />}
+      {spotlights[2] && <CinematicSpotlight item={spotlights[2]} onViewDetails={onSelectItem} />}
 
       {/* Row: Drama — genre-based, real metadata only */}
       {dramaItems.length > 0 && (

@@ -6,7 +6,7 @@ interface CinematicSpotlightProps {
   onViewDetails?: (item: ContentItem) => void;
 }
 
-export const CinematicSpotlight: React.FC<CinematicSpotlightProps> = ({ item }) => {
+export const CinematicSpotlight: React.FC<CinematicSpotlightProps> = ({ item, onViewDetails }) => {
   if (!item) return null;
 
   const backdropSrc = item.backdropUrl || item.posterUrl;
@@ -25,10 +25,20 @@ export const CinematicSpotlight: React.FC<CinematicSpotlightProps> = ({ item }) 
     slogan = `A premier ${item.type === 'series' ? 'series' : 'film'} in ${item.genres.slice(0, 2).join(' & ')}`;
   }
 
+  const handleClick = () => {
+    if (onViewDetails) {
+      onViewDetails(item);
+    }
+  };
+
   return (
     <section
       aria-label={`Cinematic Spotlight: ${item.title}`}
       className="cinematic-spotlight-container"
+      onClick={handleClick}
+      role={onViewDetails ? 'button' : undefined}
+      tabIndex={onViewDetails ? 0 : undefined}
+      onKeyDown={onViewDetails ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } } : undefined}
       style={{
         position: 'relative',
         width: '100%',
@@ -43,7 +53,19 @@ export const CinematicSpotlight: React.FC<CinematicSpotlightProps> = ({ item }) 
         padding: 'clamp(28px, 5vw, 52px)',
         boxSizing: 'border-box',
         border: '1px solid rgba(255, 255, 255, 0.08)',
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), inset 0 0 100px rgba(0, 0, 0, 0.4)'
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), inset 0 0 100px rgba(0, 0, 0, 0.4)',
+        cursor: onViewDetails ? 'pointer' : 'default',
+        transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+      }}
+      onMouseEnter={(e) => {
+        if (onViewDetails) {
+          e.currentTarget.style.transform = 'scale(1.008)';
+          e.currentTarget.style.boxShadow = '0 24px 72px rgba(0, 0, 0, 0.9), inset 0 0 100px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(245, 197, 24, 0.25)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = '0 20px 60px rgba(0, 0, 0, 0.8), inset 0 0 100px rgba(0, 0, 0, 0.4)';
       }}
     >
       {/* Title-specific Artwork Backdrop */}

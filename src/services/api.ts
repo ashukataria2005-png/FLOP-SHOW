@@ -149,7 +149,8 @@ export function adaptDbContentToFrontend(item: any): ContentItem {
     videoUrl: item.video_url || item.videoUrl ? resolveMediaUrl(item.video_url || item.videoUrl, API_BASE_URL) : undefined,
     trendingPosition: item.trending_position !== null && item.trending_position !== undefined ? Number(item.trending_position) : (item.trendingPosition !== undefined ? Number(item.trendingPosition) : undefined),
     displayPriority: item.display_priority !== null && item.display_priority !== undefined ? Number(item.display_priority) : (item.displayPriority !== undefined ? Number(item.displayPriority) : undefined),
-    seasons: seasons.length > 0 ? seasons : undefined
+    seasons: seasons.length > 0 ? seasons : undefined,
+    status: (item.status || 'PUBLISHED') as 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED'
   };
 }
 

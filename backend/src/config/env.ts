@@ -13,7 +13,10 @@ const nodeEnv = process.env.NODE_ENV || 'development';
 const isProd = nodeEnv === 'production';
 
 // Parse allowed CORS origins from FRONTEND_URL, CLIENT_ORIGIN, ALLOWED_ORIGINS, CORS_ORIGIN
-const defaultOrigins = ['https://flop-show.netlify.app'];
+const defaultOrigins = [
+  'https://flop-show-4a14.onrender.com',
+  'https://flop-show.netlify.app'
+];
 const envOriginStrings = [
   process.env.FRONTEND_URL,
   process.env.CLIENT_ORIGIN,

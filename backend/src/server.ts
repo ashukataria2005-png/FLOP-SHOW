@@ -36,6 +36,11 @@ export function createServer(): Express {
         return callback(null, true);
       }
 
+      // Allow production Render frontend and previews (*.onrender.com)
+      if (/^https:\/\/([a-zA-Z0-9_-]+\.)?onrender\.com$/.test(cleanOrigin)) {
+        return callback(null, true);
+      }
+
       // Always allow local development origins (localhost / 127.0.0.1 on any port)
       if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
         return callback(null, true);

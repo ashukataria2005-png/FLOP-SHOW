@@ -68,8 +68,8 @@ export const AuthModal: React.FC = () => {
         }
       }
 
-      // Allow browser submission lifecycle to settle before modal closes
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Allow browser submission lifecycle to settle before modal closes (standard 300ms delay)
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Pass real backend userId so the frontend never generates a fake timestamp ID
       login(data.user.id, data.user.name, data.user.email, data.user.role, data.wallet?.balanceRupees ?? 0);
@@ -83,6 +83,7 @@ export const AuthModal: React.FC = () => {
   // ── Signup Step 1: Account Details → register on backend ──────────────────
   const handleSignupDetails = async (e: React.FormEvent) => {
     e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
     setError(null);
     if (!name.trim()) { setError('Please enter your full name.'); return; }
     if (!signupEmail.trim() || !signupEmail.includes('@')) { setError('Please enter a valid email address.'); return; }
@@ -90,6 +91,17 @@ export const AuthModal: React.FC = () => {
     setIsSubmitting(true);
     try {
       const data = await api.auth.register(name.trim(), signupEmail.trim(), signupPassword.trim());
+
+      // Store in browser credential manager upon successful account registration
+      if (typeof window !== 'undefined' && 'PasswordCredential' in window && (navigator as any).credentials?.store) {
+        try {
+          const cred = new (window as any).PasswordCredential(form);
+          await (navigator as any).credentials.store(cred);
+        } catch {
+          // Gracefully ignore
+        }
+      }
+
       setPendingUserId(data.user.id);
       setPendingName(data.user.name);
       setPendingEmail(data.user.email);
@@ -289,7 +301,7 @@ export const AuthModal: React.FC = () => {
               <label htmlFor="signup-password" style={labelStyle}>Password</label>
               <input
                 id="signup-password"
-                name="new-password"
+                name="password"
                 type="password"
                 placeholder="At least 6 characters"
                 value={signupPassword}

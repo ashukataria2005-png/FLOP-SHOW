@@ -74,12 +74,15 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     .sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
   // ── Genre rows — using ACTUAL genre metadata stored in DB ────────────────────
-  const dramaItems    = byGenre(activeCatalog, 'Drama');
+  const actionItems   = byGenre(activeCatalog, 'Action');
+  const comedyItems   = byGenre(activeCatalog, 'Comedy');
   const thrillerItems = byGenre(activeCatalog, 'Thriller');
   const crimeItems    = byGenre(activeCatalog, 'Crime');
-  const actionItems   = byGenre(activeCatalog, 'Action');
+  const dramaItems    = byGenre(activeCatalog, 'Drama');
   const sciFiItems    = byGenre(activeCatalog, 'Sci-Fi', 'Science Fiction', 'Sci Fi');
-  const comedyItems   = byGenre(activeCatalog, 'Comedy');
+  const romanceItems  = byGenre(activeCatalog, 'Romance');
+  const horrorItems   = byGenre(activeCatalog, 'Horror');
+  const fantasyItems  = byGenre(activeCatalog, 'Fantasy', 'Adventure');
   const mysteryItems  = byGenre(activeCatalog, 'Mystery');
 
   // ── By content type ─────────────────────────────────────────────────────────
@@ -200,15 +203,15 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     );
   }
 
-  if (dramaItems.length > 0) {
+  if (actionItems.length > 0) {
     contentRows.push(
       <ContentSection
-        key="genre-drama"
+        key="genre-action"
         categoryLabel="GENRE"
-        title="Drama"
-        items={dramaItems}
+        title="Action & Adrenaline"
+        items={actionItems}
         onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search')}
+        onSeeAll={() => onNavigate('search', 'Action')}
       />
     );
   }
@@ -218,10 +221,10 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
       <ContentSection
         key="genre-thriller"
         categoryLabel="GENRE"
-        title="Thriller"
+        title="Gripping Thrillers"
         items={thrillerItems}
         onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search')}
+        onSeeAll={() => onNavigate('search', 'Thriller')}
       />
     );
   }
@@ -231,49 +234,10 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
       <ContentSection
         key="genre-crime"
         categoryLabel="GENRE"
-        title="Crime"
+        title="Crime & Underworld"
         items={crimeItems}
         onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search')}
-      />
-    );
-  }
-
-  if (actionItems.length > 0) {
-    contentRows.push(
-      <ContentSection
-        key="genre-action"
-        categoryLabel="GENRE"
-        title="Action"
-        items={actionItems}
-        onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search')}
-      />
-    );
-  }
-
-  if (sciFiItems.length > 0) {
-    contentRows.push(
-      <ContentSection
-        key="genre-scifi"
-        categoryLabel="GENRE"
-        title="Sci-Fi"
-        items={sciFiItems}
-        onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search')}
-      />
-    );
-  }
-
-  if (mysteryItems.length > 0) {
-    contentRows.push(
-      <ContentSection
-        key="genre-mystery"
-        categoryLabel="GENRE"
-        title="Mystery"
-        items={mysteryItems}
-        onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search')}
+        onSeeAll={() => onNavigate('search', 'Crime')}
       />
     );
   }
@@ -283,10 +247,88 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
       <ContentSection
         key="genre-comedy"
         categoryLabel="GENRE"
-        title="Comedy"
+        title="Comedy & Laughs"
         items={comedyItems}
         onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search')}
+        onSeeAll={() => onNavigate('search', 'Comedy')}
+      />
+    );
+  }
+
+  if (dramaItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-drama"
+        categoryLabel="GENRE"
+        title="Drama"
+        items={dramaItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Drama')}
+      />
+    );
+  }
+
+  if (romanceItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-romance"
+        categoryLabel="GENRE"
+        title="Romance & Heartfelt"
+        items={romanceItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Romance')}
+      />
+    );
+  }
+
+  if (sciFiItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-scifi"
+        categoryLabel="GENRE"
+        title="Sci-Fi & Future Worlds"
+        items={sciFiItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Sci-Fi')}
+      />
+    );
+  }
+
+  if (mysteryItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-mystery"
+        categoryLabel="GENRE"
+        title="Mystery & Suspense"
+        items={mysteryItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Mystery')}
+      />
+    );
+  }
+
+  if (horrorItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-horror"
+        categoryLabel="GENRE"
+        title="Horror & Supernatual"
+        items={horrorItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Horror')}
+      />
+    );
+  }
+
+  if (fantasyItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-fantasy"
+        categoryLabel="GENRE"
+        title="Fantasy & Adventure"
+        items={fantasyItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Fantasy')}
       />
     );
   }

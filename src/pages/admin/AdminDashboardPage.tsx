@@ -13,7 +13,6 @@ import {
   Wallet,
   Sliders,
   CreditCard,
-  Edit3,
   Crown,
   X,
   Search,
@@ -192,6 +191,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
   // Quick Action navigation cards
   const quickNavItems = [
+    {
+      label: 'Trending #1 Showcase',
+      desc: stats.currentTrending1
+        ? `#1: ${stats.currentTrending1.title} (${stats.currentTrending1.type}) • Manage in Catalog`
+        : 'Catalog Trending #1 showcase title',
+      action: () => onNavigateTab('admin-content'),
+      icon: TrendingUp,
+      color: '#F5C518'
+    },
     {
       label: 'Add Movie',
       desc: 'Publish a single cinematic film',
@@ -382,45 +390,124 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
           </div>
         </div>
 
-        {/* 6 Clickable Today Cards (Milestone 4) */}
+        {/* Clickable Today Cards: Combined Financials + Metrics */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
             gap: '16px'
           }}
         >
-          {/* Card 1: Today's Revenue */}
+          {/* Card 1: Today's Financials (Combined Gross Intake / Revenue + Net Margin / Profit) */}
           <div
-            onClick={() => openMetricModal('revenue')}
             style={{
               backgroundColor: 'var(--bg-surface, #12121A)',
               borderRadius: '16px',
               border: '1.5px solid rgba(245, 197, 24, 0.35)',
-              padding: '22px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
+              padding: '20px 22px',
               position: 'relative',
-              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+              gridColumn: 'span 2'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Today's Revenue
-              </span>
-              <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(245, 197, 24, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-gold, #F5C518)' }}>
-                <DollarSign size={18} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(245, 197, 24, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-gold, #F5C518)' }}>
+                  <DollarSign size={18} />
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block' }}>
+                    Today's Financial Overview
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#9CA3AF' }}>Gross Intake &amp; Net Margin</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={() => openMetricModal('revenue')}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(245, 197, 24, 0.12)',
+                    border: '1px solid rgba(245, 197, 24, 0.3)',
+                    color: 'var(--brand-gold, #F5C518)',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span>Revenue Details</span>
+                  <ChevronRight size={12} />
+                </button>
+                <button
+                  onClick={() => openMetricModal('profit')}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    color: '#34D399',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span>Profit Audit</span>
+                  <ChevronRight size={12} />
+                </button>
               </div>
             </div>
-            <div style={{ fontSize: '30px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '6px' }}>
-              ₹{today.todayRevenueRupees}
-            </div>
-            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
-              ₹{today.todayPurchasesRevenueRupees} purchases + ₹{today.todayUpiRevenueRupees} UPI
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
-              <span>Inspect today's sales</span>
-              <ChevronRight size={13} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              {/* Gross Intake / Revenue */}
+              <div
+                onClick={() => openMetricModal('revenue')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  transition: 'background 0.2s ease'
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '4px' }}>
+                  Today's Revenue / Gross Intake
+                </div>
+                <div style={{ fontSize: '28px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
+                  ₹{today.todayRevenueRupees}
+                </div>
+                <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                  ₹{today.todayPurchasesRevenueRupees} content sales + ₹{today.todayUpiRevenueRupees} UPI recharges
+                </div>
+              </div>
+
+              {/* Net Margin / Profit */}
+              <div
+                onClick={() => openMetricModal('profit')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  transition: 'background 0.2s ease'
+                }}
+              >
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '4px' }}>
+                  Today's Profit / Net Margin
+                </div>
+                <div style={{ fontSize: '28px', fontWeight: 900, color: '#34D399', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
+                  ₹{today.todayProfitRupees}
+                </div>
+                <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                  Gross 100% margin (Zero server hosting deduction)
+                </div>
+              </div>
             </div>
           </div>
 
@@ -523,40 +610,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
             </div>
           </div>
 
-          {/* Card 5: Today's Profit */}
-          <div
-            onClick={() => openMetricModal('profit')}
-            style={{
-              backgroundColor: 'var(--bg-surface, #12121A)',
-              borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              padding: '22px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              position: 'relative'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Today's Profit
-              </span>
-              <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(245, 197, 24, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-gold, #F5C518)' }}>
-                <TrendingUp size={18} />
-              </div>
-            </div>
-            <div style={{ fontSize: '30px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '6px' }}>
-              ₹{today.todayProfitRupees}
-            </div>
-            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
-              Gross 100% (Hosting costs unconfigured)
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
-              <span>Audit calculation</span>
-              <ChevronRight size={13} />
-            </div>
-          </div>
-
-          {/* Card 6: Pending Payment Requests */}
+          {/* Card 5: Pending Payment Requests */}
           <div
             onClick={() => onNavigateTab('admin-payments')}
             style={{
@@ -591,104 +645,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* ALL-TIME PLATFORM METRICS                                                 */}
-      {/* ========================================================================= */}
+      {/* Quick Action Navigation Shortcuts / Administrative Navigation Hub */}
       <div style={{ marginBottom: '36px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', marginBottom: '16px' }}>
-          All-Time Platform Summary
-        </h2>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Total Registered Users</span>
-            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalUsers}</div>
-          </div>
-
-          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Lifetime Content Sales</span>
-            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>₹{stats.totalRevenueRupees}</div>
-          </div>
-
-          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Published Titles</span>
-            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalPublished} ({stats.totalMovies} Movies • {stats.totalSeries} Series)</div>
-          </div>
-
-          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Total Purchases</span>
-            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalPurchases} completed</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Current Trending #1 Showcase Banner */}
-      {stats.currentTrending1 && (
-        <div
-          style={{
-            marginBottom: '36px',
-            padding: '24px',
-            borderRadius: '16px',
-            background: `linear-gradient(90deg, rgba(245, 197, 24, 0.12) 0%, rgba(18, 18, 26, 0.95) 100%), url(${stats.currentTrending1.backdrop || stats.currentTrending1.poster}) center/cover no-repeat`,
-            border: '1px solid rgba(245, 197, 24, 0.35)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '16px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div
-              style={{
-                padding: '8px 12px',
-                borderRadius: '10px',
-                backgroundColor: 'var(--brand-gold, #F5C518)',
-                color: '#0E0E12',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontWeight: 900,
-                fontSize: '13px'
-              }}
-            >
-              <TrendingUp size={16} />
-              <span>TRENDING #1</span>
-            </div>
-            <div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 2px' }}>
-                {stats.currentTrending1.title}
-              </h3>
-              <p style={{ fontSize: '12px', color: '#D1D5DB', margin: 0 }}>
-                {stats.currentTrending1.type} • {stats.currentTrending1.releaseYear} • {stats.currentTrending1.priceRupees === 0 ? 'FREE' : `₹${stats.currentTrending1.priceRupees}`}
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => onNavigateTab('admin-content')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '9px 16px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              color: '#FFFFFF',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            <Edit3 size={14} />
-            <span>Manage in Catalog</span>
-          </button>
-        </div>
-      )}
-
-      {/* Quick Action Navigation Shortcuts */}
-      <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Sparkles size={18} style={{ color: 'var(--brand-gold, #F5C518)' }} />
@@ -741,6 +699,37 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* ALL-TIME PLATFORM METRICS (Positioned at the end of the Dashboard)        */}
+      {/* ========================================================================= */}
+      <div style={{ marginBottom: '36px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', marginBottom: '16px' }}>
+          All-Time Platform Summary
+        </h2>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Total Registered Users</span>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalUsers}</div>
+          </div>
+
+          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Lifetime Content Sales</span>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>₹{stats.totalRevenueRupees}</div>
+          </div>
+
+          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Published Titles</span>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalPublished} ({stats.totalMovies} Movies • {stats.totalSeries} Series)</div>
+          </div>
+
+          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Total Purchases</span>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalPurchases} completed</div>
+          </div>
         </div>
       </div>
 

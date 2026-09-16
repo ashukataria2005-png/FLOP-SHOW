@@ -7,6 +7,7 @@ import {
   Loader2,
   Mail,
   Eye,
+  EyeOff,
   ShieldCheck,
   ShieldAlert,
   KeyRound,
@@ -22,7 +23,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Film,
-  Tv
+  Tv,
+  AlertCircle
 } from 'lucide-react';
 
 interface AdminUsersPageProps {
@@ -41,9 +43,13 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'purchases' | 'transactions' | 'upi' | 'metadata'>('purchases');
 
-  // Password Reset State
+  // Password Reset & Security State
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [showNewPasswordInput, setShowNewPasswordInput] = useState(false);
+  const [lastResetResult, setLastResetResult] = useState<{ password: string; show: boolean } | null>(null);
+  const [copiedResetPassword, setCopiedResetPassword] = useState(false);
+  const [showBcryptNotice, setShowBcryptNotice] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
@@ -69,6 +75,9 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
     setDetailsLoading(true);
     setShowResetPassword(false);
     setNewPassword('');
+    setShowNewPasswordInput(false);
+    setLastResetResult(null);
+    setShowBcryptNotice(false);
     setActiveTab('purchases');
 
     try {
@@ -87,6 +96,9 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
     setUserDetails(null);
     setShowResetPassword(false);
     setNewPassword('');
+    setShowNewPasswordInput(false);
+    setLastResetResult(null);
+    setShowBcryptNotice(false);
   };
 
   const handleCopy = (text: string) => {
@@ -115,17 +127,20 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
 
   const handleResetPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUserId || !newPassword.trim() || newPassword.trim().length < 6) {
+    const trimmed = newPassword.trim();
+    if (!selectedUserId || !trimmed || trimmed.length < 6) {
       showToast('Password must be at least 6 characters long.', 'error');
       return;
     }
 
     setIsResetting(true);
     try {
-      await api.admin.resetUserPassword(selectedUserId, newPassword.trim());
+      await api.admin.resetUserPassword(selectedUserId, trimmed);
       showToast('User password successfully reset and re-hashed with bcrypt.', 'success');
+      setLastResetResult({ password: trimmed, show: true });
       setShowResetPassword(false);
       setNewPassword('');
+      setShowNewPasswordInput(false);
     } catch (err: any) {
       showToast(err.message || 'Failed to reset password.', 'error');
     } finally {
@@ -609,6 +624,27 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
                             <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF' }}>Password:</span>
                             <span style={{ fontSize: '14px', fontWeight: 700, color: '#10B981' }}>Hidden / Secured</span>
                             <span style={{ fontSize: '13px', color: '#6B7280', letterSpacing: '2px' }}>••••••••</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowBcryptNotice(prev => !prev)}
+                              title={showBcryptNotice ? 'Hide security details' : 'View password security status'}
+                              style={{
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '4px 8px',
+                                color: '#9CA3AF',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '11px',
+                                marginLeft: '6px'
+                              }}
+                            >
+                              <Eye size={13} />
+                              <span>{showBcryptNotice ? 'Hide Info' : 'Show Details'}</span>
+                            </button>
                           </div>
                           <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '2px 0 0' }}>
                             Protected with bcrypt-10 cryptographic hash. Plaintext passwords are never stored or exposed.
@@ -617,7 +653,10 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
                       </div>
 
                       <button
-                        onClick={() => setShowResetPassword(prev => !prev)}
+                        onClick={() => {
+                          setShowResetPassword(prev => !prev);
+                          setShowBcryptNotice(false);
+                        }}
                         style={{
                           padding: '8px 16px',
                           borderRadius: '8px',
@@ -637,6 +676,157 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
                       </button>
                     </div>
 
+                    {/* Irreversible Hash Security Notice */}
+                    {showBcryptNotice && (
+                      <div
+                        style={{
+                          marginTop: '14px',
+                          padding: '12px 14px',
+                          borderRadius: '8px',
+                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                          border: '1px solid rgba(59, 130, 246, 0.25)',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '10px'
+                        }}
+                      >
+                        <AlertCircle size={16} color="#60A5FA" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <div style={{ fontSize: '12px', color: '#93C5FD', lineHeight: 1.5 }}>
+                          <strong>Cryptographic Security Standard:</strong> The original user password is encrypted via irreversible bcrypt cryptographic hash and is never stored in plaintext. It cannot be recovered or displayed. To change the user credentials, use the <strong>Admin Reset Password</strong> option.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Newly Reset Password Temporary View Banner */}
+                    {lastResetResult && (
+                      <div
+                        style={{
+                          marginTop: '16px',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          backgroundColor: 'rgba(245, 197, 24, 0.08)',
+                          border: '1px solid rgba(245, 197, 24, 0.35)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <ShieldCheck size={18} color="var(--brand-gold, #F5C518)" />
+                            <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Newly Reset Password (Temporary View)
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setLastResetResult(null)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#9CA3AF',
+                              cursor: 'pointer',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            title="Dismiss temporary password view"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: '#FDE68A',
+                            lineHeight: 1.4,
+                            marginBottom: '12px'
+                          }}
+                        >
+                          <strong>Notice:</strong> This is the <strong>newly reset password</strong> set by the administrator, <em>NOT a recovered old password</em>. Please copy and provide it to the user now. For security, it is held only in memory and will not be displayed again once dismissed.
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <div
+                            style={{
+                              flex: 1,
+                              minWidth: '220px',
+                              padding: '10px 14px',
+                              borderRadius: '8px',
+                              backgroundColor: 'rgba(0, 0, 0, 0.45)',
+                              border: '1px solid rgba(245, 197, 24, 0.4)',
+                              fontFamily: 'monospace',
+                              fontSize: '14px',
+                              color: '#FFFFFF',
+                              letterSpacing: lastResetResult.show ? '1px' : '3px'
+                            }}
+                          >
+                            {lastResetResult.show ? lastResetResult.password : '••••••••••••'}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setLastResetResult(prev => prev ? { ...prev, show: !prev.show } : null)}
+                            style={{
+                              padding: '10px 14px',
+                              borderRadius: '8px',
+                              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                              border: '1px solid rgba(255, 255, 255, 0.15)',
+                              color: '#FFFFFF',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '12px',
+                              fontWeight: 600
+                            }}
+                          >
+                            {lastResetResult.show ? <EyeOff size={15} /> : <Eye size={15} />}
+                            <span>{lastResetResult.show ? 'Hide' : 'Show'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(lastResetResult.password);
+                              setCopiedResetPassword(true);
+                              setTimeout(() => setCopiedResetPassword(false), 2000);
+                              showToast('Newly reset password copied to clipboard!', 'success');
+                            }}
+                            style={{
+                              padding: '10px 16px',
+                              borderRadius: '8px',
+                              backgroundColor: copiedResetPassword ? '#10B981' : 'var(--brand-gold, #F5C518)',
+                              border: 'none',
+                              color: '#0E0E12',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '12px',
+                              fontWeight: 800
+                            }}
+                          >
+                            {copiedResetPassword ? <Check size={15} /> : <Copy size={15} />}
+                            <span>{copiedResetPassword ? 'Copied!' : 'Copy Password'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setLastResetResult(null)}
+                            style={{
+                              padding: '10px 14px',
+                              borderRadius: '8px',
+                              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                              border: '1px solid rgba(255, 255, 255, 0.12)',
+                              color: '#9CA3AF',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                          >
+                            Done & Clear
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Reset Password Form */}
                     {showResetPassword && (
                       <form
@@ -651,16 +841,16 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
                           flexWrap: 'wrap'
                         }}
                       >
-                        <div style={{ flex: 1, minWidth: '240px' }}>
+                        <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
                           <input
-                            type="password"
+                            type={showNewPasswordInput ? 'text' : 'password'}
                             placeholder="Enter new password (min 6 characters)..."
                             value={newPassword}
                             onChange={e => setNewPassword(e.target.value)}
                             required
                             style={{
                               width: '100%',
-                              padding: '10px 14px',
+                              padding: '10px 42px 10px 14px',
                               borderRadius: '8px',
                               backgroundColor: 'rgba(255, 255, 255, 0.06)',
                               border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -669,6 +859,27 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
                               boxSizing: 'border-box'
                             }}
                           />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPasswordInput(prev => !prev)}
+                            title={showNewPasswordInput ? 'Hide password' : 'Show password'}
+                            style={{
+                              position: 'absolute',
+                              right: '12px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'none',
+                              border: 'none',
+                              color: '#9CA3AF',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '2px'
+                            }}
+                          >
+                            {showNewPasswordInput ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
                         </div>
                         <button
                           type="submit"

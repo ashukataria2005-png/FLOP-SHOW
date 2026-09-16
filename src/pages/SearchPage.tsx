@@ -21,8 +21,16 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem, initialFil
   });
 
   useEffect(() => {
+    if (!initialFilter) return;
     if (initialFilter === 'free') {
       setPriceFilter('free');
+    } else if (initialFilter.startsWith('genre:')) {
+      const g = initialFilter.replace('genre:', '');
+      const matched = GENRE_LIST.find(item => item.toLowerCase() === g.toLowerCase());
+      setSelectedGenre(matched || g);
+    } else if (GENRE_LIST.some(item => item.toLowerCase() === initialFilter.toLowerCase())) {
+      const matched = GENRE_LIST.find(item => item.toLowerCase() === initialFilter.toLowerCase());
+      if (matched) setSelectedGenre(matched);
     }
   }, [initialFilter]);
 
@@ -39,8 +47,10 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem, initialFil
       // Type match
       const matchesType = typeFilter === 'all' || item.type === typeFilter;
 
-      // Genre match
-      const matchesGenre = selectedGenre === 'All' || item.genres.includes(selectedGenre);
+      // Genre match (case-insensitive)
+      const matchesGenre =
+        selectedGenre === 'All' ||
+        (Array.isArray(item.genres) && item.genres.some(g => g.toLowerCase() === selectedGenre.toLowerCase()));
 
       // Price / Free match
       const isItemFree = Boolean(item.isFree || item.price === 0);

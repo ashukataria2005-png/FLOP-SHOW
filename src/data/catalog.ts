@@ -9,12 +9,20 @@ export const DEMO_CATALOG: ContentItem[] = [];
 
 export const GENRE_LIST = [
   "All",
-  "Drama",
-  "Mystery",
-  "Thriller",
-  "Sci-Fi",
-  "Documentary",
   "Action",
+  "Adventure",
+  "Animation",
+  "Biography",
+  "Comedy",
+  "Crime",
+  "Drama",
+  "Family",
+  "Fantasy",
+  "History",
+  "Horror",
+  "Mystery",
   "Romance",
-  "Indie"
+  "Sci-Fi",
+  "Thriller",
+  "War"
 ];

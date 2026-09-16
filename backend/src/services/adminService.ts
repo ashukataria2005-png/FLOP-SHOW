@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import { contentRepository, ContentRecord } from '../repositories/contentRepository.js';
 import { getAdapter } from '../db/adapter.js';
 
@@ -861,5 +862,76 @@ export const adminService = {
 
     await this.updateSettings(toUpdate);
     return this.getAdsConfig();
+  },
+
+  async getUserDetails(userId: string): Promise<any> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT u.id, u.name, u.email, u.role, u.status, u.created_at, u.updated_at,
+              w.balance,
+              (SELECT COUNT(*) FROM purchases p WHERE p.user_id = u.id AND p.status = 'COMPLETED') as purchase_count,
+              (SELECT COALESCE(SUM(p.amount_paid), 0) FROM purchases p WHERE p.user_id = u.id AND p.status = 'COMPLETED') as total_spent
+       FROM users u
+       LEFT JOIN wallets w ON u.id = w.user_id
+       WHERE u.id = ?;`,
+      [userId]
+    );
+    if (!rows[0]) {
+      const err = new Error('User not found.');
+      (err as any).statusCode = 404;
+      throw err;
+    }
+    const user = rows[0] as any;
+
+    const purchases = await this.getUserPurchases(userId);
+    const transactions = await this.getUserTransactions(userId);
+
+    const upiRes = await db.query(
+      `SELECT id, amount, utr, status, created_at, processed_at, admin_note
+       FROM upi_payment_requests
+       WHERE user_id = ?
+       ORDER BY created_at DESC;`,
+      [userId]
+    );
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status || 'ACTIVE',
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+      balanceRupees: user.balance ? Math.round(user.balance / 100) : 0,
+      purchaseCount: Number(user.purchase_count ?? 0),
+      totalSpentRupees: Math.round(Number(user.total_spent ?? 0) / 100),
+      purchases,
+      transactions,
+      upiRecharges: (upiRes.rows as any[]).map(r => ({
+        ...r,
+        amountRupees: Math.round(r.amount / 100),
+      })),
+    };
+  },
+
+  async resetUserPassword(userId: string, newPlainPassword: string): Promise<void> {
+    if (!newPlainPassword || newPlainPassword.trim().length < 6) {
+      const err = new Error('Password must be at least 6 characters long.');
+      (err as any).statusCode = 400;
+      throw err;
+    }
+    const db = getAdapter();
+    const { rows } = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
+    if (!rows[0]) {
+      const err = new Error('User not found.');
+      (err as any).statusCode = 404;
+      throw err;
+    }
+    const passwordHash = await bcrypt.hash(newPlainPassword.trim(), 10);
+    await db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [
+      passwordHash,
+      new Date().toISOString(),
+      userId,
+    ]);
   },
 };

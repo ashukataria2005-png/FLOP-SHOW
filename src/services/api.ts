@@ -725,6 +725,17 @@ export const api = {
       return request<{ count: number; transactions: any[] }>(`/admin/users/${userId}/transactions`);
     },
 
+    async getUserDetails(userId: string) {
+      return request<{ success: boolean; user: any }>(`/admin/users/${userId}`);
+    },
+
+    async resetUserPassword(userId: string, newPassword: string) {
+      return request<{ success: boolean; message: string }>(`/admin/users/${userId}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ newPassword })
+      });
+    },
+
     async getPurchases(limit = 100, offset = 0) {
       return request<{ count: number; purchases: any[] }>(`/admin/purchases?limit=${limit}&offset=${offset}`);
     },

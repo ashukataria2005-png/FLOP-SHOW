@@ -99,6 +99,29 @@ adminRouter.get('/users/:id/transactions', async (req, res, next) => {
   }
 });
 
+adminRouter.get('/users/:id', async (req, res, next) => {
+  try {
+    const user = await adminService.getUserDetails(req.params.id);
+    res.json({ success: true, user });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/users/:id/reset-password', async (req, res, next) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword) {
+      res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'New password is required.' } });
+      return;
+    }
+    await adminService.resetUserPassword(req.params.id, newPassword);
+    res.json({ success: true, message: 'User password reset successfully.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ----------------------------------------------------------------------------
 // 2. FILE UPLOADS (Videos & Images)
 // ----------------------------------------------------------------------------

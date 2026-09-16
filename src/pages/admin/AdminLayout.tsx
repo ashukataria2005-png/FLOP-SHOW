@@ -195,6 +195,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
     setIsLoggingIn(true);
     setLoginError(null);
 
@@ -217,6 +218,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         localStorage.setItem(ADMIN_QUICK_LOGIN_KEY, JSON.stringify(qData));
         setQuickLoginData(qData);
       }
+
+      // W3C Credential Management API: prompt browser to store credentials natively
+      if (typeof window !== 'undefined' && 'PasswordCredential' in window && (navigator as any).credentials?.store) {
+        try {
+          const cred = new (window as any).PasswordCredential(form);
+          await (navigator as any).credentials.store(cred);
+        } catch {
+          // Gracefully ignore if blocked or unavailable
+        }
+      }
+
+      // Allow browser submission lifecycle to settle before unmounting login form
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       login(data.user.id, data.user.name, data.user.email, 'ADMIN', 0);
       showToast(`Admin signed in: ${data.user.name}`, 'success');
@@ -578,7 +592,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             id="admin-login-form"
             name="adminLoginForm"
             method="post"
-            action="#"
+            action="/api/auth/admin/login"
             autoComplete="on"
             onSubmit={handleAdminLogin}
             style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}

@@ -261,11 +261,11 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
           </div>
 
           {/* Action CTAs: Watch now / Buy, Watch Trailer, and + My list */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          <div className="details-actions-row" style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
             <button
               onClick={handlePrimaryAction}
               className="btn btn-primary btn-lg"
-              style={{ minWidth: '160px' }}
+              style={{ minWidth: '150px' }}
             >
               <Play size={18} fill="#0E0E12" />
               <span>
@@ -452,7 +452,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
                 gap: '16px'
               }}
             >
@@ -469,6 +469,22 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
           .details-hero-container {
             padding: 50px 48px 60px;
             min-height: 520px;
+          }
+        }
+        @media (max-width: 640px) {
+          .details-hero-container {
+            padding: 24px 16px 36px !important;
+            min-height: 440px !important;
+          }
+          .details-actions-row {
+            width: 100% !important;
+            gap: 10px !important;
+          }
+          .details-actions-row .btn {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            padding: 12px 14px !important;
+            font-size: 13.5px !important;
           }
         }
       `}</style>

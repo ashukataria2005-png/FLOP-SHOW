@@ -709,6 +709,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-primary, #07070A)', color: '#FFFFFF' }}>
       {/* Top Admin Navigation Header */}
       <header
+        className="admin-header-bar"
         style={{
           height: '68px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
@@ -777,6 +778,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
           {/* Current Active Section Breadcrumb */}
           <div
+            className="admin-header-breadcrumb"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -797,13 +799,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
         {/* Right side: Exit to Main Site / Admin Profile / Sign Out */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#9CA3AF' }}>
+          <div className="admin-header-user" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#9CA3AF' }}>
             <ShieldCheck size={16} color="var(--brand-gold, #F5C518)" />
             <span>{user.name || user.email || 'Admin'}</span>
           </div>
 
           {quickLoginData && (
             <button
+              className="admin-header-device-btn"
               onClick={() => handleAdminLogout(true)}
               title="Sign out and forget this device (removes One-Click Quick Login)"
               style={{
@@ -1220,7 +1223,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       )}
 
       {/* Main Admin Content Container */}
-      <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '32px 24px 80px' }}>
+      <main className="admin-main-container" style={{ maxWidth: '1280px', margin: '0 auto', padding: '32px 24px 80px' }}>
         {children}
       </main>
     </div>

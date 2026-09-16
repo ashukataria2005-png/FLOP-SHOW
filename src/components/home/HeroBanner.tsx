@@ -162,11 +162,11 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, onViewDetails }) =
         </div>
 
         {/* Action Buttons: Watch Now / Buy, Watch Trailer, and Details */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+        <div className="hero-actions-row" style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
           <button
             onClick={handlePrimaryClick}
             className="btn btn-primary btn-lg"
-            style={{ minWidth: '150px' }}
+            style={{ minWidth: '140px' }}
           >
             <Play size={18} fill="currentColor" />
             <span>{owned || item.isFree ? 'Watch now' : `Buy for ₹${item.price}`}</span>
@@ -175,7 +175,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, onViewDetails }) =
           <button
             onClick={() => playTrailer(item)}
             className="btn btn-secondary btn-lg"
-            style={{ minWidth: '130px' }}
+            style={{ minWidth: '120px' }}
           >
             <Video size={18} color="var(--brand-gold)" />
             <span>Trailer</span>
@@ -184,7 +184,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, onViewDetails }) =
           <button
             onClick={() => onViewDetails(item)}
             className="btn btn-secondary btn-lg"
-            style={{ minWidth: '120px' }}
+            style={{ minWidth: '110px' }}
           >
             <span>Details</span>
             <ChevronRight size={18} />
@@ -197,6 +197,22 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, onViewDetails }) =
           .hero-banner-container {
             padding: 40px 48px 52px;
             min-height: 540px;
+          }
+        }
+        @media (max-width: 640px) {
+          .hero-banner-container {
+            padding: 20px 16px 28px !important;
+            min-height: 440px !important;
+          }
+          .hero-actions-row {
+            width: 100% !important;
+            gap: 10px !important;
+          }
+          .hero-actions-row .btn {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            padding: 12px 14px !important;
+            font-size: 13.5px !important;
           }
         }
       `}</style>

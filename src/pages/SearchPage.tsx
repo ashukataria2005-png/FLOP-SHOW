@@ -189,8 +189,8 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem }) => {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-            gap: '20px'
+            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+            gap: 'clamp(12px, 2.5vw, 20px)'
           }}
         >
           {filteredItems.map(item => (

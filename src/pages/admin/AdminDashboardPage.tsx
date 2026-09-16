@@ -711,24 +711,120 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
         </h2>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Total Registered Users</span>
-            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalUsers}</div>
+          {/* Total Registered Users (Clickable -> Admin Users) */}
+          <div
+            onClick={() => onNavigateTab('admin-users')}
+            style={{
+              backgroundColor: 'var(--bg-surface, #12121A)',
+              borderRadius: '14px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '18px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(245, 166, 35, 0.4)')}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
+                Total Registered Users
+              </span>
+              <ArrowUpRight size={14} color="var(--brand-gold, #F5C518)" />
+            </div>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '6px' }}>
+              {stats.totalUsers}
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--brand-gold, #F5C518)', marginTop: '4px' }}>
+              Manage users →
+            </span>
           </div>
 
-          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Total Revenue</span>
-            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>₹{stats.totalRevenueRupees}</div>
+          {/* Total Revenue */}
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface, #12121A)',
+              borderRadius: '14px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}
+          >
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
+              Total Revenue
+            </span>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '6px' }}>
+              ₹{stats.totalRevenueRupees}
+            </div>
+            <span style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
+              All-time platform gross
+            </span>
           </div>
 
-          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Published Titles</span>
-            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalPublished} ({stats.totalMovies} Movies • {stats.totalSeries} Series)</div>
+          {/* Published Movies (Clickable -> Catalog movie filter) */}
+          <div
+            onClick={() => onNavigateTab('admin-content', 'movie')}
+            style={{
+              backgroundColor: 'var(--bg-surface, #12121A)',
+              borderRadius: '14px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '18px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(245, 166, 35, 0.4)')}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
+                Published Movies
+              </span>
+              <ArrowUpRight size={14} color="var(--brand-gold, #F5C518)" />
+            </div>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '6px' }}>
+              {stats.totalMovies}
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--brand-gold, #F5C518)', marginTop: '4px' }}>
+              View Movies catalog →
+            </span>
           </div>
 
-          <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '18px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Total Purchases</span>
-            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px' }}>{stats.totalPurchases} completed</div>
+          {/* Published Series (Clickable -> Catalog series filter) */}
+          <div
+            onClick={() => onNavigateTab('admin-content', 'series')}
+            style={{
+              backgroundColor: 'var(--bg-surface, #12121A)',
+              borderRadius: '14px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '18px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between'
+            }}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(245, 166, 35, 0.4)')}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
+                Published Series
+              </span>
+              <ArrowUpRight size={14} color="var(--brand-gold, #F5C518)" />
+            </div>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '6px' }}>
+              {stats.totalSeries}
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--brand-gold, #F5C518)', marginTop: '4px' }}>
+              View Series catalog →
+            </span>
           </div>
         </div>
       </div>

@@ -28,9 +28,10 @@ import {
 
 interface AdminContentPageProps {
   onNavigateTab: (tab: string, param?: string) => void;
+  initialTypeFilter?: 'ALL' | 'MOVIE' | 'SERIES';
 }
 
-export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTab }) => {
+export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTab, initialTypeFilter = 'ALL' }) => {
   const { showToast, refreshCatalog } = useApp();
   const [contentList, setContentList] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +39,13 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'MOVIE' | 'SERIES'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'MOVIE' | 'SERIES'>(initialTypeFilter);
+
+  useEffect(() => {
+    if (initialTypeFilter) {
+      setTypeFilter(initialTypeFilter);
+    }
+  }, [initialTypeFilter]);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PUBLISHED' | 'DRAFT'>('ALL');
   const [featuredFilter, setFeaturedFilter] = useState<'ALL' | 'FEATURED'>('ALL');
   const [trendingFilter, setTrendingFilter] = useState<'ALL' | 'TRENDING'>('ALL');

@@ -124,8 +124,31 @@ authRouter.post('/admin-quick-login', requireAuth, async (req: AuthenticatedRequ
   }
 });
 
+// POST /api/auth/change-password
+authRouter.post('/change-password', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    await authService.changePassword(req.user!.id, currentPassword, newPassword);
+    res.json({ success: true, message: 'Password changed successfully.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/auth/profile
+authRouter.put('/profile', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const { name, email } = req.body;
+    const user = await authService.updateProfile(req.user!.id, name, email);
+    res.json({ success: true, user });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/auth/logout
 authRouter.post('/logout', (_req, res) => {
   // Stateless JWT: client discards token
   res.json({ message: 'Signed out successfully.' });
 });
+

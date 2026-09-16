@@ -61,4 +61,20 @@ export const userRepository = {
       [name, now, id]
     );
   },
+
+  async updateProfileAndEmail(id: string, name: string, email: string, now: string): Promise<void> {
+    const db = getAdapter();
+    await db.run(
+      `UPDATE users SET name = ?, email = ?, updated_at = ? WHERE id = ?;`,
+      [name, email.toLowerCase().trim(), now, id]
+    );
+  },
+
+  async updatePassword(id: string, passwordHash: string, now: string): Promise<void> {
+    const db = getAdapter();
+    await db.run(
+      `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?;`,
+      [passwordHash, now, id]
+    );
+  },
 };

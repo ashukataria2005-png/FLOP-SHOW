@@ -274,7 +274,12 @@ const AppContent: React.FC = () => {
           onExitAdmin={() => handleNavigate('discover')}
         >
           {currentTab === 'admin-dashboard' && <AdminDashboardPage onNavigateTab={handleNavigate} />}
-          {currentTab === 'admin-content' && <AdminContentPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-content' && (
+            <AdminContentPage
+              initialTypeFilter={adminParam === 'movie' ? 'MOVIE' : adminParam === 'series' ? 'SERIES' : 'ALL'}
+              onNavigateTab={handleNavigate}
+            />
+          )}
           {currentTab === 'admin-free-content' && <AdminFreeContentPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-hero' && <AdminHeroPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-spotlight' && <AdminSpotlightPage onNavigateTab={handleNavigate} />}
@@ -380,9 +385,12 @@ const AppContent: React.FC = () => {
             {currentTab === 'wallet' && (
               <ProfilePage initialSection="wallet" onNavigate={handleNavigate} />
             )}
+            {currentTab === 'settings' && (
+              <ProfilePage initialSection="settings" onNavigate={handleNavigate} />
+            )}
             {currentTab === 'profile' && (
               <ProfilePage
-                initialSection={adminParam === 'wallet' ? 'wallet' : 'profile'}
+                initialSection={adminParam === 'wallet' ? 'wallet' : adminParam === 'settings' ? 'settings' : 'profile'}
                 onNavigate={handleNavigate}
               />
             )}

@@ -27,5 +27,11 @@ export const GENRE_LIST = [
   "War",
   "Marvel",
   "DC",
-  "HBO"
+  "HBO",
+  "Warner Bros.",
+  "Universal Pictures",
+  "Sony Pictures",
+  "Paramount Pictures",
+  "Disney",
+  "Spider-Man"
 ];

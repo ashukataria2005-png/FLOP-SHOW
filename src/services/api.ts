@@ -322,6 +322,20 @@ export const api = {
       return data;
     },
 
+    async changePassword(currentPassword: string, newPassword: string) {
+      return request<{ success: boolean; message: string }>('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+    },
+
+    async updateProfile(name: string, email?: string) {
+      return request<{ success: boolean; user: any }>('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ name, email })
+      });
+    },
+
     logout() {
       tokenStorage.clear();
       adminTokenStorage.clear();

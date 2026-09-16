@@ -239,4 +239,72 @@ export const authService = {
     if (!record) return null;
     return toSafeUser(record);
   },
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    if (!currentPassword || !newPassword) {
+      const err = new Error('Current password and new password are required.');
+      (err as any).statusCode = 400;
+      throw err;
+    }
+
+    if (newPassword.length < 6) {
+      const err = new Error('New password must be at least 6 characters long.');
+      (err as any).statusCode = 400;
+      throw err;
+    }
+
+    const userRecord = await userRepository.findById(userId);
+    if (!userRecord) {
+      const err = new Error('User not found.');
+      (err as any).statusCode = 404;
+      throw err;
+    }
+
+    const match = await bcrypt.compare(currentPassword, userRecord.password_hash);
+    if (!match) {
+      const err = new Error('Current password is incorrect.');
+      (err as any).statusCode = 401;
+      throw err;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+    const now = new Date().toISOString();
+
+    await userRepository.updatePassword(userId, passwordHash, now);
+  },
+
+  async updateProfile(userId: string, name: string, email?: string): Promise<SafeUser> {
+    const cleanName = (name || '').trim();
+    if (!cleanName) {
+      const err = new Error('Name cannot be empty.');
+      (err as any).statusCode = 400;
+      throw err;
+    }
+
+    const userRecord = await userRepository.findById(userId);
+    if (!userRecord) {
+      const err = new Error('User not found.');
+      (err as any).statusCode = 404;
+      throw err;
+    }
+
+    const now = new Date().toISOString();
+    const cleanEmail = (email || '').trim().toLowerCase();
+
+    if (cleanEmail && cleanEmail !== userRecord.email.toLowerCase()) {
+      const existing = await userRepository.findByEmail(cleanEmail);
+      if (existing && existing.id !== userId) {
+        const err = new Error('An account with this email already exists.');
+        (err as any).statusCode = 409;
+        throw err;
+      }
+      await userRepository.updateProfileAndEmail(userId, cleanName, cleanEmail, now);
+    } else {
+      await userRepository.updateProfile(userId, cleanName, now);
+    }
+
+    const updated = await userRepository.findById(userId);
+    return toSafeUser(updated!);
+  },
 };

@@ -90,9 +90,15 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
   const seriesItems = activeCatalog.filter(c => c.type === 'series');
 
   // ── Famous Hollywood & Studio Collections ──────────────────────────────────
-  const marvelItems = byGenre(activeCatalog, 'Marvel');
-  const dcItems     = byGenre(activeCatalog, 'DC');
-  const hboItems    = byGenre(activeCatalog, 'HBO');
+  const spidermanItems  = byGenre(activeCatalog, 'Spider-Man');
+  const marvelItems     = byGenre(activeCatalog, 'Marvel');
+  const dcItems         = byGenre(activeCatalog, 'DC');
+  const hboItems        = byGenre(activeCatalog, 'HBO');
+  const warnerBrosItems = byGenre(activeCatalog, 'Warner Bros.');
+  const universalItems  = byGenre(activeCatalog, 'Universal Pictures');
+  const sonyItems       = byGenre(activeCatalog, 'Sony Pictures');
+  const paramountItems  = byGenre(activeCatalog, 'Paramount Pictures');
+  const disneyItems     = byGenre(activeCatalog, 'Disney');
 
   // ── New Releases: 2024 onwards, sorted newest first ─────────────────────────
   const newReleases = [...activeCatalog]
@@ -195,58 +201,21 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     );
   }
 
-  if (seriesItems.length > 0) {
+  // ── Studio 1: Spider-Man Collection ─────────────────────────────────────────
+  if (spidermanItems.length > 0) {
     contentRows.push(
       <ContentSection
-        key="popular-series"
-        categoryLabel="BINGE-WORTHY"
-        title="Popular Series"
-        items={seriesItems}
+        key="collection-spiderman"
+        categoryLabel="SPIDER-MAN FRANCHISE • ALL ERAS & MULTIVERSE"
+        title="Spider-Man Collection"
+        items={spidermanItems}
         onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search')}
+        onSeeAll={() => onNavigate('search', 'Spider-Man')}
       />
     );
   }
 
-  if (marvelItems.length > 0) {
-    contentRows.push(
-      <ContentSection
-        key="collection-marvel"
-        categoryLabel="MARVEL STUDIOS • MCU & HEROES"
-        title="Marvel Universe Collection"
-        items={marvelItems}
-        onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search', 'Marvel')}
-      />
-    );
-  }
-
-  if (dcItems.length > 0) {
-    contentRows.push(
-      <ContentSection
-        key="collection-dc"
-        categoryLabel="DC STUDIOS • DARK KNIGHT & METAHUMANS"
-        title="DC Universe Collection"
-        items={dcItems}
-        onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search', 'DC')}
-      />
-    );
-  }
-
-  if (hboItems.length > 0) {
-    contentRows.push(
-      <ContentSection
-        key="collection-hbo"
-        categoryLabel="HBO ORIGINALS • PRESTIGE TELEVISION & CINEMA"
-        title="HBO Collection"
-        items={hboItems}
-        onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search', 'HBO')}
-      />
-    );
-  }
-
+  // ── Genre 1: Action ─────────────────────────────────────────────────────────
   if (actionItems.length > 0) {
     contentRows.push(
       <ContentSection
@@ -260,6 +229,34 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     );
   }
 
+  if (seriesItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="popular-series"
+        categoryLabel="BINGE-WORTHY"
+        title="Popular Series"
+        items={seriesItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  // ── Studio 2: Marvel Universe ───────────────────────────────────────────────
+  if (marvelItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="collection-marvel"
+        categoryLabel="MARVEL STUDIOS • MCU & HEROES"
+        title="Marvel Universe Collection"
+        items={marvelItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Marvel')}
+      />
+    );
+  }
+
+  // ── Genre 2: Thriller ───────────────────────────────────────────────────────
   if (thrillerItems.length > 0) {
     contentRows.push(
       <ContentSection
@@ -273,19 +270,21 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     );
   }
 
-  if (crimeItems.length > 0) {
+  // ── Studio 3: DC Universe ───────────────────────────────────────────────────
+  if (dcItems.length > 0) {
     contentRows.push(
       <ContentSection
-        key="genre-crime"
-        categoryLabel="GENRE"
-        title="Crime & Underworld"
-        items={crimeItems}
+        key="collection-dc"
+        categoryLabel="DC STUDIOS • DARK KNIGHT & METAHUMANS"
+        title="DC Universe Collection"
+        items={dcItems}
         onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search', 'Crime')}
+        onSeeAll={() => onNavigate('search', 'DC')}
       />
     );
   }
 
+  // ── Genre 3: Comedy ─────────────────────────────────────────────────────────
   if (comedyItems.length > 0) {
     contentRows.push(
       <ContentSection
@@ -299,32 +298,35 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     );
   }
 
-  if (dramaItems.length > 0) {
+  // ── Genre 4: Crime ──────────────────────────────────────────────────────────
+  if (crimeItems.length > 0) {
     contentRows.push(
       <ContentSection
-        key="genre-drama"
+        key="genre-crime"
         categoryLabel="GENRE"
-        title="Drama"
-        items={dramaItems}
+        title="Crime & Underworld"
+        items={crimeItems}
         onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search', 'Drama')}
+        onSeeAll={() => onNavigate('search', 'Crime')}
       />
     );
   }
 
-  if (romanceItems.length > 0) {
+  // ── Studio 4: Warner Bros. ──────────────────────────────────────────────────
+  if (warnerBrosItems.length > 0) {
     contentRows.push(
       <ContentSection
-        key="genre-romance"
-        categoryLabel="GENRE"
-        title="Romance & Heartfelt"
-        items={romanceItems}
+        key="collection-warner"
+        categoryLabel="WARNER BROS. • TIMELESS BLOCKBUSTERS & LEGENDS"
+        title="Warner Bros. Collection"
+        items={warnerBrosItems}
         onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search', 'Romance')}
+        onSeeAll={() => onNavigate('search', 'Warner Bros.')}
       />
     );
   }
 
+  // ── Genre 5: Sci-Fi ─────────────────────────────────────────────────────────
   if (sciFiItems.length > 0) {
     contentRows.push(
       <ContentSection
@@ -338,6 +340,91 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     );
   }
 
+  // ── Genre 6: Drama ──────────────────────────────────────────────────────────
+  if (dramaItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-drama"
+        categoryLabel="GENRE"
+        title="Drama"
+        items={dramaItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Drama')}
+      />
+    );
+  }
+
+  // ── Studio 5: HBO ───────────────────────────────────────────────────────────
+  if (hboItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="collection-hbo"
+        categoryLabel="HBO ORIGINALS • PRESTIGE TELEVISION & CINEMA"
+        title="HBO Collection"
+        items={hboItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'HBO')}
+      />
+    );
+  }
+
+  // ── Studio 6: Universal Pictures ───────────────────────────────────────────
+  if (universalItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="collection-universal"
+        categoryLabel="UNIVERSAL PICTURES • ICONIC CINEMA & TELEVISION"
+        title="Universal Pictures Collection"
+        items={universalItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Universal Pictures')}
+      />
+    );
+  }
+
+  // ── Genre 7: Fantasy & Adventure ────────────────────────────────────────────
+  if (fantasyItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-fantasy"
+        categoryLabel="GENRE"
+        title="Fantasy & Adventure"
+        items={fantasyItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Fantasy')}
+      />
+    );
+  }
+
+  // ── Genre 8: Romance ────────────────────────────────────────────────────────
+  if (romanceItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="genre-romance"
+        categoryLabel="GENRE"
+        title="Romance & Heartfelt"
+        items={romanceItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Romance')}
+      />
+    );
+  }
+
+  // ── Studio 7: Sony Pictures ─────────────────────────────────────────────────
+  if (sonyItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="collection-sony"
+        categoryLabel="SONY PICTURES • COLUMBIA & TRISTAR CLASSICS"
+        title="Sony Pictures Collection"
+        items={sonyItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Sony Pictures')}
+      />
+    );
+  }
+
+  // ── Genre 9: Mystery ────────────────────────────────────────────────────────
   if (mysteryItems.length > 0) {
     contentRows.push(
       <ContentSection
@@ -351,12 +438,13 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     );
   }
 
+  // ── Genre 10: Horror ────────────────────────────────────────────────────────
   if (horrorItems.length > 0) {
     contentRows.push(
       <ContentSection
         key="genre-horror"
         categoryLabel="GENRE"
-        title="Horror & Supernatual"
+        title="Horror & Supernatural"
         items={horrorItems}
         onSelect={onSelectItem}
         onSeeAll={() => onNavigate('search', 'Horror')}
@@ -364,15 +452,30 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     );
   }
 
-  if (fantasyItems.length > 0) {
+  // ── Studio 8: Paramount Pictures ───────────────────────────────────────────
+  if (paramountItems.length > 0) {
     contentRows.push(
       <ContentSection
-        key="genre-fantasy"
-        categoryLabel="GENRE"
-        title="Fantasy & Adventure"
-        items={fantasyItems}
+        key="collection-paramount"
+        categoryLabel="PARAMOUNT PICTURES • TIMELESS HOLLYWOOD"
+        title="Paramount Pictures Collection"
+        items={paramountItems}
         onSelect={onSelectItem}
-        onSeeAll={() => onNavigate('search', 'Fantasy')}
+        onSeeAll={() => onNavigate('search', 'Paramount Pictures')}
+      />
+    );
+  }
+
+  // ── Studio 9: Disney ────────────────────────────────────────────────────────
+  if (disneyItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="collection-disney"
+        categoryLabel="DISNEY • ANIMATION, MAGIC & SAGA"
+        title="Disney Collection"
+        items={disneyItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Disney')}
       />
     );
   }

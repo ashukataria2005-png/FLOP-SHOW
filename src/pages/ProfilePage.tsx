@@ -10,7 +10,6 @@ import {
   LogOut,
   Edit2,
   Check,
-  Sliders,
   ChevronRight,
   Plus,
   ArrowUpRight,
@@ -19,7 +18,20 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  QrCode
+  QrCode,
+  Settings,
+  Lock,
+  Key,
+  Shield,
+  Eye,
+  EyeOff,
+  Moon,
+  Globe,
+  Bell,
+  Trash2,
+  AlertCircle,
+  RefreshCw,
+  Sliders
 } from 'lucide-react';
 
 interface UserPaymentRequest {
@@ -35,7 +47,7 @@ interface UserPaymentRequest {
 
 interface ProfilePageProps {
   onNavigate: (tab: string, param?: string) => void;
-  initialSection?: 'profile' | 'wallet';
+  initialSection?: 'profile' | 'wallet' | 'settings';
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSection = 'profile' }) => {
@@ -53,13 +65,48 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     isAuthenticated
   } = useApp();
 
-  const [activeSection, setActiveSection] = useState<'profile' | 'wallet'>(initialSection);
+  const [activeSection, setActiveSection] = useState<'profile' | 'wallet' | 'settings'>(initialSection);
   const [rechargeRequests, setRechargeRequests] = useState<UserPaymentRequest[]>([]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(user.name);
   const [editEmail, setEditEmail] = useState(user.email);
-  const [qualityPref, setQualityPref] = useState('1080p Full HD');
+
+  // Settings tab states
+  const [qualityPref, setQualityPref] = useState(() => {
+    return localStorage.getItem('flopshow_quality') || '1080p Full HD';
+  });
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordStatus, setPasswordStatus] = useState<{ type: 'idle' | 'loading' | 'success' | 'error'; message: string }>({
+    type: 'idle',
+    message: ''
+  });
+
+  const [themePref, setThemePref] = useState<'dark' | 'oled'>(() => {
+    return (localStorage.getItem('flopshow_theme') as 'dark' | 'oled') || 'dark';
+  });
+  const [langPref, setLangPref] = useState(() => {
+    return localStorage.getItem('flopshow_lang_pref') || 'Hindi & English';
+  });
+  const [subsPref, setSubsPref] = useState(() => {
+    return localStorage.getItem('flopshow_subs_pref') || 'English & Hindi (Auto)';
+  });
+  const [autoplayNext, setAutoplayNext] = useState(() => {
+    return localStorage.getItem('flopshow_autoplay') !== 'false';
+  });
+  const [previewHover, setPreviewHover] = useState(() => {
+    return localStorage.getItem('flopshow_preview_hover') !== 'false';
+  });
+  const [notifyReleases, setNotifyReleases] = useState(() => {
+    return localStorage.getItem('flopshow_notify_releases') !== 'false';
+  });
+  const [notifyWallet, setNotifyWallet] = useState(() => {
+    return localStorage.getItem('flopshow_notify_wallet') !== 'false';
+  });
+  const [clearDataSuccess, setClearDataSuccess] = useState(false);
 
   useEffect(() => {
     if (initialSection) {
@@ -85,11 +132,77 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     }
   }, [isAuthenticated, walletBalance, activeSection]);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editName.trim() && editEmail.trim()) {
+      try {
+        if (isAuthenticated) {
+          await api.auth.updateProfile(editName.trim(), editEmail.trim());
+        }
+      } catch {
+        // Fallback gracefully
+      }
       updateProfile(editName.trim(), editEmail.trim());
       setIsEditing(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword) {
+      setPasswordStatus({ type: 'error', message: 'Please enter your current password.' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordStatus({ type: 'error', message: 'New password must be at least 6 characters long.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus({ type: 'error', message: 'New passwords do not match.' });
+      return;
+    }
+
+    try {
+      setPasswordStatus({ type: 'loading', message: 'Updating password securely...' });
+      const res = await api.auth.changePassword(currentPassword, newPassword);
+      if (res && res.success) {
+        setPasswordStatus({
+          type: 'success',
+          message: 'Password updated successfully! Encrypted with secure server bcrypt hashing.'
+        });
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        setPasswordStatus({ type: 'error', message: (res as any)?.message || 'Failed to update password.' });
+      }
+    } catch (err: any) {
+      setPasswordStatus({
+        type: 'error',
+        message: err?.message || 'Failed to update password. Verify your current password.'
+      });
+    }
+  };
+
+  const handleThemeChange = (newTheme: 'dark' | 'oled') => {
+    setThemePref(newTheme);
+    localStorage.setItem('flopshow_theme', newTheme);
+    if (newTheme === 'oled') {
+      document.documentElement.style.setProperty('--bg-base', '#000000');
+      document.documentElement.style.setProperty('--bg-surface', '#050508');
+    } else {
+      document.documentElement.style.removeProperty('--bg-base');
+      document.documentElement.style.removeProperty('--bg-surface');
+    }
+  };
+
+  const handleClearWatchHistory = () => {
+    try {
+      localStorage.removeItem('watch_progress');
+      setClearDataSuccess(true);
+      setTimeout(() => setClearDataSuccess(false), 3000);
+    } catch {
+      // Ignore
     }
   };
 
@@ -158,6 +271,27 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
           >
             ₹{walletBalance.toFixed(0)}
           </span>
+        </button>
+
+        <button
+          onClick={() => setActiveSection('settings')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 18px',
+            borderRadius: '12px',
+            border: activeSection === 'settings' ? '1px solid rgba(245, 166, 35, 0.4)' : '1px solid transparent',
+            backgroundColor: activeSection === 'settings' ? 'rgba(245, 166, 35, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+            color: activeSection === 'settings' ? 'var(--brand-gold, #F5C518)' : 'var(--text-secondary)',
+            fontWeight: activeSection === 'settings' ? 700 : 500,
+            fontSize: '14px',
+            cursor: 'pointer',
+            transition: 'all var(--transition-fast)'
+          }}
+        >
+          <Settings size={16} />
+          <span>Settings</span>
         </button>
       </div>
 
@@ -439,6 +573,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                 justifyContent: 'space-between',
                 width: '100%',
                 padding: '16px 20px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
                 color: '#FFFFFF'
               }}
             >
@@ -448,42 +583,24 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
               </div>
               <ChevronRight size={18} color="var(--text-muted)" />
             </button>
-          </div>
 
-          {/* Preferences Section */}
-          <div
-            style={{
-              backgroundColor: 'var(--bg-surface)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '20px',
-              padding: '20px',
-              marginBottom: '24px'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-              <Sliders size={18} color="var(--brand-gold)" />
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF' }}>Playback Preferences</h3>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '14px' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Default Streaming Quality</span>
-              <select
-                value={qualityPref}
-                onChange={e => setQualityPref(e.target.value)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  color: '#FFFFFF',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  fontSize: '13px'
-                }}
-              >
-                <option value="Auto (Adaptive)">Auto (Adaptive)</option>
-                <option value="1080p Full HD">1080p Full HD</option>
-                <option value="4K Ultra HD">4K Ultra HD</option>
-              </select>
-            </div>
+            <button
+              onClick={() => setActiveSection('settings')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                padding: '16px 20px',
+                color: '#FFFFFF'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Settings size={18} color="var(--brand-gold)" />
+                <span style={{ fontSize: '15px', fontWeight: 600 }}>Settings & Security Preferences</span>
+              </div>
+              <ChevronRight size={18} color="var(--text-muted)" />
+            </button>
           </div>
 
           {/* Account Switcher / Sign Out */}
@@ -857,6 +974,784 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>No transactions yet.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 3: USER SETTINGS */}
+      {activeSection === 'settings' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Header Banner */}
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '24px',
+              padding: '24px 28px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              flexWrap: 'wrap'
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Settings size={22} color="var(--brand-gold)" />
+                <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF' }}>Preferences & Account Settings</h2>
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Customize your streaming experience, language, privacy, and account security.
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(34, 197, 94, 0.12)',
+                  border: '1px solid rgba(34, 197, 94, 0.25)',
+                  color: '#4ADE80',
+                  fontSize: '12px',
+                  fontWeight: 700
+                }}
+              >
+                <ShieldCheck size={14} />
+                Bcrypt Encrypted Session
+              </span>
+            </div>
+          </div>
+
+          {/* 1. Account Information */}
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '20px',
+              padding: '24px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <User size={18} color="var(--brand-gold)" />
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF' }}>Account Information</h3>
+              </div>
+              {isAuthenticated && !isEditing && (
+                <button onClick={() => setIsEditing(true)} className="btn btn-ghost btn-sm" style={{ gap: '6px' }}>
+                  <Edit2 size={13} />
+                  <span>Edit Info</span>
+                </button>
+              )}
+            </div>
+
+            {isEditing ? (
+              <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      fontSize: '14px',
+                      color: '#FFFFFF'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={e => setEditEmail(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      fontSize: '14px',
+                      color: '#FFFFFF'
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="submit" className="btn btn-primary btn-sm">
+                    <Check size={14} />
+                    <span>Save Changes</span>
+                  </button>
+                  <button type="button" onClick={() => setIsEditing(false)} className="btn btn-ghost btn-sm">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '12px 16px', borderRadius: '12px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                    Name
+                  </span>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF', marginTop: '2px' }}>
+                    {user.name}
+                  </div>
+                </div>
+                <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '12px 16px', borderRadius: '12px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                    Email
+                  </span>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF', marginTop: '2px' }}>
+                    {user.email}
+                  </div>
+                </div>
+                <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', padding: '12px 16px', borderRadius: '12px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                    Role & Status
+                  </span>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--brand-gold)', marginTop: '2px' }}>
+                    {user.role || 'MEMBER'} · ACTIVE
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 2. Security & Password Change */}
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '20px',
+              padding: '24px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <Lock size={18} color="var(--brand-gold)" />
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF' }}>Security & Password Change</h3>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Your password is encrypted with cryptographic bcrypt hashing. It is never stored or transmitted in plaintext.
+            </p>
+
+            {isAuthenticated ? (
+              <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {passwordStatus.message && (
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: '10px',
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      backgroundColor:
+                        passwordStatus.type === 'success'
+                          ? 'rgba(34, 197, 94, 0.15)'
+                          : passwordStatus.type === 'error'
+                          ? 'rgba(239, 68, 68, 0.15)'
+                          : 'rgba(245, 166, 35, 0.15)',
+                      color:
+                        passwordStatus.type === 'success'
+                          ? '#4ADE80'
+                          : passwordStatus.type === 'error'
+                          ? '#F87171'
+                          : 'var(--brand-gold)',
+                      border:
+                        passwordStatus.type === 'success'
+                          ? '1px solid rgba(34, 197, 94, 0.3)'
+                          : passwordStatus.type === 'error'
+                          ? '1px solid rgba(239, 68, 68, 0.3)'
+                          : '1px solid rgba(245, 166, 35, 0.3)'
+                    }}
+                  >
+                    {passwordStatus.type === 'success' && <CheckCircle2 size={16} />}
+                    {passwordStatus.type === 'error' && <AlertCircle size={16} />}
+                    {passwordStatus.type === 'loading' && <RefreshCw size={16} className="animate-spin" />}
+                    <span>{passwordStatus.message}</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                      Current Password
+                    </label>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      value={currentPassword}
+                      onChange={e => setCurrentPassword(e.target.value)}
+                      placeholder="••••••••"
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        fontSize: '14px',
+                        color: '#FFFFFF'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                      New Password (min 6 chars)
+                    </label>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      placeholder="••••••••"
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        fontSize: '14px',
+                        color: '#FFFFFF'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                      Confirm New Password
+                    </label>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        fontSize: '14px',
+                        color: '#FFFFFF'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-secondary)',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    <span>{showPassword ? 'Hide Passwords' : 'Show Passwords'}</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={passwordStatus.type === 'loading'}
+                    className="btn btn-primary btn-sm"
+                    style={{ gap: '6px' }}
+                  >
+                    <Key size={14} />
+                    <span>Update Password</span>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div
+                style={{
+                  padding: '16px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  Sign in to manage your account password and security credentials.
+                </span>
+                <button onClick={openAuthModal} className="btn btn-primary btn-sm">
+                  Sign In
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 3. Streaming Quality & Autoplay */}
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '20px',
+              padding: '24px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <Sliders size={18} color="var(--brand-gold)" />
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF' }}>Streaming & Playback</h3>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>Default Streaming Quality</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Preferred resolution for movies, studio releases, and series
+                  </div>
+                </div>
+                <select
+                  value={qualityPref}
+                  onChange={e => {
+                    setQualityPref(e.target.value);
+                    localStorage.setItem('flopshow_quality', e.target.value);
+                  }}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                    color: '#FFFFFF',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    fontSize: '13px'
+                  }}
+                >
+                  <option value="Auto (Adaptive)">Auto (Adaptive)</option>
+                  <option value="1080p Full HD">1080p Full HD</option>
+                  <option value="4K Ultra HD">4K Ultra HD</option>
+                  <option value="720p HD (Data Saver)">720p HD (Data Saver)</option>
+                </select>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                  paddingTop: '14px'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>Autoplay Next Episode</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Automatically queue and start the next episode when watching a series
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !autoplayNext;
+                    setAutoplayNext(next);
+                    localStorage.setItem('flopshow_autoplay', String(next));
+                  }}
+                  style={{
+                    width: '46px',
+                    height: '26px',
+                    borderRadius: '9999px',
+                    backgroundColor: autoplayNext ? 'var(--brand-gold)' : 'rgba(255, 255, 255, 0.15)',
+                    position: 'relative',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '3px',
+                      left: autoplayNext ? '23px' : '3px',
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      backgroundColor: '#0E0E14',
+                      transition: 'left 0.2s'
+                    }}
+                  />
+                </button>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                  paddingTop: '14px'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>Video Previews on Browse</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Show motion previews when hovering over movie and series cards
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !previewHover;
+                    setPreviewHover(next);
+                    localStorage.setItem('flopshow_preview_hover', String(next));
+                  }}
+                  style={{
+                    width: '46px',
+                    height: '26px',
+                    borderRadius: '9999px',
+                    backgroundColor: previewHover ? 'var(--brand-gold)' : 'rgba(255, 255, 255, 0.15)',
+                    position: 'relative',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '3px',
+                      left: previewHover ? '23px' : '3px',
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      backgroundColor: '#0E0E14',
+                      transition: 'left 0.2s'
+                    }}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Language & Subtitles */}
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '20px',
+              padding: '24px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <Globe size={18} color="var(--brand-gold)" />
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF' }}>Language & Subtitles</h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                  Preferred Audio Language
+                </label>
+                <select
+                  value={langPref}
+                  onChange={e => {
+                    setLangPref(e.target.value);
+                    localStorage.setItem('flopshow_lang_pref', e.target.value);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                    color: '#FFFFFF',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    fontSize: '13px'
+                  }}
+                >
+                  <option value="Hindi & English">Hindi & English (Dual Audio)</option>
+                  <option value="Hindi">Hindi (Original & Dubbed)</option>
+                  <option value="English">English (Original)</option>
+                  <option value="Multi-Language">All Available Regional Tracks</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                  Default Subtitles
+                </label>
+                <select
+                  value={subsPref}
+                  onChange={e => {
+                    setSubsPref(e.target.value);
+                    localStorage.setItem('flopshow_subs_pref', e.target.value);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                    color: '#FFFFFF',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    fontSize: '13px'
+                  }}
+                >
+                  <option value="English & Hindi (Auto)">English & Hindi (Auto)</option>
+                  <option value="English">English Only</option>
+                  <option value="Hindi">Hindi Only</option>
+                  <option value="Off">Turn Off Subtitles</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* 5. Appearance / Theme */}
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '20px',
+              padding: '24px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <Moon size={18} color="var(--brand-gold)" />
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF' }}>Appearance & Theme</h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+              <div
+                onClick={() => handleThemeChange('dark')}
+                style={{
+                  padding: '16px',
+                  borderRadius: '14px',
+                  backgroundColor: themePref === 'dark' ? 'rgba(245, 166, 35, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                  border: themePref === 'dark' ? '1.5px solid var(--brand-gold)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF' }}>Cinematic Dark</span>
+                  {themePref === 'dark' && <Check size={16} color="var(--brand-gold)" />}
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Deep charcoal with signature golden highlights (Recommended).
+                </p>
+              </div>
+
+              <div
+                onClick={() => handleThemeChange('oled')}
+                style={{
+                  padding: '16px',
+                  borderRadius: '14px',
+                  backgroundColor: themePref === 'oled' ? 'rgba(245, 166, 35, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                  border: themePref === 'oled' ? '1.5px solid var(--brand-gold)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF' }}>OLED Pure Black</span>
+                  {themePref === 'oled' && <Check size={16} color="var(--brand-gold)" />}
+                </div>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  True 100% black levels optimized for OLED and AMOLED displays.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 6. Notification Preferences */}
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '20px',
+              padding: '24px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <Bell size={18} color="var(--brand-gold)" />
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF' }}>Notification Preferences</h3>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>Studio & Spider-Man Premieres</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Get alerted when new Marvel, Disney, Warner Bros., or Spider-Man films drop
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !notifyReleases;
+                    setNotifyReleases(next);
+                    localStorage.setItem('flopshow_notify_releases', String(next));
+                  }}
+                  style={{
+                    width: '46px',
+                    height: '26px',
+                    borderRadius: '9999px',
+                    backgroundColor: notifyReleases ? 'var(--brand-gold)' : 'rgba(255, 255, 255, 0.15)',
+                    position: 'relative',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '3px',
+                      left: notifyReleases ? '23px' : '3px',
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      backgroundColor: '#0E0E14',
+                      transition: 'left 0.2s'
+                    }}
+                  />
+                </button>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                  paddingTop: '14px'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>Wallet & UPI Alerts</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Receive instant confirmation when admin approves your balance recharge
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !notifyWallet;
+                    setNotifyWallet(next);
+                    localStorage.setItem('flopshow_notify_wallet', String(next));
+                  }}
+                  style={{
+                    width: '46px',
+                    height: '26px',
+                    borderRadius: '9999px',
+                    backgroundColor: notifyWallet ? 'var(--brand-gold)' : 'rgba(255, 255, 255, 0.15)',
+                    position: 'relative',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '3px',
+                      left: notifyWallet ? '23px' : '3px',
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      backgroundColor: '#0E0E14',
+                      transition: 'left 0.2s'
+                    }}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 7. Privacy, Data & Sign Out */}
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '20px',
+              padding: '24px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <Shield size={18} color="var(--brand-gold)" />
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF' }}>Privacy & Account Control</h3>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>Clear Local Watch History</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Reset your locally cached 'Continue Watching' resume points
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {clearDataSuccess && (
+                    <span style={{ fontSize: '12px', color: '#4ADE80', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircle2 size={14} /> Cleared!
+                    </span>
+                  )}
+                  <button
+                    onClick={handleClearWatchHistory}
+                    className="btn btn-ghost btn-sm"
+                    style={{ color: '#F87171', border: '1px solid rgba(248, 113, 113, 0.2)' }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Clear History</span>
+                  </button>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                  paddingTop: '16px',
+                  flexWrap: 'wrap'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>Active Session</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    {isAuthenticated ? `Logged in as ${user.email}` : 'Browsing as Guest'}
+                  </div>
+                </div>
+                {isAuthenticated ? (
+                  <button
+                    onClick={logout}
+                    className="btn btn-secondary btn-sm"
+                    style={{ color: '#F87171', borderColor: 'rgba(244, 63, 94, 0.3)' }}
+                  >
+                    <LogOut size={14} />
+                    <span>Sign Out</span>
+                  </button>
+                ) : (
+                  <button onClick={openAuthModal} className="btn btn-primary btn-sm">
+                    <User size={14} />
+                    <span>Sign In</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

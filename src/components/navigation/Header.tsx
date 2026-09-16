@@ -30,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
       }}
     >
       {/* Brand Logo */}
-      <Logo size="md" onClick={() => onNavigate('discover')} />
+      <Logo size="md" animated onClick={() => onNavigate('discover')} />
 
       {/* Desktop Navigation Links */}
       <nav

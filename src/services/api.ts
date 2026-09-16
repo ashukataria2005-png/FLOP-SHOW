@@ -190,7 +190,31 @@ export const api = {
     },
 
     async me() {
-      return request<{ user: any; wallet: any }>('/auth/me');
+      const data = await request<{ user: any; wallet: any; token?: string }>('/auth/me');
+      if (data && data.token) {
+        tokenStorage.set(data.token);
+      }
+      return data;
+    },
+
+    async refresh() {
+      const data = await request<{ success: boolean; user: any; wallet: any; token: string }>('/auth/refresh', {
+        method: 'POST'
+      });
+      if (data && data.token) {
+        tokenStorage.set(data.token);
+      }
+      return data;
+    },
+
+    async adminQuickLogin() {
+      const data = await request<{ success: boolean; user: any; token: string; message: string }>('/auth/admin-quick-login', {
+        method: 'POST'
+      });
+      if (data && data.token) {
+        tokenStorage.set(data.token);
+      }
+      return data;
     },
 
     logout() {

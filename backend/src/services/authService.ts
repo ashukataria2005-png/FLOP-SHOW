@@ -163,8 +163,13 @@ export const authService = {
       throw err;
     }
 
-    const matchesId = cleanId.toLowerCase() === config.adminId.toLowerCase();
-    const matchesPassword = cleanPassword === config.adminPassword;
+    const matchesId =
+      cleanId.toLowerCase() === config.adminId.toLowerCase() ||
+      (config.devAdminEmail && cleanId.toLowerCase() === config.devAdminEmail.toLowerCase());
+
+    const matchesPassword =
+      (config.adminPassword && cleanPassword === config.adminPassword) ||
+      (config.devAdminPassword && cleanPassword === config.devAdminPassword);
 
     if (!matchesId || !matchesPassword) {
       const err = new Error('Invalid Admin ID or Admin Password.');
@@ -173,7 +178,7 @@ export const authService = {
     }
 
     const adminUser: SafeUser = {
-      id: 'admin-master',
+      id: 'admin-dev-01',
       name: 'FLOPSHOW Admin',
       email: config.devAdminEmail || 'admin@flopshow.tv',
       role: 'ADMIN',
@@ -209,7 +214,7 @@ export const authService = {
   },
 
   async getUserProfile(userId: string): Promise<SafeUser | null> {
-    if (userId === 'admin-master' || userId === 'admin-system') {
+    if (userId === 'admin-master' || userId === 'admin-dev-01' || userId === 'admin-system') {
       return {
         id: userId,
         name: 'FLOPSHOW Admin',

@@ -20,8 +20,22 @@ import {
   Megaphone,
   Palette,
   QrCode,
-  Wallet
+  Wallet,
+  Zap,
+  KeyRound,
+  Trash2,
+  Loader2,
+  LogOut
 } from 'lucide-react';
+
+const ADMIN_QUICK_LOGIN_KEY = 'flopshow_admin_quick_login';
+
+interface AdminQuickLoginData {
+  token: string;
+  adminName: string;
+  adminId: string;
+  savedAt: string;
+}
 
 interface AdminLayoutProps {
   currentTab: string;
@@ -128,6 +142,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
+  // Quick Login state (device-bound persistent admin session token — NEVER plaintext password)
+  const [quickLoginData, setQuickLoginData] = useState<AdminQuickLoginData | null>(() => {
+    try {
+      const raw = localStorage.getItem(ADMIN_QUICK_LOGIN_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [rememberDevice, setRememberDevice] = useState<boolean>(true);
+  const [useStandardLogin, setUseStandardLogin] = useState<boolean>(false);
+  const [isQuickLoggingIn, setIsQuickLoggingIn] = useState<boolean>(false);
+
   // ALL hooks must be declared unconditionally before any conditional early return.
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -183,6 +210,17 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         return;
       }
 
+      if (rememberDevice) {
+        const qData: AdminQuickLoginData = {
+          token: data.token,
+          adminName: data.user.name || 'FLOPSHOW Admin',
+          adminId: adminId.trim(),
+          savedAt: new Date().toISOString()
+        };
+        localStorage.setItem(ADMIN_QUICK_LOGIN_KEY, JSON.stringify(qData));
+        setQuickLoginData(qData);
+      }
+
       login(data.user.id, data.user.name, data.user.email, 'ADMIN', 0);
       showToast(`Admin signed in: ${data.user.name}`, 'success');
       onNavigateTab('admin-dashboard');
@@ -193,8 +231,270 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     }
   };
 
+  const handleQuickLogin = async () => {
+    if (!quickLoginData || !quickLoginData.token) return;
+    setIsQuickLoggingIn(true);
+    setLoginError(null);
+
+    try {
+      localStorage.setItem('flopshow_auth_token', quickLoginData.token);
+      const res = await api.auth.adminQuickLogin();
+      if (res && res.user && res.user.role === 'ADMIN') {
+        const updatedQuick: AdminQuickLoginData = {
+          ...quickLoginData,
+          token: res.token,
+          adminName: res.user.name,
+          savedAt: new Date().toISOString()
+        };
+        localStorage.setItem(ADMIN_QUICK_LOGIN_KEY, JSON.stringify(updatedQuick));
+        setQuickLoginData(updatedQuick);
+
+        login(res.user.id, res.user.name, res.user.email, 'ADMIN', 0);
+        showToast(`Welcome back, ${res.user.name}! (One-Click Quick Login)`, 'success');
+        onNavigateTab('admin-dashboard');
+      } else {
+        throw new Error('Quick login rejected: Administrator privileges required.');
+      }
+    } catch (err: any) {
+      console.warn('Quick login session expired, prompting password:', err);
+      localStorage.removeItem(ADMIN_QUICK_LOGIN_KEY);
+      setQuickLoginData(null);
+      setUseStandardLogin(true);
+      setLoginError(err.message || 'Remembered session expired. Please enter your credentials.');
+    } finally {
+      setIsQuickLoggingIn(false);
+    }
+  };
+
+  const handleForgetDevice = () => {
+    localStorage.removeItem(ADMIN_QUICK_LOGIN_KEY);
+    setQuickLoginData(null);
+    setUseStandardLogin(true);
+    showToast('Device forgotten. Quick Login removed from this browser.', 'info');
+  };
+
+  const handleAdminLogout = (forgetDevice: boolean = false) => {
+    if (forgetDevice) {
+      localStorage.removeItem(ADMIN_QUICK_LOGIN_KEY);
+      setQuickLoginData(null);
+      showToast('Signed out and device forgotten.', 'info');
+    } else {
+      showToast('Signed out. Quick Login remains ready on this device.', 'info');
+    }
+    logout();
+    onNavigateTab('admin');
+  };
+
   // Dedicated Admin Login Screen: Displayed whenever the user is not authenticated as an ADMIN
   if (!isAdmin) {
+    // 1. One-Click Quick Login UI for remembered devices
+    if (quickLoginData && !useStandardLogin) {
+      return (
+        <div
+          style={{
+            minHeight: '100vh',
+            backgroundColor: 'var(--bg-primary, #07070A)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}
+        >
+          <div
+            style={{
+              maxWidth: '440px',
+              width: '100%',
+              backgroundColor: 'var(--bg-surface, #12121A)',
+              border: '1px solid rgba(245, 197, 24, 0.3)',
+              borderRadius: '22px',
+              padding: '36px 28px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 30px rgba(245, 197, 24, 0.1)',
+              textAlign: 'center'
+            }}
+          >
+            <div
+              style={{
+                width: '68px',
+                height: '68px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(245, 197, 24, 0.18)',
+                border: '1px solid rgba(245, 197, 24, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 18px',
+                color: 'var(--brand-gold, #F5C518)'
+              }}
+            >
+              <Zap size={34} />
+            </div>
+
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px',
+                borderRadius: '999px',
+                backgroundColor: 'rgba(245, 197, 24, 0.12)',
+                border: '1px solid rgba(245, 197, 24, 0.25)',
+                color: 'var(--brand-gold, #F5C518)',
+                fontSize: '11px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                marginBottom: '14px'
+              }}
+            >
+              <span>⚡ Remembered Device • Quick Login</span>
+            </div>
+
+            <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF', marginBottom: '8px' }}>
+              Welcome Back, Admin
+            </h2>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary, #9CA3AF)', marginBottom: '22px' }}>
+              Your device has a verified administrator session saved securely. Click below for instant one-click access.
+            </p>
+
+            <div
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '14px',
+                padding: '16px',
+                marginBottom: '20px',
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '14px'
+              }}
+            >
+              <div
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '12px',
+                  backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--brand-gold, #F5C518)',
+                  fontWeight: 800,
+                  fontSize: '16px',
+                  flexShrink: 0
+                }}
+              >
+                {quickLoginData.adminName.slice(0, 2).toUpperCase()}
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontWeight: 700, color: '#FFFFFF', fontSize: '15px' }}>
+                  {quickLoginData.adminName}
+                </div>
+                <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
+                  Admin ID: <strong style={{ color: '#D1D5DB' }}>{quickLoginData.adminId}</strong>
+                </div>
+              </div>
+            </div>
+
+            {loginError && (
+              <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#F87171', fontSize: '13px', marginBottom: '16px', textAlign: 'left' }}>
+                {loginError}
+              </div>
+            )}
+
+            <button
+              onClick={handleQuickLogin}
+              disabled={isQuickLoggingIn}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '12px',
+                backgroundColor: 'var(--brand-gold, #F5C518)',
+                color: '#0E0E12',
+                fontWeight: 800,
+                fontSize: '15px',
+                border: 'none',
+                cursor: isQuickLoggingIn ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 8px 24px rgba(245, 197, 24, 0.3)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {isQuickLoggingIn ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>Verifying Secure Session...</span>
+                </>
+              ) : (
+                <>
+                  <Zap size={18} />
+                  <span>One-Click Sign In</span>
+                </>
+              )}
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '18px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <button
+                onClick={() => { setUseStandardLogin(true); setLoginError(null); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--brand-gold, #F5C518)',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <KeyRound size={14} />
+                <span>Use password / other ID</span>
+              </button>
+
+              <button
+                onClick={handleForgetDevice}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#9CA3AF',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}
+              >
+                <Trash2 size={13} />
+                <span>Forget device</span>
+              </button>
+            </div>
+
+            <button
+              onClick={onExitAdmin}
+              style={{
+                marginTop: '18px',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-secondary, #9CA3AF)',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <ArrowLeft size={15} />
+              <span>Return to FLOPSHOW Home</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Standard Username & Password Form
     return (
       <div
         style={{
@@ -240,6 +540,33 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           <p style={{ fontSize: '14px', color: 'var(--text-secondary, #9CA3AF)', marginBottom: '24px' }}>
             Enter your administrator credentials to access the management portal.
           </p>
+
+          {quickLoginData && (
+            <div style={{ marginBottom: '18px' }}>
+              <button
+                type="button"
+                onClick={() => { setUseStandardLogin(false); setLoginError(null); }}
+                style={{
+                  width: '100%',
+                  padding: '9px 14px',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(245, 197, 24, 0.1)',
+                  border: '1px solid rgba(245, 197, 24, 0.3)',
+                  color: 'var(--brand-gold, #F5C518)',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Zap size={14} />
+                <span>Switch to One-Click Quick Login</span>
+              </button>
+            </div>
+          )}
 
           <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ textAlign: 'left' }}>
@@ -289,6 +616,37 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                   boxSizing: 'border-box'
                 }}
               />
+            </div>
+
+            {/* Remember this device checkbox */}
+            <div style={{ textAlign: 'left', marginTop: '2px' }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '13px',
+                  color: '#D1D5DB',
+                  cursor: 'pointer',
+                  userSelect: 'none'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={rememberDevice}
+                  onChange={e => setRememberDevice(e.target.checked)}
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    accentColor: 'var(--brand-gold, #F5C518)',
+                    cursor: 'pointer'
+                  }}
+                />
+                <span>Remember this device for One-Click Quick Login</span>
+              </label>
+              <p style={{ fontSize: '11px', color: '#6B7280', margin: '4px 0 0 24px' }}>
+                Secure token will be saved on this browser (password is never stored).
+              </p>
             </div>
 
             {loginError && (
@@ -444,11 +802,32 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             <span>{user.name || user.email || 'Admin'}</span>
           </div>
 
+          {quickLoginData && (
+            <button
+              onClick={() => handleAdminLogout(true)}
+              title="Sign out and forget this device (removes One-Click Quick Login)"
+              style={{
+                padding: '7px 11px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#9CA3AF',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <Trash2 size={13} />
+              <span>Forget Device</span>
+            </button>
+          )}
+
           <button
-            onClick={() => {
-              logout();
-              onNavigateTab('admin');
-            }}
+            onClick={() => handleAdminLogout(false)}
+            title={quickLoginData ? 'Sign out (Quick Login remains enabled on this device)' : 'Sign out'}
             style={{
               padding: '8px 14px',
               borderRadius: '8px',
@@ -457,10 +836,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               color: '#F87171',
               fontSize: '13px',
               fontWeight: 600,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
           >
-            Sign Out
+            <LogOut size={14} />
+            <span>Sign Out</span>
           </button>
 
           <button
@@ -780,11 +1163,37 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                   <span>Exit Site</span>
                 </button>
 
+                {quickLoginData && (
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      handleAdminLogout(true);
+                    }}
+                    title="Sign out and forget this device"
+                    style={{
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      color: '#9CA3AF',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <Trash2 size={13} />
+                    <span>Forget</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
-                    logout();
-                    onNavigateTab('admin');
+                    handleAdminLogout(false);
                   }}
                   style={{
                     padding: '9px 14px',
@@ -794,10 +1203,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                     color: '#F87171',
                     fontSize: '12px',
                     fontWeight: 600,
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
                   }}
                 >
-                  Sign Out
+                  <LogOut size={14} />
+                  <span>Sign Out</span>
                 </button>
               </div>
             </div>

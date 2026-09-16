@@ -64,7 +64,7 @@ export const handleAdminLogin = async (req: any, res: any, next: any) => {
 authRouter.post('/admin-login', handleAdminLogin);
 authRouter.post('/admin/login', handleAdminLogin);
 
-// GET /api/auth/me
+// GET /api/auth/me (with session refresh)
 authRouter.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const user = await authService.getUserProfile(req.user!.id);
@@ -74,7 +74,51 @@ authRouter.get('/me', requireAuth, async (req: AuthenticatedRequest, res: Respon
     }
 
     const wallet = await walletService.getBalance(user.id);
-    res.json({ user, wallet });
+    const refreshedToken = authService.generateToken(user);
+    res.json({ user, wallet, token: refreshedToken });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/refresh (extend active session without re-login)
+authRouter.post('/refresh', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const user = await authService.getUserProfile(req.user!.id);
+    if (!user) {
+      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found.' } });
+      return;
+    }
+
+    const wallet = await walletService.getBalance(user.id);
+    const freshToken = authService.generateToken(user);
+    res.json({ success: true, user, wallet, token: freshToken });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/admin-quick-login (verifies remembered admin session and issues active session)
+authRouter.post('/admin-quick-login', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const user = await authService.getUserProfile(req.user!.id);
+    if (!user || user.role !== 'ADMIN') {
+      res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Access denied: Administrator privileges required.'
+        }
+      });
+      return;
+    }
+
+    const freshToken = authService.generateToken(user);
+    res.json({
+      success: true,
+      user,
+      token: freshToken,
+      message: 'Quick login successful.'
+    });
   } catch (err) {
     next(err);
   }

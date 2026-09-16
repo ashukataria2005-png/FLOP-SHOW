@@ -160,6 +160,7 @@ const AppContent: React.FC = () => {
   const {
     user,
     isAuthenticated,
+    sessionLoading,
     toasts,
     activeMediaSource,
     closePlayer,
@@ -196,13 +197,13 @@ const AppContent: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }, [currentTab, selectedItem]);
 
-  // Route security: If an unauthenticated user or non-admin tries to open a protected admin sub-route directly, send them to /admin (the Admin Login page)
+  // Route security: Only redirect unauthenticated non-admins once the initial session loading has completed
   useEffect(() => {
-    if (currentTab.startsWith('admin') && currentTab !== 'admin' && (!isAuthenticated || !isAdmin)) {
+    if (!sessionLoading && currentTab.startsWith('admin') && currentTab !== 'admin' && (!isAuthenticated || !isAdmin)) {
       setCurrentTab('admin');
       window.history.replaceState(null, '', '/admin');
     }
-  }, [currentTab, isAuthenticated, isAdmin]);
+  }, [currentTab, isAuthenticated, isAdmin, sessionLoading]);
 
   // If authenticated as admin and on /admin, redirect/open the Admin Dashboard
   useEffect(() => {
@@ -216,7 +217,7 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const handlePopState = () => {
       const route = pathToTab(window.location.pathname);
-      if (route.tab.startsWith('admin') && route.tab !== 'admin' && (!isAuthenticated || !isAdmin)) {
+      if (!sessionLoading && route.tab.startsWith('admin') && route.tab !== 'admin' && (!isAuthenticated || !isAdmin)) {
         setCurrentTab('admin');
         window.history.replaceState(null, '', '/admin');
         return;
@@ -228,7 +229,7 @@ const AppContent: React.FC = () => {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [isAuthenticated, isAdmin]);
+  }, [isAuthenticated, isAdmin, sessionLoading]);
 
   const handleNavigate = (tab: string, param?: string) => {
     if (tab === 'details' && !param) return;

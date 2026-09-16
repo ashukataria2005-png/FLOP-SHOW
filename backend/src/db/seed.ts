@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { getAdapter } from './adapter.js';
 import { config } from '../config/env.js';
+import { adminAccountService } from '../services/adminAccountService.js';
 
 export interface SeedReport {
   genresCount: number;
@@ -26,6 +27,7 @@ export async function seedDatabase(): Promise<SeedReport> {
   const now = new Date().toISOString();
 
   let adminCreated = false;
+  let adminEmail: string | undefined;
   let adminGeneratedPassword: string | undefined;
 
   await db.transaction(async txDb => {
@@ -58,40 +60,11 @@ export async function seedDatabase(): Promise<SeedReport> {
     }
 
     // ------------------------------------------------------------------------
-    // 2. SEED ADMIN ACCOUNT (SAFE MECHANISM — idempotent)
+    // 2. SEED ADMIN ACCOUNT (SAFE MECHANISM — ensures exactly ONE admin exists)
     // ------------------------------------------------------------------------
-    let adminPassword = config.devAdminPassword;
-
-    if (!adminPassword) {
-      // Auto-generate a random secure development password if not specified
-      adminGeneratedPassword = crypto.randomBytes(12).toString('base64url') + '!A1';
-      adminPassword = adminGeneratedPassword;
-      console.log('------------------------------------------------------------');
-      console.log('NOTICE: DEV_ADMIN_PASSWORD was not specified.');
-      console.log(`Generated development admin password: ${adminGeneratedPassword}`);
-      console.log('------------------------------------------------------------');
-    }
-
-    const adminSalt = await bcrypt.genSalt(10);
-    const adminPasswordHash = await bcrypt.hash(adminPassword, adminSalt);
-    const adminEmail = config.devAdminEmail.toLowerCase().trim();
-    const adminId = 'admin-dev-01';
-
-    await txDb.run(
-      `INSERT INTO users (id, name, email, password_hash, role, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'ADMIN', 'ACTIVE', ?, ?)
-       ON CONFLICT (id) DO NOTHING;`,
-      [adminId, 'FLOPSHOW System Admin', adminEmail, adminPasswordHash, now, now]
-    );
-
-    await txDb.run(
-      `INSERT INTO wallets (user_id, balance, updated_at)
-       VALUES (?, 0, ?)
-       ON CONFLICT (user_id) DO NOTHING;`,
-      [adminId, now]
-    );
-
+    const cleanupRes = await adminAccountService.ensureSingleAdminAccount();
     adminCreated = true;
+    adminEmail = cleanupRes.adminEmail;
 
     // ------------------------------------------------------------------------
     // 3. SEED DEDICATED DEMO / TEST ACCOUNT (idempotent — never recreated)

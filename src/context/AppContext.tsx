@@ -105,7 +105,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const hasToken = Boolean(localStorage.getItem('flopshow_auth_token'));
     return hasToken ? loadFromStorage('user', GUEST_USER) : GUEST_USER;
   });
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    const hasToken = Boolean(localStorage.getItem('flopshow_auth_token'));
+    const savedUser = loadFromStorage('user', GUEST_USER);
+    return Boolean(hasToken && savedUser && savedUser.id && savedUser.id !== 'guest-user');
+  });
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => {
@@ -121,7 +125,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return hasToken ? loadFromStorage('watch_progress', INITIAL_WATCH_PROGRESS) : [];
   });
   // sessionLoading: true while we're checking the stored JWT on startup
-  const [sessionLoading, setSessionLoading] = useState<boolean>(true);
+  const [sessionLoading, setSessionLoading] = useState<boolean>(() => {
+    return Boolean(localStorage.getItem('flopshow_auth_token'));
+  });
 
   const setTheme = (newTheme: AppTheme) => {
     setThemeState(newTheme);
@@ -218,18 +224,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           // Sync wallet transactions from backend
           syncTransactions();
         }
-      }).catch(() => {
-        // Token is invalid or expired — clean up completely so the user is
-        // not silently left in an authenticated state with stale data.
-        tokenStorage.clear();
-        setIsAuthenticated(false);
-        setUser(GUEST_USER);
-        setWalletBalance(0);
-        setTransactions([]);
-        setPurchases([]);
-        setMyList([]);
-        setWatchProgress([]);
-        saveToStorage('user', GUEST_USER);
+      }).catch((err: any) => {
+        // ONLY invalidate session if server explicitly rejected credentials (401 Unauthorized or INVALID_TOKEN).
+        // If it's a network glitch, timeout, 500/502/503 server restart error, DO NOT log the user out!
+        const isAuthRejection = err?.status === 401 || err?.code === 'INVALID_TOKEN' || err?.code === 'UNAUTHORIZED';
+        if (isAuthRejection) {
+          console.warn('[Auth] Session token invalid or expired, signing out.');
+          tokenStorage.clear();
+          setIsAuthenticated(false);
+          setUser(GUEST_USER);
+          setWalletBalance(0);
+          setTransactions([]);
+          setPurchases([]);
+          setMyList([]);
+          setWatchProgress([]);
+          saveToStorage('user', GUEST_USER);
+        } else {
+          console.warn('[Auth] Transient network or server error while validating session; keeping cached session.', err);
+          // Keep the restored session active!
+        }
       }).finally(() => {
         setSessionLoading(false);
       });

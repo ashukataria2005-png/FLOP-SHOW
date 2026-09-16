@@ -196,7 +196,6 @@ input, textarea, select {
 @media (min-width: 900px) {
   .main-content {
     padding-bottom: 60px;
-    padding-top: var(--header-height);
   }
 }
 

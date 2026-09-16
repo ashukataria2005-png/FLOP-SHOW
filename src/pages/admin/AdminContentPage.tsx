@@ -22,7 +22,8 @@ import {
   AlertTriangle,
   Sparkles,
   MoreVertical,
-  Crown
+  Crown,
+  Gift
 } from 'lucide-react';
 
 interface AdminContentPageProps {
@@ -133,6 +134,28 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
       refreshCatalog();
     } catch (err: any) {
       showToast(err.message || 'Failed to update Trending position.', 'error');
+    }
+  };
+
+  // Handle 1-click Quick Free / Paid Toggle
+  const handleToggleFree = async (item: ContentItem) => {
+    const isCurrentlyFree = item.price === 0 || item.isFree;
+    const newPrice = isCurrentlyFree ? (item.type === 'movie' ? 10 : 20) : 0;
+
+    try {
+      await api.admin.updatePrice(item.id, newPrice);
+      setContentList(prev =>
+        prev.map(c => (c.id === item.id ? { ...c, price: newPrice, isFree: newPrice === 0 } : c))
+      );
+      refreshCatalog();
+      showToast(
+        newPrice === 0
+          ? `"${item.title}" is now 100% FREE!`
+          : `"${item.title}" set to ₹${newPrice} (PAID)`,
+        'success'
+      );
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update content price.', 'error');
     }
   };
 
@@ -253,6 +276,27 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
           >
             <Crown size={18} color="var(--brand-gold, #F5C518)" />
             <span>Home Hero</span>
+          </button>
+
+          <button
+            onClick={() => onNavigateTab('admin-free-content')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 20px',
+              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+              color: '#10B981',
+              border: '1px solid rgba(16, 185, 129, 0.35)',
+              fontWeight: 800,
+              fontSize: '14px',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Gift size={18} />
+            <span>Free Content Manager</span>
           </button>
 
           <button
@@ -617,9 +661,28 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({ onNavigateTa
 
                       {/* Price */}
                       <td style={{ padding: '16px 20px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: 700, color: item.price === 0 ? '#10B981' : '#FFFFFF' }}>
-                          {item.price === 0 ? 'FREE' : `₹${item.price}`}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '14px', fontWeight: 700, color: item.price === 0 ? '#10B981' : '#FFFFFF' }}>
+                            {item.price === 0 ? 'FREE' : `₹${item.price}`}
+                          </span>
+                          <button
+                            onClick={() => handleToggleFree(item)}
+                            title={item.price === 0 ? 'Set as Paid' : 'Make 100% Free'}
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              border: item.price === 0 ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.15)',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              backgroundColor: item.price === 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                              color: item.price === 0 ? '#10B981' : '#D1D5DB',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {item.price === 0 ? 'Make Paid' : 'Make Free'}
+                          </button>
+                        </div>
                       </td>
 
                       {/* Status Badge */}

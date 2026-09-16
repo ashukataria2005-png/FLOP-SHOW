@@ -169,7 +169,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, onViewDetails }) =
             style={{ minWidth: '140px' }}
           >
             <Play size={18} fill="currentColor" />
-            <span>{owned || item.isFree ? 'Watch now' : `Buy for ₹${item.price}`}</span>
+            <span>{owned || item.isFree || item.price === 0 ? 'Watch now' : `Buy for ₹${item.price}`}</span>
           </button>
 
           <button

@@ -1,20 +1,30 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { GENRE_LIST } from '../data/catalog';
 import { ContentItem } from '../types/content';
 import { ContentCard } from '../components/cards/ContentCard';
 import { useApp } from '../context/AppContext';
-import { Search as SearchIcon, X, Film, Tv } from 'lucide-react';
+import { Search as SearchIcon, X, Film, Tv, Gift } from 'lucide-react';
 
 interface SearchPageProps {
   onSelectItem: (item: ContentItem) => void;
+  initialFilter?: string;
 }
 
-export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem }) => {
+export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem, initialFilter }) => {
   const { catalog } = useApp();
   const activeCatalog = catalog || [];
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'movie' | 'series'>('all');
   const [selectedGenre, setSelectedGenre] = useState<string>('All');
+  const [priceFilter, setPriceFilter] = useState<'all' | 'free' | 'paid'>(() => {
+    return initialFilter === 'free' ? 'free' : 'all';
+  });
+
+  useEffect(() => {
+    if (initialFilter === 'free') {
+      setPriceFilter('free');
+    }
+  }, [initialFilter]);
 
   // Filter logic
   const filteredItems = useMemo(() => {
@@ -32,9 +42,20 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem }) => {
       // Genre match
       const matchesGenre = selectedGenre === 'All' || item.genres.includes(selectedGenre);
 
-      return matchesQuery && matchesType && matchesGenre;
+      // Price / Free match
+      const isItemFree = Boolean(item.isFree || item.price === 0);
+      const matchesPrice =
+        priceFilter === 'all' ||
+        (priceFilter === 'free' && isItemFree) ||
+        (priceFilter === 'paid' && !isItemFree);
+
+      return matchesQuery && matchesType && matchesGenre && matchesPrice;
     });
-  }, [query, typeFilter, selectedGenre]);
+  }, [query, typeFilter, selectedGenre, priceFilter, activeCatalog]);
+
+  const freeItems = useMemo(() => {
+    return activeCatalog.filter(item => item.isFree || item.price === 0);
+  }, [activeCatalog]);
 
   return (
     <div style={{ padding: '24px 20px', maxWidth: 'var(--max-width)', margin: '0 auto' }}>
@@ -93,18 +114,32 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem }) => {
         )}
       </div>
 
-      {/* Type Filter Pills: All / Movies / Series */}
+      {/* Type Filter Pills: All / Free / Movies / Series */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', overflowX: 'auto', paddingBottom: '4px' }}>
         <button
-          onClick={() => setTypeFilter('all')}
-          className={`btn btn-sm ${typeFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => { setTypeFilter('all'); setPriceFilter('all'); }}
+          className={`btn btn-sm ${typeFilter === 'all' && priceFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
         >
           All Content
         </button>
 
         <button
+          onClick={() => setPriceFilter(prev => prev === 'free' ? 'all' : 'free')}
+          className={`btn btn-sm ${priceFilter === 'free' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{
+            borderColor: priceFilter === 'free' ? 'var(--brand-gold)' : 'rgba(16, 185, 129, 0.4)',
+            backgroundColor: priceFilter === 'free' ? 'rgba(245, 166, 35, 0.25)' : 'rgba(16, 185, 129, 0.12)',
+            color: priceFilter === 'free' ? 'var(--brand-gold)' : '#10B981',
+            fontWeight: 700
+          }}
+        >
+          <Gift size={15} />
+          <span>100% Free ({freeItems.length})</span>
+        </button>
+
+        <button
           onClick={() => setTypeFilter('movie')}
-          className={`btn btn-sm ${typeFilter === 'movie' ? 'btn-primary' : 'btn-secondary'}`}
+          className={`btn btn-sm ${typeFilter === 'movie' && priceFilter !== 'free' ? 'btn-primary' : 'btn-secondary'}`}
         >
           <Film size={15} />
           <span>Movies</span>
@@ -112,12 +147,55 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem }) => {
 
         <button
           onClick={() => setTypeFilter('series')}
-          className={`btn btn-sm ${typeFilter === 'series' ? 'btn-primary' : 'btn-secondary'}`}
+          className={`btn btn-sm ${typeFilter === 'series' && priceFilter !== 'free' ? 'btn-primary' : 'btn-secondary'}`}
         >
           <Tv size={15} />
           <span>Webseries</span>
         </button>
       </div>
+
+      {/* Free Content Highlight Banner (when browsing all content) */}
+      {query === '' && priceFilter === 'all' && freeItems.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '14px 20px',
+            borderRadius: '14px',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            marginBottom: '20px',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Gift size={22} color="#10B981" />
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF' }}>
+                Dedicated 100% Free Section
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                {freeItems.length} titles are currently completely free to stream without payments.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setPriceFilter('free')}
+            className="btn btn-sm"
+            style={{
+              backgroundColor: '#10B981',
+              color: '#07070A',
+              fontWeight: 700,
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            Show Free Only
+          </button>
+        </div>
+      )}
 
       {/* Genre Filter Pills */}
       <div
@@ -166,18 +244,22 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem }) => {
         }}
       >
         <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+          {priceFilter === 'free' && (
+            <span style={{ color: '#10B981', fontWeight: 700, marginRight: '6px' }}>[100% FREE]</span>
+          )}
           Found <strong style={{ color: '#FFFFFF' }}>{filteredItems.length}</strong> title
           {filteredItems.length === 1 ? '' : 's'}
         </span>
 
-        {(query || typeFilter !== 'all' || selectedGenre !== 'All') && (
+        {(query || typeFilter !== 'all' || selectedGenre !== 'All' || priceFilter !== 'all') && (
           <button
             onClick={() => {
               setQuery('');
               setTypeFilter('all');
               setSelectedGenre('All');
+              setPriceFilter('all');
             }}
-            style={{ fontSize: '13px', color: 'var(--brand-gold)', fontWeight: 600 }}
+            style={{ fontSize: '13px', color: 'var(--brand-gold)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
           >
             Reset Filters
           </button>

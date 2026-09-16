@@ -6,7 +6,6 @@ import { DiscoverPage } from './pages/DiscoverPage';
 import { SearchPage } from './pages/SearchPage';
 import { DetailsPage } from './pages/DetailsPage';
 import { LibraryPage } from './pages/LibraryPage';
-import { WalletPage } from './pages/WalletPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
@@ -24,6 +23,7 @@ import { AdminAdsPage } from './pages/admin/AdminAdsPage';
 import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage';
 import { AdminUpiSettingsPage } from './pages/admin/AdminUpiSettingsPage';
 import { AdminFinancePage } from './pages/admin/AdminFinancePage';
+import { AdminFreeContentPage } from './pages/admin/AdminFreeContentPage';
 import { PurchaseModal } from './components/purchase/PurchaseModal';
 import { RechargeModal } from './components/wallet/RechargeModal';
 import { AuthModal } from './components/auth/AuthModal';
@@ -45,6 +45,9 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   }
   if (cleanPath === '/admin/content') {
     return { tab: 'admin-content' };
+  }
+  if (cleanPath === '/admin/free-content') {
+    return { tab: 'admin-free-content' };
   }
   if (cleanPath === '/admin/hero') {
     return { tab: 'admin-hero' };
@@ -96,8 +99,8 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   if (cleanPath === '/library') {
     return { tab: 'library' };
   }
-  if (cleanPath === '/wallet') {
-    return { tab: 'wallet' };
+  if (cleanPath === '/wallet' || cleanPath === '/profile/wallet') {
+    return { tab: 'profile', param: 'wallet' };
   }
   if (cleanPath === '/profile') {
     return { tab: 'profile' };
@@ -108,7 +111,7 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
 /**
  * Map app tab state to browser URL pathname
  */
-function tabToPath(tab: string, param?: string): string {
+export function tabToPath(tab: string, param?: string): string {
   switch (tab) {
     case 'admin':
       return '/admin';
@@ -116,6 +119,8 @@ function tabToPath(tab: string, param?: string): string {
       return '/admin/dashboard';
     case 'admin-content':
       return '/admin/content';
+    case 'admin-free-content':
+      return '/admin/free-content';
     case 'admin-hero':
       return '/admin/hero';
     case 'admin-spotlight':
@@ -147,9 +152,9 @@ function tabToPath(tab: string, param?: string): string {
     case 'library':
       return '/library';
     case 'wallet':
-      return '/wallet';
+      return '/profile/wallet';
     case 'profile':
-      return '/profile';
+      return param === 'wallet' ? '/profile/wallet' : '/profile';
     case 'discover':
     default:
       return '/';
@@ -199,7 +204,11 @@ const AppContent: React.FC = () => {
 
   // Route security: Only redirect unauthenticated non-admins once the initial session loading has completed
   useEffect(() => {
-    if (!sessionLoading && currentTab.startsWith('admin') && currentTab !== 'admin' && (!isAuthenticated || !isAdmin)) {
+    const hasAdminDeviceAuth = Boolean(
+      localStorage.getItem('flopshow_admin_quick_login') ||
+      localStorage.getItem('flopshow_admin_token')
+    );
+    if (!sessionLoading && currentTab.startsWith('admin') && currentTab !== 'admin' && (!isAuthenticated || !isAdmin) && !hasAdminDeviceAuth) {
       setCurrentTab('admin');
       window.history.replaceState(null, '', '/admin');
     }
@@ -217,7 +226,11 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const handlePopState = () => {
       const route = pathToTab(window.location.pathname);
-      if (!sessionLoading && route.tab.startsWith('admin') && route.tab !== 'admin' && (!isAuthenticated || !isAdmin)) {
+      const hasAdminDeviceAuth = Boolean(
+        localStorage.getItem('flopshow_admin_quick_login') ||
+        localStorage.getItem('flopshow_admin_token')
+      );
+      if (!sessionLoading && route.tab.startsWith('admin') && route.tab !== 'admin' && (!isAuthenticated || !isAdmin) && !hasAdminDeviceAuth) {
         setCurrentTab('admin');
         window.history.replaceState(null, '', '/admin');
         return;
@@ -262,6 +275,7 @@ const AppContent: React.FC = () => {
         >
           {currentTab === 'admin-dashboard' && <AdminDashboardPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-content' && <AdminContentPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-free-content' && <AdminFreeContentPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-hero' && <AdminHeroPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-spotlight' && <AdminSpotlightPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-ads' && <AdminAdsPage onNavigateTab={handleNavigate} />}
@@ -277,7 +291,7 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-design' && <AdminDesignPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings'].includes(currentTab) && (
+          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>
@@ -364,10 +378,13 @@ const AppContent: React.FC = () => {
               <LibraryPage onSelectItem={handleSelectItem} onNavigate={handleNavigate} />
             )}
             {currentTab === 'wallet' && (
-              <WalletPage />
+              <ProfilePage initialSection="wallet" onNavigate={handleNavigate} />
             )}
             {currentTab === 'profile' && (
-              <ProfilePage onNavigate={handleNavigate} />
+              <ProfilePage
+                initialSection={adminParam === 'wallet' ? 'wallet' : 'profile'}
+                onNavigate={handleNavigate}
+              />
             )}
           </>
         )}

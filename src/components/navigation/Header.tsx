@@ -88,30 +88,14 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
           <Bookmark size={18} />
           My Library
         </button>
-
-        <button
-          onClick={() => onNavigate('wallet')}
-          style={{
-            color: currentTab === 'wallet' ? 'var(--brand-gold)' : 'var(--text-secondary)',
-            fontWeight: currentTab === 'wallet' ? 700 : 500,
-            fontSize: '15px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'color var(--transition-fast)'
-          }}
-        >
-          <Wallet size={18} />
-          Wallet
-        </button>
       </nav>
 
       {/* Right Action Icons: Wallet balance & Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
         {/* Wallet Balance Pill */}
         <button
-          onClick={() => onNavigate('wallet')}
-          title="Open Wallet"
+          onClick={() => onNavigate('profile', 'wallet')}
+          title="Open Wallet in Profile"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -123,6 +107,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
             color: 'var(--brand-gold)',
             fontSize: '14px',
             fontWeight: 700,
+            cursor: 'pointer',
             transition: 'all var(--transition-fast)'
           }}
           onMouseEnter={e => {
@@ -138,9 +123,9 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
           <span>₹{walletBalance}</span>
         </button>
 
-        {/* User Avatar Circle matching screenshot 1 */}
+        {/* User Avatar Circle */}
         <button
-          onClick={() => onNavigate('profile')}
+          onClick={() => onNavigate('profile', 'profile')}
           title="Account Profile"
           style={{
             width: '40px',

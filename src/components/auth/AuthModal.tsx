@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
-import { X, UserCheck, Sparkles, Loader2, ShieldCheck } from 'lucide-react';
+import { X, UserCheck, Loader2, ShieldCheck } from 'lucide-react';
 import { Logo } from '../common/Logo';
 
 // Signup flow steps
@@ -99,22 +99,6 @@ export const AuthModal: React.FC = () => {
     signup(pendingUserId, pendingName, pendingEmail, pendingBalance);
   };
 
-  // ── Quick Demo Login ───────────────────────────────────────────────────────
-  const handleQuickDemo = async () => {
-    setError(null);
-    setIsSubmitting(true);
-    try {
-      // The demo account is seeded idempotently at backend startup.
-      // We ONLY login — never register — to avoid duplicate demo accounts.
-      const data = await api.auth.login('demo@flopshow.tv', 'demo1234');
-      login(data.user.id, data.user.name, data.user.email, data.user.role, data.wallet?.balanceRupees ?? 0);
-    } catch (err: any) {
-      setError(err?.message || 'Demo account unavailable. Please create your own account.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleClose = () => {
     resetForm();
     closeAuthModal();
@@ -185,10 +169,6 @@ export const AuthModal: React.FC = () => {
             <button type="submit" disabled={isSubmitting} className="btn btn-primary btn-block btn-lg" style={{ marginBottom: '12px' }}>
               {isSubmitting ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <UserCheck size={18} />}
               <span>{isSubmitting ? 'Signing in...' : 'Sign In to FLOPSHOW'}</span>
-            </button>
-            <button type="button" onClick={handleQuickDemo} disabled={isSubmitting} className="btn btn-secondary btn-block" style={{ fontSize: '13px' }}>
-              <Sparkles size={16} color="var(--brand-gold)" />
-              <span>Quick Login as Demo User</span>
             </button>
           </form>
         )}

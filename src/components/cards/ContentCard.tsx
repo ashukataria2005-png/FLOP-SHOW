@@ -94,8 +94,8 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, onSelect, width 
             </span>
           )}
           {owned && <Badge type="OWNED" />}
-          {!owned && item.isFree && <Badge type="FREE" />}
-          {!owned && !item.isFree && <Badge type="PRICE" price={item.price} />}
+          {!owned && (item.isFree || item.price === 0) && <Badge type="FREE" />}
+          {!owned && !item.isFree && item.price > 0 && <Badge type="PRICE" price={item.price} />}
           {item.isNow && <Badge type="NOW" />}
         </div>
 

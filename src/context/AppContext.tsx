@@ -11,7 +11,7 @@ import {
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { formatCurrentDate } from '../utils/formatters';
 import { MediaPlayerSource } from '../components/player/MediaPlayer';
-import { api, tokenStorage, API_BASE_URL } from '../services/api';
+import { api, tokenStorage, adminTokenStorage, API_BASE_URL } from '../services/api';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 
 interface Toast {
@@ -97,36 +97,47 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // State initialization with localStorage persistence
   // NOTE: isAuthenticated defaults to FALSE — the startup useEffect will restore
   // the session from the stored JWT if one exists and is still valid.
-  // Defaulting to true was the root cause of silent demo-account auto-login.
+  // Helper to determine if any credentials or device session exist
+  const hasAnyStoredAuth = (): boolean => {
+    try {
+      return Boolean(
+        localStorage.getItem('flopshow_auth_token') ||
+        localStorage.getItem('flopshow_admin_token') ||
+        localStorage.getItem('flopshow_admin_quick_login')
+      );
+    } catch {
+      return false;
+    }
+  };
+
   const [theme, setThemeState] = useState<AppTheme>(() => loadFromStorage('app_theme', 'flopshow-gold'));
   const [user, setUser] = useState<User>(() => {
-    // Only restore a saved user if there is an auth token — otherwise start as guest.
-    // We check localStorage directly here to avoid a circular import (tokenStorage).
-    const hasToken = Boolean(localStorage.getItem('flopshow_auth_token'));
+    // Only restore a saved user if there is an auth token or remembered device
+    const hasToken = hasAnyStoredAuth();
     return hasToken ? loadFromStorage('user', GUEST_USER) : GUEST_USER;
   });
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const hasToken = Boolean(localStorage.getItem('flopshow_auth_token'));
+    const hasToken = hasAnyStoredAuth();
     const savedUser = loadFromStorage('user', GUEST_USER);
     return Boolean(hasToken && savedUser && savedUser.id && savedUser.id !== 'guest-user');
   });
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => {
-    const hasToken = Boolean(localStorage.getItem('flopshow_auth_token'));
+    const hasToken = hasAnyStoredAuth();
     return hasToken ? loadFromStorage('purchases', INITIAL_PURCHASES) : [];
   });
   const [myList, setMyList] = useState<string[]>(() => {
-    const hasToken = Boolean(localStorage.getItem('flopshow_auth_token'));
+    const hasToken = hasAnyStoredAuth();
     return hasToken ? loadFromStorage('my_list', INITIAL_MY_LIST) : [];
   });
   const [watchProgress, setWatchProgress] = useState<WatchProgress[]>(() => {
-    const hasToken = Boolean(localStorage.getItem('flopshow_auth_token'));
+    const hasToken = hasAnyStoredAuth();
     return hasToken ? loadFromStorage('watch_progress', INITIAL_WATCH_PROGRESS) : [];
   });
-  // sessionLoading: true while we're checking the stored JWT on startup
+  // sessionLoading: true while we're verifying stored token on startup
   const [sessionLoading, setSessionLoading] = useState<boolean>(() => {
-    return Boolean(localStorage.getItem('flopshow_auth_token'));
+    return hasAnyStoredAuth();
   });
 
   const setTheme = (newTheme: AppTheme) => {
@@ -183,12 +194,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Keep local default
     });
 
-    const token = tokenStorage.get();
+    const token = tokenStorage.get() || adminTokenStorage.get();
     if (token) {
-      // We have a stored JWT — validate it with the backend and restore the session.
+      // Validate token with backend and restore user session
       api.auth.me().then(({ user: serverUser, wallet: serverWallet }) => {
         if (serverUser) {
-          // Update user state with the authoritative backend values (including real ID)
           const restoredUser: User = {
             id: serverUser.id,
             name: serverUser.name,
@@ -199,9 +209,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           };
           setUser(restoredUser);
           saveToStorage('user', restoredUser);
-          setWalletBalance(serverWallet.balanceRupees);
+          if (serverWallet?.balanceRupees !== undefined) {
+            setWalletBalance(serverWallet.balanceRupees);
+          }
           setIsAuthenticated(true);
-          // Fetch purchases for the restored session
+
+          // Fetch purchases for restored session
           api.library.getPurchases().then((backendPurchases) => {
             const localPurchases = backendPurchases.map((p: any) => ({
               id: p.id,
@@ -221,16 +234,64 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }).catch((err) => {
             console.warn('Failed to sync purchases from backend', err);
           });
+
           // Sync wallet transactions from backend
           syncTransactions();
         }
-      }).catch((err: any) => {
-        // ONLY invalidate session if server explicitly rejected credentials (401 Unauthorized or INVALID_TOKEN).
-        // If it's a network glitch, timeout, 500/502/503 server restart error, DO NOT log the user out!
+      }).catch(async (err: any) => {
         const isAuthRejection = err?.status === 401 || err?.code === 'INVALID_TOKEN' || err?.code === 'UNAUTHORIZED';
         if (isAuthRejection) {
+          // Attempt automatic session refresh before destroying state
+          try {
+            const refreshed = await api.auth.refresh();
+            if (refreshed?.user) {
+              const restoredUser: User = {
+                id: refreshed.user.id,
+                name: refreshed.user.name,
+                email: refreshed.user.email,
+                avatarInitials: (refreshed.user.name || '').trim().split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U',
+                joinedDate: refreshed.user.createdAt ? new Date(refreshed.user.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : formatCurrentDate(),
+                role: refreshed.user.role
+              };
+              setUser(restoredUser);
+              saveToStorage('user', restoredUser);
+              if (refreshed.wallet?.balanceRupees !== undefined) {
+                setWalletBalance(refreshed.wallet.balanceRupees);
+              }
+              setIsAuthenticated(true);
+              return;
+            }
+          } catch {
+            // Standard refresh failed
+          }
+
+          // Check if admin quick login is present before giving up
+          const hasAdminQuick = Boolean(localStorage.getItem('flopshow_admin_quick_login'));
+          if (hasAdminQuick) {
+            try {
+              const res = await api.auth.adminQuickLogin();
+              if (res?.user && res.user.role === 'ADMIN') {
+                const restoredAdmin: User = {
+                  id: res.user.id,
+                  name: res.user.name,
+                  email: res.user.email,
+                  avatarInitials: 'AK',
+                  joinedDate: formatCurrentDate(),
+                  role: 'ADMIN'
+                };
+                setUser(restoredAdmin);
+                saveToStorage('user', restoredAdmin);
+                setIsAuthenticated(true);
+                return;
+              }
+            } catch {
+              // Admin quick login also failed
+            }
+          }
+
           console.warn('[Auth] Session token invalid or expired, signing out.');
           tokenStorage.clear();
+          adminTokenStorage.clear();
           setIsAuthenticated(false);
           setUser(GUEST_USER);
           setWalletBalance(0);
@@ -247,11 +308,66 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSessionLoading(false);
       });
     } else {
-      // No token — definitively not authenticated
-      setIsAuthenticated(false);
-      setSessionLoading(false);
+      // Check if admin quick login is saved on this device
+      const hasAdminQuick = Boolean(localStorage.getItem('flopshow_admin_quick_login'));
+      if (hasAdminQuick) {
+        api.auth.adminQuickLogin().then(res => {
+          if (res?.user && res.user.role === 'ADMIN') {
+            const restoredAdmin: User = {
+              id: res.user.id,
+              name: res.user.name,
+              email: res.user.email,
+              avatarInitials: 'AK',
+              joinedDate: formatCurrentDate(),
+              role: 'ADMIN'
+            };
+            setUser(restoredAdmin);
+            saveToStorage('user', restoredAdmin);
+            setIsAuthenticated(true);
+          } else {
+            setIsAuthenticated(false);
+          }
+        }).catch(() => {
+          setIsAuthenticated(false);
+        }).finally(() => {
+          setSessionLoading(false);
+        });
+      } else {
+        setIsAuthenticated(false);
+        setSessionLoading(false);
+      }
     }
   }, []);
+
+  // Proactive background session refresh to prevent random expiry during long editing sessions
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const interval = setInterval(() => {
+      const token = tokenStorage.get() || adminTokenStorage.get();
+      if (token) {
+        api.auth.refresh().catch(() => {
+          // Ignore background refresh errors
+        });
+      }
+    }, 4 * 60 * 60 * 1000); // every 4 hours
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const token = tokenStorage.get() || adminTokenStorage.get();
+        if (token) {
+          api.auth.refresh().catch(() => {});
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAuthenticated]);
 
   // Sync user-specific data to localStorage (only when authenticated, so guest state doesn't overwrite)
   useEffect(() => { if (isAuthenticated) saveToStorage('purchases', purchases); }, [purchases, isAuthenticated]);

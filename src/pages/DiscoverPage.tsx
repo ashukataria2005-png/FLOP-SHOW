@@ -103,6 +103,9 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     return !indianLanguages.includes(lang) && lang !== 'english' && lang !== '';
   });
 
+  // ── Free Content: items that are 100% free (price === 0 or isFree) ───────────
+  const freeItems = activeCatalog.filter(c => c.isFree || c.price === 0);
+
   // Collect all active catalog content rows in order
   const contentRows: React.ReactNode[] = [];
 
@@ -115,6 +118,19 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
         items={inProgressItems}
         onSelect={onSelectItem}
         onSeeAll={() => onNavigate('library')}
+      />
+    );
+  }
+
+  if (freeItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="free-content"
+        categoryLabel="100% FREE • WATCH WITHOUT SUBSCRIPTION"
+        title="Free Movies & Series"
+        items={freeItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'free')}
       />
     );
   }

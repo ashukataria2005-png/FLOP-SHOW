@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { api } from '../../services/api';
+import { api, adminTokenStorage } from '../../services/api';
 import {
   LayoutDashboard,
   Film,
@@ -25,7 +25,10 @@ import {
   KeyRound,
   Trash2,
   Loader2,
-  LogOut
+  LogOut,
+  Eye,
+  EyeOff,
+  Gift
 } from 'lucide-react';
 
 const ADMIN_QUICK_LOGIN_KEY = 'flopshow_admin_quick_login';
@@ -81,6 +84,7 @@ const navGroups: NavGroup[] = [
     icon: Film,
     items: [
       { id: 'admin-content', label: 'Catalog & Media', icon: Film },
+      { id: 'admin-free-content', label: 'Free Content Manager', icon: Gift },
       { id: 'admin-quick-add', label: 'Quick Add / Auto Import', icon: Sparkles },
       { id: 'admin-genres', label: 'Genres & Categories', icon: Tag }
     ]
@@ -139,6 +143,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const { user, login, logout, showToast } = useApp();
   const [adminId, setAdminId] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -158,32 +163,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   // ALL hooks must be declared unconditionally before any conditional early return.
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Track expanded groups in the sidebar drawer
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    'group-dashboard': true,
-    'group-content': true,
-    'group-payments': true,
-    'group-homepage': true,
-    'group-users': true,
-    'group-finance': true,
-    'group-ads': true,
-    'group-settings': true
-  });
+  // Clean accordion state: exactly one group open at a time, or null (all collapsed).
+  // Initialized to null: no group is automatically expanded on open/login.
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
 
   const toggleGroup = (groupId: string) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [groupId]: !prev[groupId]
-    }));
+    // Accordion behavior: opening one automatically closes any other previously opened group.
+    // Clicking the already open group collapses it.
+    setExpandedGroupId(prev => (prev === groupId ? null : groupId));
   };
-
-  // Auto-expand group containing currentTab
-  useEffect(() => {
-    const activeGroup = navGroups.find(g => g.items.some(item => item.id === currentTab));
-    if (activeGroup) {
-      setExpandedGroups(prev => ({ ...prev, [activeGroup.id]: true }));
-    }
-  }, [currentTab]);
 
   // Close drawer on Escape key (always registered; no-op when login screen is shown)
   useEffect(() => {
@@ -198,6 +186,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
   const isAdmin = Boolean(user && user.role === 'ADMIN');
 
+  // Auto-restore admin session silently on mount if device is remembered
+  useEffect(() => {
+    if (!isAdmin && quickLoginData?.token && !useStandardLogin && !isQuickLoggingIn) {
+      handleQuickLogin();
+    }
+  }, [isAdmin, quickLoginData, useStandardLogin]);
+
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
@@ -210,10 +205,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         return;
       }
 
+      adminTokenStorage.set(data.token);
+
       if (rememberDevice) {
         const qData: AdminQuickLoginData = {
           token: data.token,
-          adminName: data.user.name || 'FLOPSHOW Admin',
+          adminName: data.user.name || 'Ashu Kataria',
           adminId: adminId.trim(),
           savedAt: new Date().toISOString()
         };
@@ -223,7 +220,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
       login(data.user.id, data.user.name, data.user.email, 'ADMIN', 0);
       showToast(`Admin signed in: ${data.user.name}`, 'success');
-      onNavigateTab('admin-dashboard');
+      if (currentTab === 'admin') {
+        onNavigateTab('admin-dashboard');
+      }
     } catch (err: any) {
       setLoginError(err.message || 'Invalid Admin ID or Admin Password.');
     } finally {
@@ -238,6 +237,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
     try {
       localStorage.setItem('flopshow_auth_token', quickLoginData.token);
+      adminTokenStorage.set(quickLoginData.token);
       const res = await api.auth.adminQuickLogin();
       if (res && res.user && res.user.role === 'ADMIN') {
         const updatedQuick: AdminQuickLoginData = {
@@ -248,16 +248,20 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         };
         localStorage.setItem(ADMIN_QUICK_LOGIN_KEY, JSON.stringify(updatedQuick));
         setQuickLoginData(updatedQuick);
+        adminTokenStorage.set(res.token);
 
         login(res.user.id, res.user.name, res.user.email, 'ADMIN', 0);
         showToast(`Welcome back, ${res.user.name}! (One-Click Quick Login)`, 'success');
-        onNavigateTab('admin-dashboard');
+        if (currentTab === 'admin') {
+          onNavigateTab('admin-dashboard');
+        }
       } else {
         throw new Error('Quick login rejected: Administrator privileges required.');
       }
     } catch (err: any) {
       console.warn('Quick login session expired, prompting password:', err);
       localStorage.removeItem(ADMIN_QUICK_LOGIN_KEY);
+      adminTokenStorage.clear();
       setQuickLoginData(null);
       setUseStandardLogin(true);
       setLoginError(err.message || 'Remembered session expired. Please enter your credentials.');
@@ -268,6 +272,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
   const handleForgetDevice = () => {
     localStorage.removeItem(ADMIN_QUICK_LOGIN_KEY);
+    adminTokenStorage.clear();
     setQuickLoginData(null);
     setUseStandardLogin(true);
     showToast('Device forgotten. Quick Login removed from this browser.', 'info');
@@ -276,6 +281,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const handleAdminLogout = (forgetDevice: boolean = false) => {
     if (forgetDevice) {
       localStorage.removeItem(ADMIN_QUICK_LOGIN_KEY);
+      adminTokenStorage.clear();
       setQuickLoginData(null);
       showToast('Signed out and device forgotten.', 'info');
     } else {
@@ -568,18 +574,29 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             </div>
           )}
 
-          <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <form
+            id="admin-login-form"
+            name="adminLoginForm"
+            method="post"
+            action="#"
+            autoComplete="on"
+            onSubmit={handleAdminLogin}
+            style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+          >
             <div style={{ textAlign: 'left' }}>
-              <label style={{ fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
-                Admin ID
+              <label htmlFor="admin-username" style={{ fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
+                Admin Email / ID
               </label>
               <input
+                id="admin-username"
+                name="username"
                 type="text"
                 value={adminId}
                 onChange={e => setAdminId(e.target.value)}
-                placeholder="Enter Admin ID"
+                placeholder="Enter Admin Email or ID"
                 required
                 autoFocus
+                autoComplete="username"
                 style={{
                   width: '100%',
                   marginTop: '6px',
@@ -595,27 +612,53 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             </div>
 
             <div style={{ textAlign: 'left' }}>
-              <label style={{ fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
+              <label htmlFor="admin-password" style={{ fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
                 Admin Password
               </label>
-              <input
-                type="password"
-                value={adminPassword}
-                onChange={e => setAdminPassword(e.target.value)}
-                placeholder="Enter Admin Password"
-                required
-                style={{
-                  width: '100%',
-                  marginTop: '6px',
-                  padding: '12px 14px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#FFFFFF',
-                  fontSize: '14px',
-                  boxSizing: 'border-box'
-                }}
-              />
+              <div style={{ position: 'relative', marginTop: '6px' }}>
+                <input
+                  id="admin-password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={adminPassword}
+                  onChange={e => setAdminPassword(e.target.value)}
+                  placeholder="Enter Admin Password"
+                  required
+                  autoComplete="current-password"
+                  style={{
+                    width: '100%',
+                    padding: '12px 42px 12px 14px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#9CA3AF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '4px'
+                  }}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             {/* Remember this device checkbox */}
@@ -657,6 +700,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
             <button
               type="submit"
+              name="login"
               disabled={isLoggingIn}
               style={{
                 marginTop: '10px',
@@ -972,7 +1016,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {navGroups.map(group => {
                   const GroupIcon = group.icon;
-                  const isExpanded = !!expandedGroups[group.id];
+                  const isExpanded = expandedGroupId === group.id;
                   const hasActiveChild = group.items.some(item => item.id === currentTab);
 
                   return (
@@ -991,6 +1035,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                         type="button"
                         onClick={() => {
                           if (group.items.length === 1) {
+                            setExpandedGroupId(null);
                             onNavigateTab(group.items[0].id);
                             setIsMenuOpen(false);
                           } else {
@@ -1074,6 +1119,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                               <button
                                 key={item.id}
                                 onClick={() => {
+                                  setExpandedGroupId(null);
                                   onNavigateTab(item.id);
                                   setIsMenuOpen(false);
                                 }}

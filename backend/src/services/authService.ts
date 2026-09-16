@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { userRepository, UserRecord } from '../repositories/userRepository.js';
 import { walletRepository } from '../repositories/walletRepository.js';
+import { getAdapter } from '../db/adapter.js';
 import { config } from '../config/env.js';
 
 export interface SafeUser {
@@ -102,20 +103,28 @@ export const authService = {
     if (
       config.adminPassword &&
       (cleanEmail.toLowerCase() === config.adminId.toLowerCase() ||
-        cleanEmail.toLowerCase() === (config.devAdminEmail || 'admin@flopshow.tv').toLowerCase()) &&
+        cleanEmail.toLowerCase() === 'admin' ||
+        cleanEmail.toLowerCase() === 'ashukataria2005@gmail.com') &&
       params.password === config.adminPassword
     ) {
-      const adminUser: SafeUser = {
-        id: 'admin-master',
-        name: 'FLOPSHOW Admin',
-        email: config.devAdminEmail || 'admin@flopshow.tv',
-        role: 'ADMIN',
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      const token = authService.generateToken(adminUser);
-      return { user: adminUser, token };
+      const db = getAdapter();
+      const { rows: adminRows } = await db.query(
+        "SELECT id, name, email, role, status, created_at, updated_at FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE' LIMIT 1"
+      );
+      if (adminRows.length > 0) {
+        const dbAdmin = adminRows[0] as any;
+        const adminUser: SafeUser = {
+          id: dbAdmin.id,
+          name: dbAdmin.name || 'Ashu Kataria',
+          email: dbAdmin.email,
+          role: 'ADMIN',
+          status: 'ACTIVE',
+          createdAt: dbAdmin.created_at || new Date().toISOString(),
+          updatedAt: dbAdmin.updated_at || new Date().toISOString(),
+        };
+        const token = authService.generateToken(adminUser);
+        return { user: adminUser, token };
+      }
     }
 
     const userRecord = await userRepository.findByEmail(cleanEmail);
@@ -157,19 +166,31 @@ export const authService = {
       throw err;
     }
 
-    if (!config.adminPassword) {
-      const err = new Error('Admin credentials are not configured on this server.');
+    const db = getAdapter();
+    const { rows: adminRows } = await db.query(
+      "SELECT id, name, email, password_hash, role, status, created_at, updated_at FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE' LIMIT 1"
+    );
+
+    if (adminRows.length === 0) {
+      const err = new Error('No active administrator account is configured in the database.');
       (err as any).statusCode = 503;
       throw err;
     }
 
+    const dbAdmin = adminRows[0] as any;
+
     const matchesId =
       cleanId.toLowerCase() === config.adminId.toLowerCase() ||
-      (config.devAdminEmail && cleanId.toLowerCase() === config.devAdminEmail.toLowerCase());
+      cleanId.toLowerCase() === dbAdmin.email.toLowerCase() ||
+      cleanId.toLowerCase() === 'ashukataria2005@gmail.com';
 
-    const matchesPassword =
-      (config.adminPassword && cleanPassword === config.adminPassword) ||
-      (config.devAdminPassword && cleanPassword === config.devAdminPassword);
+    let matchesPassword = Boolean(
+      config.adminPassword && cleanPassword === config.adminPassword
+    );
+
+    if (!matchesPassword && dbAdmin.password_hash) {
+      matchesPassword = await bcrypt.compare(cleanPassword, dbAdmin.password_hash);
+    }
 
     if (!matchesId || !matchesPassword) {
       const err = new Error('Invalid Admin ID or Admin Password.');
@@ -178,13 +199,13 @@ export const authService = {
     }
 
     const adminUser: SafeUser = {
-      id: 'admin-dev-01',
-      name: 'FLOPSHOW Admin',
-      email: config.devAdminEmail || 'admin@flopshow.tv',
+      id: dbAdmin.id,
+      name: dbAdmin.name || 'Ashu Kataria',
+      email: dbAdmin.email,
       role: 'ADMIN',
       status: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: dbAdmin.created_at || new Date().toISOString(),
+      updatedAt: dbAdmin.updated_at || new Date().toISOString(),
     };
 
     const token = authService.generateToken(adminUser);
@@ -214,17 +235,6 @@ export const authService = {
   },
 
   async getUserProfile(userId: string): Promise<SafeUser | null> {
-    if (userId === 'admin-master' || userId === 'admin-dev-01' || userId === 'admin-system') {
-      return {
-        id: userId,
-        name: 'FLOPSHOW Admin',
-        email: config.devAdminEmail || 'admin@flopshow.tv',
-        role: 'ADMIN',
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-    }
     const record = await userRepository.findById(userId);
     if (!record) return null;
     return toSafeUser(record);

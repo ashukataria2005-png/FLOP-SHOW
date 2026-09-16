@@ -77,8 +77,10 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
     c => c.id !== currentItem.id && c.genres.some(g => currentItem.genres.includes(g))
   ).slice(0, 4);
 
+  const isFreeItem = Boolean(currentItem.isFree || currentItem.price === 0);
+
   const handlePrimaryAction = () => {
-    if (owned || currentItem.isFree) {
+    if (owned || isFreeItem) {
       startPlaying(currentItem);
     } else {
       openPurchaseModal(currentItem);
@@ -86,7 +88,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
   };
 
   const handlePlayEpisode = (episode: Episode) => {
-    if (owned || currentItem.isFree) {
+    if (owned || isFreeItem) {
       startPlaying(currentItem, episode);
     } else {
       openPurchaseModal(currentItem);
@@ -269,7 +271,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
             >
               <Play size={18} fill="#0E0E12" />
               <span>
-                {owned || currentItem.isFree
+                {owned || isFreeItem
                   ? 'Watch now'
                   : `Buy for ₹${currentItem.price}`}
               </span>

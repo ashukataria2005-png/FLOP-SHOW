@@ -35,6 +35,8 @@ export const API_BASE_URL = resolveApiBaseUrl();
  * Helper to get and set auth tokens in localStorage
  */
 const TOKEN_KEY = 'flopshow_auth_token';
+const ADMIN_TOKEN_KEY = 'flopshow_admin_token';
+const ADMIN_QUICK_LOGIN_KEY = 'flopshow_admin_quick_login';
 
 export const tokenStorage = {
   get: (): string | null => {
@@ -60,12 +62,58 @@ export const tokenStorage = {
   }
 };
 
+export const adminTokenStorage = {
+  get: (): string | null => {
+    try {
+      const direct = localStorage.getItem(ADMIN_TOKEN_KEY);
+      if (direct) return direct;
+      const quick = localStorage.getItem(ADMIN_QUICK_LOGIN_KEY);
+      if (quick) {
+        const parsed = JSON.parse(quick);
+        if (parsed?.token) return parsed.token;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+  set: (token: string): void => {
+    try {
+      localStorage.setItem(ADMIN_TOKEN_KEY, token);
+    } catch {
+      // Ignore
+    }
+  },
+  clear: (): void => {
+    try {
+      localStorage.removeItem(ADMIN_TOKEN_KEY);
+    } catch {
+      // Ignore
+    }
+  }
+};
+
+interface RequestOptions extends RequestInit {
+  _isRetry?: boolean;
+}
+
 /**
  * Standard HTTP Request Wrapper for FLOPSHOW API
+ * Robust session handling:
+ * - Differentiates admin vs user tokens
+ * - Transparently auto-refreshes on 401 before giving up
+ * - Never destroys state on transient network/server errors
  */
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  const token = tokenStorage.get();
+  const isAdminEndpoint =
+    endpoint.startsWith('/admin') ||
+    endpoint.startsWith('/payments/admin') ||
+    endpoint.includes('admin-quick-login');
+
+  const token = isAdminEndpoint
+    ? (adminTokenStorage.get() || tokenStorage.get())
+    : (tokenStorage.get() || adminTokenStorage.get());
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -84,6 +132,55 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    // If 401 Unauthorized, attempt transparent token refresh ONCE before throwing or destroying session
+    if (response.status === 401 && !options._isRetry && token) {
+      try {
+        const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json().catch(() => ({}));
+          if (refreshData?.token) {
+            const freshToken = refreshData.token;
+            if (isAdminEndpoint) {
+              adminTokenStorage.set(freshToken);
+              try {
+                const quick = localStorage.getItem(ADMIN_QUICK_LOGIN_KEY);
+                if (quick) {
+                  const parsed = JSON.parse(quick);
+                  parsed.token = freshToken;
+                  localStorage.setItem(ADMIN_QUICK_LOGIN_KEY, JSON.stringify(parsed));
+                }
+              } catch {
+                // Ignore storage parsing error
+              }
+            } else {
+              tokenStorage.set(freshToken);
+            }
+
+            // Retry original request once with fresh token
+            const retryHeaders = {
+              ...headers,
+              'Authorization': `Bearer ${freshToken}`
+            };
+
+            return await request<T>(endpoint, {
+              ...options,
+              headers: retryHeaders,
+              _isRetry: true
+            });
+          }
+        }
+      } catch {
+        // Fall through to standard error throw below
+      }
+    }
+
     const message = data?.error?.message || `Request failed with status ${response.status}`;
     const error = new Error(message);
     (error as any).status = response.status;
@@ -185,6 +282,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ adminId, adminPassword })
       });
+      adminTokenStorage.set(data.token);
       tokenStorage.set(data.token);
       return data;
     },
@@ -192,6 +290,9 @@ export const api = {
     async me() {
       const data = await request<{ user: any; wallet: any; token?: string }>('/auth/me');
       if (data && data.token) {
+        if (data.user?.role === 'ADMIN') {
+          adminTokenStorage.set(data.token);
+        }
         tokenStorage.set(data.token);
       }
       return data;
@@ -202,6 +303,9 @@ export const api = {
         method: 'POST'
       });
       if (data && data.token) {
+        if (data.user?.role === 'ADMIN') {
+          adminTokenStorage.set(data.token);
+        }
         tokenStorage.set(data.token);
       }
       return data;
@@ -212,6 +316,7 @@ export const api = {
         method: 'POST'
       });
       if (data && data.token) {
+        adminTokenStorage.set(data.token);
         tokenStorage.set(data.token);
       }
       return data;
@@ -219,6 +324,7 @@ export const api = {
 
     logout() {
       tokenStorage.clear();
+      adminTokenStorage.clear();
     }
   },
 
@@ -638,7 +744,7 @@ export const api = {
         xhr.open('POST', url, true);
         xhr.timeout = 10 * 60 * 1000; // 10 minutes timeout for large video uploads
 
-        const token = tokenStorage.get();
+        const token = adminTokenStorage.get() || tokenStorage.get();
         if (token) {
           xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         }

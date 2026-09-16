@@ -6,6 +6,17 @@ interface LogoProps {
   animated?: boolean;
 }
 
+const LETTERS = [
+  { char: 'F', color: '#FFFFFF' },
+  { char: 'L', color: '#FFFFFF' },
+  { char: 'O', color: '#FFFFFF' },
+  { char: 'P', color: '#FFFFFF' },
+  { char: 'S', color: 'var(--brand-gold, #F5A623)' },
+  { char: 'H', color: 'var(--brand-gold, #F5A623)' },
+  { char: 'O', color: 'var(--brand-gold, #F5A623)' },
+  { char: 'W', color: 'var(--brand-gold, #F5A623)' }
+];
+
 export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = false }) => {
   const iconSizes = {
     sm: { box: 28, radius: 7 },
@@ -177,23 +188,41 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
         )}
       </div>
 
-      {/* Brand Wordmark */}
+      {/* Brand Wordmark: individual animated letter spans for smooth continuous letter-by-letter absorption */}
       <span
-        className={animated ? 'cinematic-wordmark' : undefined}
+        className={animated ? 'cinematic-wordmark-track' : undefined}
         style={{
           fontFamily: "'Outfit', sans-serif",
           fontWeight: 800,
           fontSize: fontSizes[size],
           letterSpacing: '0.08em',
-          color: '#FFFFFF',
           lineHeight: 1,
           position: 'relative',
           zIndex: 4,
-          display: 'inline-block',
+          display: 'inline-flex',
+          alignItems: 'center',
           whiteSpace: 'nowrap'
         }}
       >
-        FLOP<span style={{ color: 'var(--brand-gold, #F5A623)' }}>SHOW</span>
+        {animated ? (
+          LETTERS.map((item, idx) => (
+            <span
+              key={idx}
+              className={`cinematic-letter cinematic-letter-${idx}`}
+              style={{
+                color: item.color,
+                display: 'inline-block',
+                position: 'relative'
+              }}
+            >
+              {item.char}
+            </span>
+          ))
+        ) : (
+          <>
+            FLOP<span style={{ color: 'var(--brand-gold, #F5A623)' }}>SHOW</span>
+          </>
+        )}
       </span>
 
       {animated && (
@@ -273,60 +302,74 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             will-change: transform, opacity;
           }
 
-          .cinematic-wordmark {
-            animation: cinematicWordmark 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+          /* SINGLE CONTINUOUS TRACK MOTION: Zero intermediate stops, 100% fluid interpolation */
+          .cinematic-wordmark-track {
+            animation: cinematicWordmarkTrack 12.5s cubic-bezier(0.35, 0, 0.25, 1) infinite;
             transform-origin: left center;
             will-change: transform, opacity, filter;
           }
 
-          /* Keyframe Sequences */
+          .cinematic-letter {
+            will-change: transform, opacity;
+            transform-origin: center center;
+          }
 
-          /* 1. ORIGINAL LOGO: Stays 100% visible throughout magnetic pull; morphs into camera only after text enters */
+          /* Individual Staggered Letter Animations */
+          .cinematic-letter-0 { animation: cinematicLetter0 12.5s linear infinite; }
+          .cinematic-letter-1 { animation: cinematicLetter1 12.5s linear infinite; }
+          .cinematic-letter-2 { animation: cinematicLetter2 12.5s linear infinite; }
+          .cinematic-letter-3 { animation: cinematicLetter3 12.5s linear infinite; }
+          .cinematic-letter-4 { animation: cinematicLetter4 12.5s linear infinite; }
+          .cinematic-letter-5 { animation: cinematicLetter5 12.5s linear infinite; }
+          .cinematic-letter-6 { animation: cinematicLetter6 12.5s linear infinite; }
+          .cinematic-letter-7 { animation: cinematicLetter7 12.5s linear infinite; }
+
+          /* ========================================================================= */
+          /* KEYFRAME SEQUENCES                                                        */
+          /* ========================================================================= */
+
+          /* 1. ORIGINAL LOGO: Stays solid & 100% visible throughout magnetic pull */
           @keyframes cinematicOriginalLogo {
-            /* Static initial rest */
-            0%, 17.6% {
+            0%, 17.0% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
               filter: none;
             }
-            /* Magnetic activation pulse */
-            20.0% {
+            18.5%, 20.0% {
               opacity: 1;
               transform: scale(1.06);
               filter: drop-shadow(0 0 10px rgba(245, 166, 35, 0.8));
             }
-            /* Magnetic pull phase: solidly visible, actively drawing text in */
-            22.4%, 37.6% {
+            20.1%, 36.0% {
               opacity: 1;
               transform: scale(1.04);
               filter: drop-shadow(0 0 14px rgba(245, 166, 35, 0.9));
             }
-            /* Text has entered: Logo sits briefly alone and solid */
-            37.7%, 42.4% {
+            /* Text fully absorbed: Logo sits alone, solid and bright */
+            36.1%, 41.0% {
               opacity: 1;
               transform: scale(1);
               filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.45));
             }
             /* Morphs into vintage camera */
-            46.0%, 50.4% {
+            45.0%, 47.0% {
               opacity: 0;
               transform: scale(0.85) rotate(-6deg);
               filter: blur(1.5px);
             }
-            /* Hidden while camera is active */
-            50.5%, 79.2% {
+            47.1%, 78.0% {
               opacity: 0;
               transform: scale(0.85) rotate(0deg);
               filter: blur(1.5px);
             }
             /* Morphs back from camera */
-            83.5%, 87.2% {
+            82.0%, 84.0% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
               filter: blur(0px);
             }
-            /* Static final rest before seamless loop */
-            87.3%, 100% {
+            /* Static rest before seamless loop */
+            84.1%, 100% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
               filter: none;
@@ -335,130 +378,158 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
 
           /* Magnetic Aura pulsing around logo during attraction */
           @keyframes cinematicMagneticAura {
-            0%, 17.6% {
+            0%, 17.0% {
               opacity: 0;
               transform: scale(0.9);
             }
-            20.0% {
+            18.5%, 20.0% {
               opacity: 0.85;
               transform: scale(1.18);
             }
-            25.0% {
-              opacity: 0.65;
-              transform: scale(1.08);
+            24.0% {
+              opacity: 0.7;
+              transform: scale(1.1);
             }
-            29.5% {
+            28.0% {
               opacity: 0.95;
               transform: scale(1.22);
             }
-            34.0% {
+            32.0% {
               opacity: 0.75;
               transform: scale(1.12);
             }
-            37.6% {
+            36.0%, 38.5% {
               opacity: 0;
               transform: scale(0.85);
             }
-            37.7%, 100% {
+            38.6%, 100% {
               opacity: 0;
               transform: scale(0.9);
             }
           }
 
-          /* 2. FLOPSHOW WORDMARK: Visible progressive magnetic pull into logo, then emerges from yellow light */
-          @keyframes cinematicWordmark {
-            /* Static initial rest */
-            0%, 17.6% {
+          /* 2. CONTINUOUS WORDMARK TRACK MOTION: Pure fluid translation, NO intermediate stutter stops */
+          @keyframes cinematicWordmarkTrack {
+            /* 1. Static Initial Rest */
+            0%, 20.0% {
               opacity: 1;
               transform: translateX(0px) scale(1);
               filter: none;
             }
-            /* Magnetic tension begins */
-            20.0% {
+            /* 2. Single Continuous Fluid Magnetic Pull (20.0% to 37.0%) */
+            37.0% {
               opacity: 1;
-              transform: translateX(-4px) scaleX(1.02);
-              filter: drop-shadow(0 0 4px rgba(245, 166, 35, 0.35));
+              transform: translateX(-112px) scale(1);
+              filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.5));
             }
-            /* Progressive visible magnetic pull (accelerating towards logo) */
-            24.0% {
-              opacity: 1;
-              transform: translateX(-15px) scaleX(0.97);
-              filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.45));
-            }
-            27.5% {
-              opacity: 1;
-              transform: translateX(-35px) scaleX(0.92) scaleY(0.98);
-              filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.6));
-            }
-            31.0% {
-              opacity: 0.96;
-              transform: translateX(-62px) scaleX(0.82) scaleY(0.92);
-              filter: drop-shadow(0 0 10px rgba(245, 166, 35, 0.7));
-            }
-            34.5% {
-              opacity: 0.85;
-              transform: translateX(-92px) scaleX(0.65) scaleY(0.82);
-              filter: drop-shadow(0 0 12px rgba(245, 166, 35, 0.85));
-            }
-            /* Final letters enter and absorb into logo */
-            37.6% {
+            /* 3. Fully Absorbed inside Logo & Camera */
+            37.1%, 53.9% {
               opacity: 0;
-              transform: translateX(-120px) scale(0.12) scaleX(0.3);
-              filter: blur(1.5px);
-            }
-            /* Completely inside logo / camera */
-            37.7%, 56.5% {
-              opacity: 0;
-              transform: translateX(-26px) scale(0.66);
+              transform: translateX(-26px) scale(0.68);
               filter: drop-shadow(0 0 14px rgba(255, 215, 0, 0.95)) brightness(1.35);
             }
-            /* FLOPSHOW emerges out of yellow projector beam */
-            58.4% {
-              opacity: 0.25;
-              transform: translateX(-24px) scale(0.68);
+            /* 4. Single Continuous Fluid Emergence from Yellow Light (54.0% to 70.0%) */
+            54.0% {
+              opacity: 0;
+              transform: translateX(-26px) scale(0.68);
               filter: drop-shadow(0 0 14px rgba(255, 215, 0, 0.95)) brightness(1.35);
             }
-            64.5% {
+            57.0% {
               opacity: 0.92;
-              transform: translateX(-7px) scale(0.93);
-              filter: drop-shadow(0 0 12px rgba(245, 166, 35, 0.85)) brightness(1.2);
             }
-            71.2% {
+            70.0% {
               opacity: 1;
               transform: translateX(0px) scale(1);
-              filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.55)) brightness(1.1);
+              filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.4)) brightness(1.1);
             }
-            /* Light fades, wordmark normalizes */
-            75.5% {
+            /* 5. Light Fades, Wordmark Normalizes to Default */
+            76.0% {
               opacity: 1;
               transform: translateX(0px) scale(1);
-              filter: drop-shadow(0 0 2px rgba(245, 166, 35, 0.25));
+              filter: none;
             }
-            79.2%, 100% {
+            76.1%, 100% {
               opacity: 1;
               transform: translateX(0px) scale(1);
               filter: none;
             }
           }
 
-          /* 3. VINTAGE MOVIE CAMERA */
+          /* 3. LETTER-BY-LETTER PROGRESSIVE ABSORPTION */
+          /* Letter 0: 'F' - Arrives at logo first */
+          @keyframes cinematicLetter0 {
+            0%, 21.8% { opacity: 1; transform: scale(1); }
+            23.4%, 54.0% { opacity: 0; transform: scale(0.2); }
+            56.0%, 100% { opacity: 1; transform: scale(1); }
+          }
+
+          /* Letter 1: 'L' - Arrives second */
+          @keyframes cinematicLetter1 {
+            0%, 23.6% { opacity: 1; transform: scale(1); }
+            25.2%, 54.0% { opacity: 0; transform: scale(0.2); }
+            56.0%, 100% { opacity: 1; transform: scale(1); }
+          }
+
+          /* Letter 2: 'O' - Arrives third */
+          @keyframes cinematicLetter2 {
+            0%, 25.4% { opacity: 1; transform: scale(1); }
+            27.0%, 54.0% { opacity: 0; transform: scale(0.2); }
+            56.0%, 100% { opacity: 1; transform: scale(1); }
+          }
+
+          /* Letter 3: 'P' - Arrives fourth */
+          @keyframes cinematicLetter3 {
+            0%, 27.2% { opacity: 1; transform: scale(1); }
+            28.8%, 54.0% { opacity: 0; transform: scale(0.2); }
+            56.0%, 100% { opacity: 1; transform: scale(1); }
+          }
+
+          /* Letter 4: 'S' - Arrives fifth */
+          @keyframes cinematicLetter4 {
+            0%, 29.0% { opacity: 1; transform: scale(1); }
+            30.6%, 54.0% { opacity: 0; transform: scale(0.2); }
+            56.0%, 100% { opacity: 1; transform: scale(1); }
+          }
+
+          /* Letter 5: 'H' - Arrives sixth */
+          @keyframes cinematicLetter5 {
+            0%, 30.8% { opacity: 1; transform: scale(1); }
+            32.4%, 54.0% { opacity: 0; transform: scale(0.2); }
+            56.0%, 100% { opacity: 1; transform: scale(1); }
+          }
+
+          /* Letter 6: 'O' - Arrives seventh */
+          @keyframes cinematicLetter6 {
+            0%, 32.6% { opacity: 1; transform: scale(1); }
+            34.2%, 54.0% { opacity: 0; transform: scale(0.2); }
+            56.0%, 100% { opacity: 1; transform: scale(1); }
+          }
+
+          /* Letter 7: 'W' - Arrives last */
+          @keyframes cinematicLetter7 {
+            0%, 34.4% { opacity: 1; transform: scale(1); }
+            36.0%, 54.0% { opacity: 0; transform: scale(0.2); }
+            56.0%, 100% { opacity: 1; transform: scale(1); }
+          }
+
+          /* 4. VINTAGE MOVIE CAMERA */
           @keyframes cinematicCameraLogo {
-            0%, 42.4% {
+            0%, 41.0% {
               opacity: 0;
               transform: scale(0.85) rotate(6deg);
               filter: blur(1.5px);
             }
-            48.0%, 75.0% {
+            47.0%, 75.0% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
               filter: blur(0px);
             }
-            79.2%, 84.8% {
+            78.0%, 84.0% {
               opacity: 0;
               transform: scale(0.85) rotate(-6deg);
               filter: blur(1.5px);
             }
-            84.9%, 100% {
+            84.1%, 100% {
               opacity: 0;
               transform: scale(0.85);
             }
@@ -473,40 +544,40 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             }
           }
 
-          /* 4. YELLOW V-SHAPED PROJECTOR BEAM */
+          /* 5. YELLOW V-SHAPED PROJECTOR BEAM */
           @keyframes cinematicBeam {
-            0%, 50.4% {
+            0%, 48.0% {
               opacity: 0;
               transform: translateY(-50%) scaleX(0.12);
             }
-            55.0%, 71.2% {
+            52.0%, 70.0% {
               opacity: 0.95;
               transform: translateY(-50%) scaleX(1);
             }
-            77.0%, 79.2% {
+            74.0%, 78.0% {
               opacity: 0;
               transform: translateY(-50%) scaleX(0.85);
             }
-            79.3%, 100% {
+            78.1%, 100% {
               opacity: 0;
               transform: translateY(-50%) scaleX(0.12);
             }
           }
 
           @keyframes cinematicFlare {
-            0%, 50.4% {
+            0%, 48.0% {
               opacity: 0;
               transform: scale(0.2);
             }
-            54.5%, 71.2% {
+            52.0%, 70.0% {
               opacity: 1;
               transform: scale(1);
             }
-            76.5%, 79.2% {
+            74.0%, 78.0% {
               opacity: 0;
               transform: scale(0.2);
             }
-            79.3%, 100% {
+            78.1%, 100% {
               opacity: 0;
               transform: scale(0.2);
             }
@@ -518,11 +589,13 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             .cinematic-camera-logo,
             .cinematic-projector-beam,
             .cinematic-lens-flare,
-            .cinematic-wordmark,
+            .cinematic-wordmark-track,
+            .cinematic-letter,
             .cinematic-magnetic-aura {
               animation: none !important;
               transform: none !important;
               filter: none !important;
+              opacity: 1 !important;
             }
             .cinematic-camera-logo,
             .cinematic-projector-beam,
@@ -531,9 +604,6 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
               display: none !important;
             }
             .cinematic-original-logo {
-              opacity: 1 !important;
-            }
-            .cinematic-wordmark {
               opacity: 1 !important;
             }
           }

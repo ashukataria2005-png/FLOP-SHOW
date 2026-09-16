@@ -34,7 +34,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
         position: 'relative'
       }}
     >
-      {/* Icon Area: contains static logo or animated logo + camera + projector beam */}
+      {/* Icon Area: contains static logo or animated logo + magnetic aura + camera + projector beam */}
       <div
         style={{
           width: config.box,
@@ -43,6 +43,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
           flexShrink: 0
         }}
       >
+        {animated && <div className="cinematic-magnetic-aura" />}
+
         {/* Base / Original Film Frame Logo */}
         <div
           className={animated ? 'cinematic-original-logo' : undefined}
@@ -187,7 +189,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
           lineHeight: 1,
           position: 'relative',
           zIndex: 4,
-          display: 'inline-block'
+          display: 'inline-block',
+          whiteSpace: 'nowrap'
         }}
       >
         FLOP<span style={{ color: 'var(--brand-gold, #F5A623)' }}>SHOW</span>
@@ -195,15 +198,28 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
 
       {animated && (
         <style>{`
-          /* Overall cinematic 11s loop animation */
+          /* Overall cinematic 12.5s loop animation */
           .cinematic-original-logo {
-            animation: cinematicOriginalLogo 11s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: cinematicOriginalLogo 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             transform-origin: center center;
             will-change: transform, opacity, filter;
           }
 
+          .cinematic-magnetic-aura {
+            position: absolute;
+            inset: -5px;
+            border-radius: 12px;
+            border: 1.5px solid rgba(245, 166, 35, 0.65);
+            box-shadow: 0 0 14px rgba(245, 166, 35, 0.6), inset 0 0 10px rgba(245, 166, 35, 0.35);
+            pointer-events: none;
+            z-index: 1;
+            animation: cinematicMagneticAura 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            transform-origin: center center;
+            will-change: transform, opacity;
+          }
+
           .cinematic-camera-logo {
-            animation: cinematicCameraLogo 11s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: cinematicCameraLogo 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             transform-origin: center center;
             will-change: transform, opacity, filter;
           }
@@ -229,7 +245,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             box-shadow: 0 0 10px #FFE082, 0 0 18px #F5A623;
             pointer-events: none;
             z-index: 3;
-            animation: cinematicFlare 11s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: cinematicFlare 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             transform-origin: center center;
             will-change: transform, opacity;
           }
@@ -253,65 +269,198 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             );
             filter: drop-shadow(0 0 10px rgba(245, 166, 35, 0.65));
             transform-origin: left center;
-            animation: cinematicBeam 11s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: cinematicBeam 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             will-change: transform, opacity;
           }
 
           .cinematic-wordmark {
-            animation: cinematicWordmark 11s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: cinematicWordmark 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             transform-origin: left center;
             will-change: transform, opacity, filter;
           }
 
           /* Keyframe Sequences */
+
+          /* 1. ORIGINAL LOGO: Stays 100% visible throughout magnetic pull; morphs into camera only after text enters */
           @keyframes cinematicOriginalLogo {
-            0%, 22.7% {
+            /* Static initial rest */
+            0%, 17.6% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
-              filter: blur(0px);
+              filter: none;
             }
-            30%, 34% {
+            /* Magnetic activation pulse */
+            20.0% {
+              opacity: 1;
+              transform: scale(1.06);
+              filter: drop-shadow(0 0 10px rgba(245, 166, 35, 0.8));
+            }
+            /* Magnetic pull phase: solidly visible, actively drawing text in */
+            22.4%, 37.6% {
+              opacity: 1;
+              transform: scale(1.04);
+              filter: drop-shadow(0 0 14px rgba(245, 166, 35, 0.9));
+            }
+            /* Text has entered: Logo sits briefly alone and solid */
+            37.7%, 42.4% {
+              opacity: 1;
+              transform: scale(1);
+              filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.45));
+            }
+            /* Morphs into vintage camera */
+            46.0%, 50.4% {
               opacity: 0;
               transform: scale(0.85) rotate(-6deg);
               filter: blur(1.5px);
             }
-            34.1%, 77.3% {
+            /* Hidden while camera is active */
+            50.5%, 79.2% {
               opacity: 0;
               transform: scale(0.85) rotate(0deg);
               filter: blur(1.5px);
             }
-            83%, 87.3% {
+            /* Morphs back from camera */
+            83.5%, 87.2% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
               filter: blur(0px);
             }
-            87.4%, 100% {
+            /* Static final rest before seamless loop */
+            87.3%, 100% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
-              filter: blur(0px);
+              filter: none;
             }
           }
 
+          /* Magnetic Aura pulsing around logo during attraction */
+          @keyframes cinematicMagneticAura {
+            0%, 17.6% {
+              opacity: 0;
+              transform: scale(0.9);
+            }
+            20.0% {
+              opacity: 0.85;
+              transform: scale(1.18);
+            }
+            25.0% {
+              opacity: 0.65;
+              transform: scale(1.08);
+            }
+            29.5% {
+              opacity: 0.95;
+              transform: scale(1.22);
+            }
+            34.0% {
+              opacity: 0.75;
+              transform: scale(1.12);
+            }
+            37.6% {
+              opacity: 0;
+              transform: scale(0.85);
+            }
+            37.7%, 100% {
+              opacity: 0;
+              transform: scale(0.9);
+            }
+          }
+
+          /* 2. FLOPSHOW WORDMARK: Visible progressive magnetic pull into logo, then emerges from yellow light */
+          @keyframes cinematicWordmark {
+            /* Static initial rest */
+            0%, 17.6% {
+              opacity: 1;
+              transform: translateX(0px) scale(1);
+              filter: none;
+            }
+            /* Magnetic tension begins */
+            20.0% {
+              opacity: 1;
+              transform: translateX(-4px) scaleX(1.02);
+              filter: drop-shadow(0 0 4px rgba(245, 166, 35, 0.35));
+            }
+            /* Progressive visible magnetic pull (accelerating towards logo) */
+            24.0% {
+              opacity: 1;
+              transform: translateX(-15px) scaleX(0.97);
+              filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.45));
+            }
+            27.5% {
+              opacity: 1;
+              transform: translateX(-35px) scaleX(0.92) scaleY(0.98);
+              filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.6));
+            }
+            31.0% {
+              opacity: 0.96;
+              transform: translateX(-62px) scaleX(0.82) scaleY(0.92);
+              filter: drop-shadow(0 0 10px rgba(245, 166, 35, 0.7));
+            }
+            34.5% {
+              opacity: 0.85;
+              transform: translateX(-92px) scaleX(0.65) scaleY(0.82);
+              filter: drop-shadow(0 0 12px rgba(245, 166, 35, 0.85));
+            }
+            /* Final letters enter and absorb into logo */
+            37.6% {
+              opacity: 0;
+              transform: translateX(-120px) scale(0.12) scaleX(0.3);
+              filter: blur(1.5px);
+            }
+            /* Completely inside logo / camera */
+            37.7%, 56.5% {
+              opacity: 0;
+              transform: translateX(-26px) scale(0.66);
+              filter: drop-shadow(0 0 14px rgba(255, 215, 0, 0.95)) brightness(1.35);
+            }
+            /* FLOPSHOW emerges out of yellow projector beam */
+            58.4% {
+              opacity: 0.25;
+              transform: translateX(-24px) scale(0.68);
+              filter: drop-shadow(0 0 14px rgba(255, 215, 0, 0.95)) brightness(1.35);
+            }
+            64.5% {
+              opacity: 0.92;
+              transform: translateX(-7px) scale(0.93);
+              filter: drop-shadow(0 0 12px rgba(245, 166, 35, 0.85)) brightness(1.2);
+            }
+            71.2% {
+              opacity: 1;
+              transform: translateX(0px) scale(1);
+              filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.55)) brightness(1.1);
+            }
+            /* Light fades, wordmark normalizes */
+            75.5% {
+              opacity: 1;
+              transform: translateX(0px) scale(1);
+              filter: drop-shadow(0 0 2px rgba(245, 166, 35, 0.25));
+            }
+            79.2%, 100% {
+              opacity: 1;
+              transform: translateX(0px) scale(1);
+              filter: none;
+            }
+          }
+
+          /* 3. VINTAGE MOVIE CAMERA */
           @keyframes cinematicCameraLogo {
-            0%, 28% {
+            0%, 42.4% {
               opacity: 0;
               transform: scale(0.85) rotate(6deg);
               filter: blur(1.5px);
             }
-            35%, 72% {
+            48.0%, 75.0% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
               filter: blur(0px);
             }
-            78%, 84% {
+            79.2%, 84.8% {
               opacity: 0;
               transform: scale(0.85) rotate(-6deg);
               filter: blur(1.5px);
             }
-            84.1%, 100% {
+            84.9%, 100% {
               opacity: 0;
-              transform: scale(0.85) rotate(0deg);
-              filter: blur(1.5px);
+              transform: scale(0.85);
             }
           }
 
@@ -324,74 +473,42 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             }
           }
 
+          /* 4. YELLOW V-SHAPED PROJECTOR BEAM */
           @keyframes cinematicBeam {
-            0%, 43.6% {
+            0%, 50.4% {
               opacity: 0;
               transform: translateY(-50%) scaleX(0.12);
             }
-            48%, 66% {
-              opacity: 0.92;
+            55.0%, 71.2% {
+              opacity: 0.95;
               transform: translateY(-50%) scaleX(1);
             }
-            73%, 77.3% {
+            77.0%, 79.2% {
               opacity: 0;
               transform: translateY(-50%) scaleX(0.85);
             }
-            77.4%, 100% {
+            79.3%, 100% {
               opacity: 0;
               transform: translateY(-50%) scaleX(0.12);
             }
           }
 
           @keyframes cinematicFlare {
-            0%, 43.6% {
+            0%, 50.4% {
               opacity: 0;
               transform: scale(0.2);
             }
-            47%, 66% {
+            54.5%, 71.2% {
               opacity: 1;
               transform: scale(1);
             }
-            72%, 77.3% {
+            76.5%, 79.2% {
               opacity: 0;
               transform: scale(0.2);
             }
-            77.4%, 100% {
+            79.3%, 100% {
               opacity: 0;
               transform: scale(0.2);
-            }
-          }
-
-          @keyframes cinematicWordmark {
-            0%, 22.7% {
-              opacity: 1;
-              transform: translateX(0px) scale(1);
-              filter: none;
-            }
-            30%, 33.6% {
-              opacity: 0;
-              transform: translateX(-42px) scale(0.35);
-              filter: blur(2px);
-            }
-            33.7%, 52.7% {
-              opacity: 0;
-              transform: translateX(-24px) scale(0.68);
-              filter: drop-shadow(0 0 12px rgba(245, 166, 35, 0.9)) brightness(1.3);
-            }
-            62%, 68.2% {
-              opacity: 1;
-              transform: translateX(0px) scale(1);
-              filter: drop-shadow(0 0 10px rgba(245, 166, 35, 0.8)) brightness(1.2);
-            }
-            74%, 77.3% {
-              opacity: 1;
-              transform: translateX(0px) scale(1);
-              filter: drop-shadow(0 0 2px rgba(245, 166, 35, 0.3)) brightness(1.05);
-            }
-            80%, 100% {
-              opacity: 1;
-              transform: translateX(0px) scale(1);
-              filter: none;
             }
           }
 
@@ -401,14 +518,16 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             .cinematic-camera-logo,
             .cinematic-projector-beam,
             .cinematic-lens-flare,
-            .cinematic-wordmark {
+            .cinematic-wordmark,
+            .cinematic-magnetic-aura {
               animation: none !important;
               transform: none !important;
               filter: none !important;
             }
             .cinematic-camera-logo,
             .cinematic-projector-beam,
-            .cinematic-lens-flare {
+            .cinematic-lens-flare,
+            .cinematic-magnetic-aura {
               display: none !important;
             }
             .cinematic-original-logo {

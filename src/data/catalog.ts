@@ -24,5 +24,8 @@ export const GENRE_LIST = [
   "Romance",
   "Sci-Fi",
   "Thriller",
-  "War"
+  "War",
+  "Marvel",
+  "DC",
+  "HBO"
 ];

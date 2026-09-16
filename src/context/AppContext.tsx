@@ -175,7 +175,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Fetch central catalog from backend
   const refreshCatalog = async () => {
     try {
-      const items = await api.content.list();
+      const items = await api.content.list({ limit: 1000 });
       setCatalog(items || []);
     } catch {
       // Offline: keep current state

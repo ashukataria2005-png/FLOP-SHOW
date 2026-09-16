@@ -41,6 +41,16 @@ async function auditCatalog() {
   console.log(`World Series count: ${categories.WORLD_SERIES.length}`);
   console.log(`Indian Series count: ${categories.INDIAN_SERIES.length}`);
 
+  const { rows: dupes } = await db.query(
+    'SELECT LOWER(TRIM(title)) as t, type, COUNT(*) as c FROM content GROUP BY LOWER(TRIM(title)), type HAVING COUNT(*) > 1;'
+  );
+  console.log(`Duplicate records in catalog: ${dupes.length}`);
+  if (dupes.length > 0) {
+    console.warn('Duplicates:', dupes);
+  } else {
+    console.log('PASS: 0 duplicate records found in catalog.');
+  }
+
   process.exit(0);
 }
 

@@ -131,7 +131,7 @@ export const contentRepository = {
     }
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-    const limit = filters.limit || 50;
+    const limit = filters.limit !== undefined ? filters.limit : 1000;
     const offset = filters.offset || 0;
 
     const sql = `

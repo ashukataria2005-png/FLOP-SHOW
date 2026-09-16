@@ -28,9 +28,9 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem, initialFil
       const g = initialFilter.replace('genre:', '');
       const matched = GENRE_LIST.find(item => item.toLowerCase() === g.toLowerCase());
       setSelectedGenre(matched || g);
-    } else if (GENRE_LIST.some(item => item.toLowerCase() === initialFilter.toLowerCase())) {
+    } else {
       const matched = GENRE_LIST.find(item => item.toLowerCase() === initialFilter.toLowerCase());
-      if (matched) setSelectedGenre(matched);
+      setSelectedGenre(matched || initialFilter);
     }
   }, [initialFilter]);
 

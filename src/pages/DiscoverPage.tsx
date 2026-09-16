@@ -89,6 +89,11 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
   const movieItems  = activeCatalog.filter(c => c.type === 'movie');
   const seriesItems = activeCatalog.filter(c => c.type === 'series');
 
+  // ── Famous Hollywood & Studio Collections ──────────────────────────────────
+  const marvelItems = byGenre(activeCatalog, 'Marvel');
+  const dcItems     = byGenre(activeCatalog, 'DC');
+  const hboItems    = byGenre(activeCatalog, 'HBO');
+
   // ── New Releases: 2024 onwards, sorted newest first ─────────────────────────
   const newReleases = [...activeCatalog]
     .filter(c => (c.releaseYear || 0) >= 2024)
@@ -199,6 +204,45 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
         items={seriesItems}
         onSelect={onSelectItem}
         onSeeAll={() => onNavigate('search')}
+      />
+    );
+  }
+
+  if (marvelItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="collection-marvel"
+        categoryLabel="MARVEL STUDIOS • MCU & HEROES"
+        title="Marvel Universe Collection"
+        items={marvelItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'Marvel')}
+      />
+    );
+  }
+
+  if (dcItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="collection-dc"
+        categoryLabel="DC STUDIOS • DARK KNIGHT & METAHUMANS"
+        title="DC Universe Collection"
+        items={dcItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'DC')}
+      />
+    );
+  }
+
+  if (hboItems.length > 0) {
+    contentRows.push(
+      <ContentSection
+        key="collection-hbo"
+        categoryLabel="HBO ORIGINALS • PRESTIGE TELEVISION & CINEMA"
+        title="HBO Collection"
+        items={hboItems}
+        onSelect={onSelectItem}
+        onSeeAll={() => onNavigate('search', 'HBO')}
       />
     );
   }

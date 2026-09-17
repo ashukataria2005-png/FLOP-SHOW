@@ -696,6 +696,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let subtitle = '';
     let sourceUrl = '';
     let episodeId = episode?.id;
+    let activeVcdnStatus: string | undefined = undefined;
 
     if (content.type === 'series') {
       // If no specific episode was provided, try to find from progress or first season episode
@@ -741,6 +742,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (mediaRes?.url && mediaRes.url.trim() !== '') {
           sourceUrl = mediaRes.url;
         }
+        if ((mediaRes as any)?.vcdnStatus) {
+          activeVcdnStatus = (mediaRes as any).vcdnStatus;
+        }
       } catch (err: any) {
         if (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403) {
           // skipOwnershipCheck is set when called immediately after a purchase (before React re-renders
@@ -766,12 +770,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     } else {
       setActiveEpisode(null);
+      activeVcdnStatus = (content as any)?.vcdnStatus;
 
       // Attempt to resolve real movie media from backend database
       try {
         const mediaRes = await api.media.getContentMedia(content.id, 'MAIN');
         if (mediaRes?.url && mediaRes.url.trim() !== '') {
           sourceUrl = mediaRes.url;
+        }
+        if ((mediaRes as any)?.vcdnStatus) {
+          activeVcdnStatus = (mediaRes as any).vcdnStatus;
         }
       } catch (err: any) {
         if (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403) {
@@ -809,7 +817,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       poster: ep?.thumbnailUrl || content.backdropUrl || content.posterUrl,
       contentId: content.id,
       episodeId,
-      initialTimeSeconds: progress?.currentTime || 0
+      initialTimeSeconds: progress?.currentTime || 0,
+      vcdnStatus: activeVcdnStatus || (content as any)?.vcdnStatus
     });
   };
 

@@ -761,7 +761,18 @@ export const api = {
     async uploadFile(
       file: File,
       onProgress?: (percent: number) => void
-    ): Promise<{ success: boolean; url: string; filename: string; mimeType: string; size: number }> {
+    ): Promise<{
+      success: boolean;
+      url: string;
+      filename: string;
+      mimeType: string;
+      size: number;
+      provider?: string;
+      playbackUrl?: string;
+      embedUrl?: string;
+      vcdnVideoId?: string;
+      vcdnStatus?: string;
+    }> {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         const url = `${API_BASE_URL}/admin/upload`;
@@ -798,12 +809,10 @@ export const api = {
           }
 
           if (xhr.status >= 200 && xhr.status < 300) {
-            // Return the raw relative path (e.g. /uploads/videos/abc.mp4) as returned by the server.
-            // This relative path is stored in the DB. Resolution to an absolute URL happens at
-            // playback time in getContentMedia / getEpisodeMedia via resolveMediaUrl().
+            // Return the raw relative path or VCDN streaming URL as returned by the server.
             resolve({
               ...data,
-              url: data.url || ''
+              url: data.url || data.playbackUrl || ''
             });
           } else {
             const errMsg = data?.error?.message || `Upload failed with status ${xhr.status}.`;
@@ -823,6 +832,18 @@ export const api = {
         formData.append('file', file, file.name);
         xhr.send(formData);
       });
+    },
+
+    async getVcdnStatus(videoId: string) {
+      return request<{
+        success: boolean;
+        vcdnVideoId: string;
+        status: string;
+        playbackUrl?: string;
+        embedUrl?: string;
+        thumbnails?: string[];
+        duration?: number;
+      }>(`/admin/media/vcdn/status/${videoId}`);
     },
 
     async createContent(contentData: any) {
@@ -875,6 +896,12 @@ export const api = {
       mimeType?: string;
       duration?: string;
       thumbnail?: string;
+      vcdnVideoId?: string;
+      vcdnStatus?: string;
+      vcdnPlaybackUrl?: string;
+      vcdnEmbedUrl?: string;
+      vcdnThumbnailUrl?: string;
+      mediaProvider?: string;
     }) {
       return request<{ success: boolean; media: any }>('/admin/media', {
         method: 'POST',

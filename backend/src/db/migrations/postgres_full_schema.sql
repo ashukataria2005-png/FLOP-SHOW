@@ -79,6 +79,12 @@ CREATE TABLE IF NOT EXISTS content (
   director TEXT,
   cast_json TEXT DEFAULT '[]',
   is_hero INTEGER DEFAULT 0,
+  vcdn_video_id TEXT DEFAULT NULL,
+  vcdn_status TEXT DEFAULT NULL,
+  vcdn_playback_url TEXT DEFAULT NULL,
+  vcdn_embed_url TEXT DEFAULT NULL,
+  vcdn_thumbnail_url TEXT DEFAULT NULL,
+  media_provider TEXT DEFAULT 'LOCAL',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   CONSTRAINT uq_content_slug UNIQUE (slug)
@@ -88,6 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_content_status_featured ON content(status, featur
 CREATE INDEX IF NOT EXISTS idx_content_type_status ON content(type, status);
 CREATE INDEX IF NOT EXISTS idx_content_release_year ON content(release_year DESC);
 CREATE INDEX IF NOT EXISTS idx_content_trending ON content(trending_position);
+CREATE INDEX IF NOT EXISTS idx_content_vcdn_id ON content(vcdn_video_id);
 
 -- Partial unique indexes (PostgreSQL supports these natively)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_content_trending_unique_1
@@ -152,6 +159,12 @@ CREATE TABLE IF NOT EXISTS episodes (
   duration TEXT,
   duration_seconds INTEGER NOT NULL DEFAULT 0,
   video_url TEXT NOT NULL,
+  vcdn_video_id TEXT DEFAULT NULL,
+  vcdn_status TEXT DEFAULT NULL,
+  vcdn_playback_url TEXT DEFAULT NULL,
+  vcdn_embed_url TEXT DEFAULT NULL,
+  vcdn_thumbnail_url TEXT DEFAULT NULL,
+  media_provider TEXT DEFAULT 'LOCAL',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (season_id) REFERENCES seasons(id) ON DELETE CASCADE,
@@ -159,6 +172,7 @@ CREATE TABLE IF NOT EXISTS episodes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_episodes_season ON episodes(season_id);
+CREATE INDEX IF NOT EXISTS idx_episodes_vcdn_id ON episodes(vcdn_video_id);
 
 -- ==============================================================================
 -- 9. PURCHASES
@@ -253,6 +267,12 @@ CREATE TABLE IF NOT EXISTS media (
   duration_seconds INTEGER DEFAULT 0,
   thumbnail TEXT,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+  vcdn_video_id TEXT DEFAULT NULL,
+  vcdn_status TEXT DEFAULT NULL,
+  vcdn_playback_url TEXT DEFAULT NULL,
+  vcdn_embed_url TEXT DEFAULT NULL,
+  vcdn_thumbnail_url TEXT DEFAULT NULL,
+  media_provider TEXT DEFAULT 'LOCAL',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (content_id) REFERENCES content(id) ON DELETE CASCADE,
@@ -263,6 +283,7 @@ CREATE INDEX IF NOT EXISTS idx_media_content ON media(content_id);
 CREATE INDEX IF NOT EXISTS idx_media_episode ON media(episode_id);
 CREATE INDEX IF NOT EXISTS idx_media_type ON media(media_type);
 CREATE INDEX IF NOT EXISTS idx_media_active ON media(is_active);
+CREATE INDEX IF NOT EXISTS idx_media_vcdn_id ON media(vcdn_video_id);
 
 -- ==============================================================================
 -- 14. APP SETTINGS

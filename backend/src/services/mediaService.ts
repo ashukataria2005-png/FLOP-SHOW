@@ -17,6 +17,10 @@ export interface MediaPlayableResponse {
   title: string;
   poster?: string;
   authorized: boolean;
+  vcdnVideoId?: string | null;
+  vcdnStatus?: string | null;
+  vcdnPlaybackUrl?: string | null;
+  mediaProvider?: string | null;
 }
 
 export const mediaService = {
@@ -34,6 +38,12 @@ export const mediaService = {
       durationSeconds?: number;
       thumbnail?: string;
       isActive?: boolean;
+      vcdnVideoId?: string | null;
+      vcdnStatus?: string | null;
+      vcdnPlaybackUrl?: string | null;
+      vcdnEmbedUrl?: string | null;
+      vcdnThumbnailUrl?: string | null;
+      mediaProvider?: string | null;
     }
   ): Promise<MediaRecord> {
     const content = await contentRepository.findByIdOrSlug(contentId);
@@ -61,6 +71,8 @@ export const mediaService = {
     } else if (cleanUrl.includes('cloudinary.com') || params.sourceType === 'UPLOAD') {
       // Cloudinary hosted uploaded media — keep existing UPLOAD sourceType model
       detectedSource = 'UPLOAD';
+    } else if (cleanUrl.includes('vcdn.me') || params.vcdnVideoId) {
+      detectedSource = 'DIRECT_URL';
     } else if (detectedSource !== 'UPLOAD' && !isValidMediaUrl(cleanUrl)) {
       const err = new Error('Invalid URL. Please provide a valid http or https URL, or upload a file.');
       (err as any).statusCode = 400;
@@ -69,6 +81,7 @@ export const mediaService = {
 
     const now = new Date().toISOString();
     const mediaId = `med-${crypto.randomUUID()}`;
+    const mediaProvider = params.mediaProvider || (params.vcdnVideoId || cleanUrl.includes('vcdn.me') ? 'VCDN' : (detectedSource === 'YOUTUBE' ? 'YOUTUBE' : 'LOCAL'));
 
     await mediaRepository.create({
       id: mediaId,
@@ -76,11 +89,17 @@ export const mediaService = {
       mediaType: params.mediaType,
       sourceType: detectedSource,
       url: cleanUrl,
-      mimeType: params.mimeType || (detectedSource === 'YOUTUBE' ? 'video/youtube' : 'video/mp4'),
+      mimeType: params.mimeType || (cleanUrl.includes('.m3u8') ? 'application/x-mpegURL' : (detectedSource === 'YOUTUBE' ? 'video/youtube' : 'video/mp4')),
       duration: params.duration || null,
       durationSeconds: params.durationSeconds || 0,
       thumbnail: params.thumbnail || content.poster,
       isActive: params.isActive !== false ? 1 : 0,
+      vcdnVideoId: params.vcdnVideoId || null,
+      vcdnStatus: params.vcdnStatus || (params.vcdnVideoId ? 'PROCESSING' : null),
+      vcdnPlaybackUrl: params.vcdnPlaybackUrl || (cleanUrl.includes('vcdn.me') ? cleanUrl : null),
+      vcdnEmbedUrl: params.vcdnEmbedUrl || null,
+      vcdnThumbnailUrl: params.vcdnThumbnailUrl || null,
+      mediaProvider,
       now,
     });
 
@@ -88,7 +107,14 @@ export const mediaService = {
     if (params.mediaType === 'TRAILER') {
       await contentRepository.updateContent(content.id, { trailer_url: cleanUrl });
     } else if (params.mediaType === 'MAIN') {
-      await contentRepository.updateContent(content.id, { video_url: cleanUrl });
+      await contentRepository.updateContent(content.id, {
+        video_url: cleanUrl,
+        vcdn_video_id: params.vcdnVideoId || content.vcdn_video_id || null,
+        vcdn_status: params.vcdnStatus || (params.vcdnVideoId ? 'PROCESSING' : content.vcdn_status) || null,
+        vcdn_playback_url: params.vcdnPlaybackUrl || (cleanUrl.includes('vcdn.me') ? cleanUrl : content.vcdn_playback_url) || null,
+        vcdn_embed_url: params.vcdnEmbedUrl || content.vcdn_embed_url || null,
+        media_provider: mediaProvider
+      });
     }
 
     return (await mediaRepository.findById(mediaId))!;
@@ -108,6 +134,12 @@ export const mediaService = {
       durationSeconds?: number;
       thumbnail?: string;
       isActive?: boolean;
+      vcdnVideoId?: string | null;
+      vcdnStatus?: string | null;
+      vcdnPlaybackUrl?: string | null;
+      vcdnEmbedUrl?: string | null;
+      vcdnThumbnailUrl?: string | null;
+      mediaProvider?: string | null;
     }
   ): Promise<MediaRecord> {
     const db = getAdapter();
@@ -137,6 +169,8 @@ export const mediaService = {
     } else if (cleanUrl.includes('cloudinary.com') || params.sourceType === 'UPLOAD') {
       // Cloudinary hosted uploaded media — keep existing UPLOAD sourceType model
       detectedSource = 'UPLOAD';
+    } else if (cleanUrl.includes('vcdn.me') || params.vcdnVideoId) {
+      detectedSource = 'DIRECT_URL';
     } else if (detectedSource !== 'UPLOAD' && !isValidMediaUrl(cleanUrl)) {
       const err = new Error('Invalid URL. Please provide a valid http or https URL, or upload a file.');
       (err as any).statusCode = 400;
@@ -145,6 +179,7 @@ export const mediaService = {
 
     const now = new Date().toISOString();
     const mediaId = `med-${crypto.randomUUID()}`;
+    const mediaProvider = params.mediaProvider || (params.vcdnVideoId || cleanUrl.includes('vcdn.me') ? 'VCDN' : (detectedSource === 'YOUTUBE' ? 'YOUTUBE' : 'LOCAL'));
 
     await mediaRepository.create({
       id: mediaId,
@@ -152,21 +187,30 @@ export const mediaService = {
       mediaType: params.mediaType,
       sourceType: detectedSource,
       url: cleanUrl,
-      mimeType: params.mimeType || (detectedSource === 'YOUTUBE' ? 'video/youtube' : 'video/mp4'),
+      mimeType: params.mimeType || (cleanUrl.includes('.m3u8') ? 'application/x-mpegURL' : (detectedSource === 'YOUTUBE' ? 'video/youtube' : 'video/mp4')),
       duration: params.duration || episode.duration,
       durationSeconds: params.durationSeconds || episode.duration_seconds,
       thumbnail: params.thumbnail || episode.thumbnail,
       isActive: params.isActive !== false ? 1 : 0,
+      vcdnVideoId: params.vcdnVideoId || null,
+      vcdnStatus: params.vcdnStatus || (params.vcdnVideoId ? 'PROCESSING' : null),
+      vcdnPlaybackUrl: params.vcdnPlaybackUrl || (cleanUrl.includes('vcdn.me') ? cleanUrl : null),
+      vcdnEmbedUrl: params.vcdnEmbedUrl || null,
+      vcdnThumbnailUrl: params.vcdnThumbnailUrl || null,
+      mediaProvider,
       now,
     });
 
     // Synchronize to episode table
     if (params.mediaType === 'MAIN') {
-      await db.run('UPDATE episodes SET video_url = ?, updated_at = ? WHERE id = ?', [
-        cleanUrl,
-        now,
-        episode.id,
-      ]);
+      await contentRepository.updateEpisode(episode.id, {
+        video_url: cleanUrl,
+        vcdn_video_id: params.vcdnVideoId || episode.vcdn_video_id || null,
+        vcdn_status: params.vcdnStatus || (params.vcdnVideoId ? 'PROCESSING' : episode.vcdn_status) || null,
+        vcdn_playback_url: params.vcdnPlaybackUrl || (cleanUrl.includes('vcdn.me') ? cleanUrl : episode.vcdn_playback_url) || null,
+        vcdn_embed_url: params.vcdnEmbedUrl || episode.vcdn_embed_url || null,
+        media_provider: mediaProvider
+      });
     }
 
     return (await mediaRepository.findById(mediaId))!;
@@ -241,6 +285,16 @@ export const mediaService = {
       throw err;
     }
 
+    const vcdnVideoId = mainMedia?.vcdn_video_id || content.vcdn_video_id || null;
+    const vcdnStatus = mainMedia?.vcdn_status || content.vcdn_status || null;
+    const vcdnPlaybackUrl = mainMedia?.vcdn_playback_url || content.vcdn_playback_url || null;
+    const mediaProvider = mainMedia?.media_provider || content.media_provider || (vcdnVideoId ? 'VCDN' : 'LOCAL');
+
+    // Prefer HLS playback URL if available from VCDN
+    if (vcdnPlaybackUrl && (!mainVideoUrl || vcdnStatus === 'READY' || mainVideoUrl.includes('vcdn.me'))) {
+      mainVideoUrl = vcdnPlaybackUrl;
+    }
+
     const yt = parseYouTubeUrl(mainVideoUrl);
     return {
       mediaId: mainMedia?.id,
@@ -249,11 +303,15 @@ export const mediaService = {
       url: mainVideoUrl,
       embedUrl: yt.embedUrl,
       isYouTube: yt.isYouTube,
-      mimeType: mainMedia?.mime_type,
+      mimeType: mainMedia?.mime_type || (mainVideoUrl.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4'),
       duration: mainMedia?.duration || content.duration,
       title: content.title,
       poster: content.backdrop || content.poster,
       authorized: true,
+      vcdnVideoId,
+      vcdnStatus,
+      vcdnPlaybackUrl,
+      mediaProvider,
     };
   },
 
@@ -335,6 +393,15 @@ export const mediaService = {
       throw err;
     }
 
+    const vcdnVideoId = mainMedia?.vcdn_video_id || episode.vcdn_video_id || null;
+    const vcdnStatus = mainMedia?.vcdn_status || episode.vcdn_status || null;
+    const vcdnPlaybackUrl = mainMedia?.vcdn_playback_url || episode.vcdn_playback_url || null;
+    const mediaProvider = mainMedia?.media_provider || episode.media_provider || (vcdnVideoId ? 'VCDN' : 'LOCAL');
+
+    if (vcdnPlaybackUrl && (!videoUrl || vcdnStatus === 'READY' || videoUrl.includes('vcdn.me'))) {
+      videoUrl = vcdnPlaybackUrl;
+    }
+
     const yt = parseYouTubeUrl(videoUrl);
     return {
       mediaId: mainMedia?.id,
@@ -343,11 +410,15 @@ export const mediaService = {
       url: videoUrl,
       embedUrl: yt.embedUrl,
       isYouTube: yt.isYouTube,
-      mimeType: mainMedia?.mime_type,
+      mimeType: mainMedia?.mime_type || (videoUrl.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4'),
       duration: episode.duration,
       title: `${episode.series_title}: ${episode.title}`,
       poster: episode.thumbnail || episode.series_backdrop,
       authorized: true,
+      vcdnVideoId,
+      vcdnStatus,
+      vcdnPlaybackUrl,
+      mediaProvider,
     };
   },
 

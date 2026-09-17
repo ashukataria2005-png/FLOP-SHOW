@@ -72,7 +72,15 @@ export const config = {
   omdbApiKey: process.env.OMDB_API_KEY || '',
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || '',
-  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || ''
+  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || '',
+  // VCDN Media Storage & Video Streaming Provider
+  vcdnApiKey: process.env.VCDN_API_KEY?.trim() || '',
+  vcdnWebhookSecret: process.env.VCDN_WEBHOOK_SECRET?.trim() || ''
 };
+
+export function isVcdnConfigured(): boolean {
+  return Boolean(config.vcdnApiKey && config.vcdnApiKey.length > 0);
+}
+
 
 

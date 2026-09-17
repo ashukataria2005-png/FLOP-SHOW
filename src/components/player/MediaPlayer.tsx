@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import Hls from 'hls.js';
 import { formatSeconds } from '../../utils/formatters';
 import { parseYouTubeUrl } from '../../utils/mediaUrl';
 import { api } from '../../services/api';
@@ -30,6 +31,7 @@ export interface MediaPlayerSource {
   episodeId?: string;
   durationSeconds?: number;
   initialTimeSeconds?: number;
+  vcdnStatus?: string;
 }
 
 export interface MediaPlayerProps {
@@ -52,6 +54,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   const { saveWatchProgress } = useApp();
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
   const progressIntervalRef = useRef<number | null>(null);
@@ -78,6 +81,10 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   const [adChecking, setAdChecking] = useState<boolean>(
     !!(source && source.mediaType === 'MAIN')
   );
+
+  // Determine if source is YouTube
+  const youtubeInfo = parseYouTubeUrl(source?.url || '');
+  const isYouTube = youtubeInfo.isYouTube;
 
   // ─── ALL HOOKS UNCONDITIONAL — Rules of Hooks requires this ─────────────────
 
@@ -180,6 +187,95 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Initialize video stream: Adaptive HLS via hls.js or native HTML5 video
+  useEffect(() => {
+    if (!source?.url || isYouTube || adChecking || (!adFinished && adConfig?.enabled)) return;
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    const isHls = source.url.includes('.m3u8') || source.url.includes('stream.vcdn.me') || source.url.includes('/master.m3u8');
+
+    // Clean up any existing Hls instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    if (isHls && Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+        backBufferLength: 90
+      });
+
+      hlsRef.current = hls;
+      hls.loadSource(source.url);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setIsLoading(false);
+        setErrorMessage(null);
+        if (source.initialTimeSeconds && source.initialTimeSeconds > 5) {
+          video.currentTime = source.initialTimeSeconds;
+        }
+        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      });
+
+      hls.on(Hls.Events.LEVEL_LOADED, (_event, data) => {
+        if (data.details.totalduration) {
+          setDuration(data.details.totalduration);
+        }
+      });
+
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.warn('[HLS] Network error encountered, attempting recovery...');
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.warn('[HLS] Media error encountered, attempting recovery...');
+              hls.recoverMediaError();
+              break;
+            default:
+              console.error('[HLS] Fatal unrecoverable error:', data);
+              hls.destroy();
+              hlsRef.current = null;
+              setIsLoading(false);
+              setIsPlaying(false);
+              setErrorMessage('Adaptive HLS stream failed to load. The video may still be transcoding or unavailable.');
+              break;
+          }
+        }
+      });
+
+      return () => {
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+          hlsRef.current = null;
+        }
+      };
+    } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari native HLS support
+      video.src = source.url;
+    } else {
+      // Standard MP4 / WebM / direct URL video file
+      video.src = source.url;
+    }
+  }, [source?.url, isYouTube, adChecking, adFinished, adConfig?.enabled, source?.initialTimeSeconds]);
+
+  // Cleanup HLS instance on component unmount
+  useEffect(() => {
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, []);
+
   // Stable callback when preroll ad completes or is skipped
   const handleAdComplete = useCallback(() => {
     setAdFinished(true);
@@ -250,14 +346,17 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     );
   }
 
-  // Determine if source is YouTube
-  const youtubeInfo = parseYouTubeUrl(source.url);
-  const isYouTube = youtubeInfo.isYouTube;
-
   const handleRetry = () => {
     setErrorMessage(null);
     setIsLoading(true);
-    if (videoRef.current) {
+    if (hlsRef.current && source?.url) {
+      hlsRef.current.loadSource(source.url);
+      hlsRef.current.startLoad();
+      if (videoRef.current) {
+        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      }
+    } else if (videoRef.current) {
+      if (source?.url) videoRef.current.src = source.url;
       videoRef.current.load();
       videoRef.current
         .play()
@@ -394,9 +493,49 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
         /* 2. HTML5 VIDEO (MP4, WebM, Local Uploaded, Direct URL) */
         /* ------------------------------------------------------------------ */
         <>
+          {source.vcdnStatus === 'PROCESSING' && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '72px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 35,
+                backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                border: '1px solid rgba(245, 197, 24, 0.5)',
+                backdropFilter: 'blur(12px)',
+                borderRadius: '12px',
+                padding: '12px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                maxWidth: '90%',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)'
+              }}
+            >
+              <div
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  border: '2px solid rgba(245, 197, 24, 0.3)',
+                  borderTopColor: 'var(--brand-gold, #F5C518)',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite',
+                  flexShrink: 0
+                }}
+              />
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
+                  ⚡ VCDN Adaptive Streaming: Transcoding in Progress
+                </div>
+                <div style={{ fontSize: '12px', color: '#D1D5DB' }}>
+                  This video is currently being transcoded to multi-bitrate HLS. Playback will start automatically when ready.
+                </div>
+              </div>
+            </div>
+          )}
           <video
             ref={videoRef}
-            src={source.url}
             poster={source.poster}
             preload="auto"
             playsInline

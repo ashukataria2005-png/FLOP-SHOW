@@ -188,7 +188,55 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 2 };
+    // Apply incremental 007_vcdn_media_streaming for PostgreSQL if not already applied
+    const vcdnMigrationVersion = '007_vcdn_media_streaming';
+    if (!appliedSet.has(vcdnMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 007_vcdn_media_streaming...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          -- 1. Extend media table
+          ALTER TABLE media ADD COLUMN IF NOT EXISTS vcdn_video_id TEXT DEFAULT NULL;
+          ALTER TABLE media ADD COLUMN IF NOT EXISTS vcdn_status TEXT DEFAULT NULL;
+          ALTER TABLE media ADD COLUMN IF NOT EXISTS vcdn_playback_url TEXT DEFAULT NULL;
+          ALTER TABLE media ADD COLUMN IF NOT EXISTS vcdn_embed_url TEXT DEFAULT NULL;
+          ALTER TABLE media ADD COLUMN IF NOT EXISTS vcdn_thumbnail_url TEXT DEFAULT NULL;
+          ALTER TABLE media ADD COLUMN IF NOT EXISTS media_provider TEXT DEFAULT 'LOCAL';
+
+          -- 2. Extend content table
+          ALTER TABLE content ADD COLUMN IF NOT EXISTS vcdn_video_id TEXT DEFAULT NULL;
+          ALTER TABLE content ADD COLUMN IF NOT EXISTS vcdn_status TEXT DEFAULT NULL;
+          ALTER TABLE content ADD COLUMN IF NOT EXISTS vcdn_playback_url TEXT DEFAULT NULL;
+          ALTER TABLE content ADD COLUMN IF NOT EXISTS vcdn_embed_url TEXT DEFAULT NULL;
+          ALTER TABLE content ADD COLUMN IF NOT EXISTS vcdn_thumbnail_url TEXT DEFAULT NULL;
+          ALTER TABLE content ADD COLUMN IF NOT EXISTS media_provider TEXT DEFAULT 'LOCAL';
+
+          -- 3. Extend episodes table
+          ALTER TABLE episodes ADD COLUMN IF NOT EXISTS vcdn_video_id TEXT DEFAULT NULL;
+          ALTER TABLE episodes ADD COLUMN IF NOT EXISTS vcdn_status TEXT DEFAULT NULL;
+          ALTER TABLE episodes ADD COLUMN IF NOT EXISTS vcdn_playback_url TEXT DEFAULT NULL;
+          ALTER TABLE episodes ADD COLUMN IF NOT EXISTS vcdn_embed_url TEXT DEFAULT NULL;
+          ALTER TABLE episodes ADD COLUMN IF NOT EXISTS vcdn_thumbnail_url TEXT DEFAULT NULL;
+          ALTER TABLE episodes ADD COLUMN IF NOT EXISTS media_provider TEXT DEFAULT 'LOCAL';
+
+          CREATE INDEX IF NOT EXISTS idx_media_vcdn_id ON media(vcdn_video_id);
+          CREATE INDEX IF NOT EXISTS idx_content_vcdn_id ON content(vcdn_video_id);
+          CREATE INDEX IF NOT EXISTS idx_episodes_vcdn_id ON episodes(vcdn_video_id);
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${vcdnMigrationVersion}', '007_vcdn_media_streaming.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('007_vcdn_media_streaming.sql');
+        console.log('✓ [PostgreSQL] Migration 007_vcdn_media_streaming applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 3 };
   } finally {
     client.release();
     await pool.end();

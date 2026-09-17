@@ -10,6 +10,7 @@ import { libraryRouter } from './routes/libraryRoutes.js';
 import { adminRouter } from './routes/adminRoutes.js';
 import { mediaRouter } from './routes/mediaRoutes.js';
 import { paymentRouter } from './routes/paymentRoutes.js';
+import { webhookRouter } from './routes/webhookRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
 import { config } from './config/env.js';
@@ -215,6 +216,7 @@ export function createServer(): Express {
   app.use('/api/admin', adminRouter);
   app.use('/api/media', mediaRouter);
   app.use('/api/payments', paymentRouter);
+  app.use('/api/webhooks', webhookRouter);
 
   // Direct aliases for admin login
   app.post('/api/admin-login', handleAdminLogin);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api, API_BASE_URL } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { ContentType } from '../../types/content';
@@ -93,6 +93,17 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
   const [uploadProgressEpisodeVideo, setUploadProgressEpisodeVideo] = useState<number>(0);
   const [uploadingEpisodeThumb, setUploadingEpisodeThumb] = useState(false);
 
+  // VCDN Media & Transcoding State
+  const [vcdnVideoId, setVcdnVideoId] = useState<string>('');
+  const [vcdnStatus, setVcdnStatus] = useState<string>('');
+  const [vcdnPlaybackUrl, setVcdnPlaybackUrl] = useState<string>('');
+  const [_isVcdnPolling, setIsVcdnPolling] = useState<boolean>(false);
+
+  // Episode VCDN State
+  const [episodeVcdnVideoId, setEpisodeVcdnVideoId] = useState<string>('');
+  const [episodeVcdnStatus, setEpisodeVcdnStatus] = useState<string>('');
+  const [episodeVcdnPlaybackUrl, setEpisodeVcdnPlaybackUrl] = useState<string>('');
+
   // Preview Player State
   const [previewSource, setPreviewSource] = useState<MediaPlayerSource | null>(null);
 
@@ -130,6 +141,11 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
       setBackdropUrl(data.backdropUrl || '');
       setTrailerUrl(data.trailerUrl || '');
       setMainVideoUrl(data.videoUrl || '');
+      if ((data as any).vcdnVideoId) {
+        setVcdnVideoId((data as any).vcdnVideoId);
+        setVcdnStatus((data as any).vcdnStatus || 'READY');
+        setVcdnPlaybackUrl((data as any).vcdnPlaybackUrl || data.videoUrl || '');
+      }
 
       if (data.type === 'series' && data.seasons) {
         setSeasons(data.seasons);
@@ -138,6 +154,52 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
       showToast(err.message || 'Failed to load content details.', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const startVcdnPolling = useCallback((vidId: string) => {
+    if (!vidId) return;
+    setIsVcdnPolling(true);
+    const interval = window.setInterval(async () => {
+      try {
+        const check = await api.admin.getVcdnStatus(vidId);
+        if (check.success && check.status) {
+          setVcdnStatus(check.status);
+          if (check.playbackUrl) {
+            setVcdnPlaybackUrl(check.playbackUrl);
+            setMainVideoUrl(check.playbackUrl);
+          }
+          if (check.status === 'READY') {
+            window.clearInterval(interval);
+            setIsVcdnPolling(false);
+            showToast('✓ VCDN HLS stream transcoding complete! Ready for playback.', 'success');
+          } else if (check.status === 'FAILED') {
+            window.clearInterval(interval);
+            setIsVcdnPolling(false);
+            showToast('VCDN Transcoding failed.', 'error');
+          }
+        }
+      } catch (err) {
+        console.warn('VCDN status poll error:', err);
+      }
+    }, 5000);
+  }, [showToast]);
+
+  const handleManualCheckVcdnStatus = async () => {
+    if (!vcdnVideoId) return;
+    try {
+      showToast('Checking VCDN status...', 'info');
+      const check = await api.admin.getVcdnStatus(vcdnVideoId);
+      if (check.success && check.status) {
+        setVcdnStatus(check.status);
+        if (check.playbackUrl) {
+          setVcdnPlaybackUrl(check.playbackUrl);
+          setMainVideoUrl(check.playbackUrl);
+        }
+        showToast(`VCDN Status: ${check.status}`, check.status === 'READY' ? 'success' : 'info');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to fetch VCDN status.', 'error');
     }
   };
 
@@ -200,7 +262,15 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
       setUploadProgressVideo(0);
       const res = await api.admin.uploadFile(file, pct => setUploadProgressVideo(pct));
       setMainVideoUrl(res.url);
-      showToast('Main video file uploaded successfully!', 'success');
+      if (res.vcdnVideoId) {
+        setVcdnVideoId(res.vcdnVideoId);
+        setVcdnStatus(res.vcdnStatus || 'PROCESSING');
+        if (res.playbackUrl) setVcdnPlaybackUrl(res.playbackUrl);
+        showToast('Video uploaded to VCDN! Transcoding into HLS streams...', 'success');
+        startVcdnPolling(res.vcdnVideoId);
+      } else {
+        showToast('Main video file uploaded successfully!', 'success');
+      }
     } catch (err: any) {
       showToast(err.message || 'Video upload failed.', 'error');
     } finally {
@@ -218,7 +288,14 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
       setUploadProgressEpisodeVideo(0);
       const res = await api.admin.uploadFile(file, pct => setUploadProgressEpisodeVideo(pct));
       setEpisodeVideoUrl(res.url);
-      showToast('Episode video uploaded!', 'success');
+      if (res.vcdnVideoId) {
+        setEpisodeVcdnVideoId(res.vcdnVideoId);
+        setEpisodeVcdnStatus(res.vcdnStatus || 'PROCESSING');
+        if (res.playbackUrl) setEpisodeVcdnPlaybackUrl(res.playbackUrl);
+        showToast('Episode video uploaded to VCDN! Processing...', 'success');
+      } else {
+        showToast('Episode video uploaded!', 'success');
+      }
     } catch (err: any) {
       showToast(err.message || 'Episode upload failed.', 'error');
     } finally {
@@ -268,6 +345,9 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
     setEpisodeSynopsis('');
     setEpisodeVideoUrl('');
     setEpisodeThumbnailUrl('');
+    setEpisodeVcdnVideoId('');
+    setEpisodeVcdnStatus('');
+    setEpisodeVcdnPlaybackUrl('');
     setShowEpisodeModal(true);
   };
 
@@ -278,6 +358,9 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
     setEpisodeSynopsis(ep.synopsis || ep.description || '');
     setEpisodeVideoUrl(ep.videoUrl || '');
     setEpisodeThumbnailUrl(ep.thumbnailUrl || ep.thumbnail || '');
+    setEpisodeVcdnVideoId(ep.vcdnVideoId || '');
+    setEpisodeVcdnStatus(ep.vcdnStatus || '');
+    setEpisodeVcdnPlaybackUrl(ep.vcdnPlaybackUrl || '');
     setShowEpisodeModal(true);
   };
 
@@ -316,7 +399,10 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
       durationSeconds: 2400,
       thumbnailUrl: episodeThumbnailUrl || posterUrl || '',
       videoUrl: episodeVideoUrl,
-      synopsis: episodeSynopsis
+      synopsis: episodeSynopsis,
+      vcdnVideoId: episodeVcdnVideoId || undefined,
+      vcdnStatus: episodeVcdnStatus || undefined,
+      vcdnPlaybackUrl: episodeVcdnPlaybackUrl || undefined
     };
 
     setSeasons(prev =>
@@ -338,6 +424,9 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
     setEpisodeVideoUrl('');
     setEpisodeThumbnailUrl('');
     setEpisodeSynopsis('');
+    setEpisodeVcdnVideoId('');
+    setEpisodeVcdnStatus('');
+    setEpisodeVcdnPlaybackUrl('');
     showToast(`Saved Episode ${episodeNumber}!`, 'success');
   };
 
@@ -413,7 +502,11 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
         await api.admin.attachMedia({
           contentId: targetId,
           mediaType: 'MAIN',
-          url: mainVideoUrl
+          url: mainVideoUrl,
+          vcdnVideoId: vcdnVideoId || undefined,
+          vcdnStatus: vcdnStatus || (vcdnVideoId ? 'PROCESSING' : undefined),
+          vcdnPlaybackUrl: vcdnPlaybackUrl || mainVideoUrl,
+          mediaProvider: vcdnVideoId ? 'VCDN' : undefined
         });
       }
 
@@ -474,7 +567,11 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                   await api.admin.attachMedia({
                     episodeId: activeEpId,
                     mediaType: 'MAIN',
-                    url: ep.videoUrl
+                    url: ep.videoUrl,
+                    vcdnVideoId: ep.vcdnVideoId || undefined,
+                    vcdnStatus: ep.vcdnStatus || undefined,
+                    vcdnPlaybackUrl: ep.vcdnPlaybackUrl || ep.videoUrl,
+                    mediaProvider: ep.vcdnVideoId ? 'VCDN' : undefined
                   });
                 }
               }
@@ -1506,6 +1603,77 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                       </>
                     )}
                   </div>
+
+                  {/* VCDN Status & Transcoding Card */}
+                  {vcdnVideoId && (
+                    <div
+                      style={{
+                        marginTop: '14px',
+                        padding: '12px 16px',
+                        borderRadius: '10px',
+                        backgroundColor: 'rgba(15, 23, 42, 0.7)',
+                        border: '1px solid rgba(245, 197, 24, 0.25)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div
+                          style={{
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            backgroundColor: vcdnStatus === 'READY' ? '#10B981' : vcdnStatus === 'FAILED' ? '#EF4444' : '#F59E0B',
+                            boxShadow: `0 0 10px ${vcdnStatus === 'READY' ? '#10B981' : vcdnStatus === 'FAILED' ? '#EF4444' : '#F59E0B'}`
+                          }}
+                        />
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span>VCDN Stream ID: <code style={{ color: 'var(--brand-gold, #F5C518)', fontSize: '12px' }}>{vcdnVideoId}</code></span>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                fontWeight: 700,
+                                backgroundColor: vcdnStatus === 'READY' ? 'rgba(16, 185, 129, 0.2)' : vcdnStatus === 'FAILED' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                                color: vcdnStatus === 'READY' ? '#10B981' : vcdnStatus === 'FAILED' ? '#EF4444' : '#F59E0B'
+                              }}
+                            >
+                              {vcdnStatus || 'PROCESSING'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
+                            {vcdnStatus === 'READY'
+                              ? 'Adaptive HLS master playlist is active.'
+                              : vcdnStatus === 'FAILED'
+                              ? 'Transcoding encountered an issue on VCDN.'
+                              : 'VCDN is transcoding video into multi-bitrate HLS streams...'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleManualCheckVcdnStatus}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '8px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          color: '#FFFFFF',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Refresh Status
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: 'rgba(192, 132, 252, 0.1)', border: '1px solid rgba(192, 132, 252, 0.2)' }}>

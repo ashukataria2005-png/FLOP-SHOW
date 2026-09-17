@@ -28,6 +28,12 @@ export interface ContentRecord {
   created_at: string;
   updated_at: string;
   is_hero?: number;
+  vcdn_video_id?: string | null;
+  vcdn_status?: string | null;
+  vcdn_playback_url?: string | null;
+  vcdn_embed_url?: string | null;
+  vcdn_thumbnail_url?: string | null;
+  media_provider?: string | null;
   genres?: string[]; // array of genre names
 }
 
@@ -56,6 +62,12 @@ export interface EpisodeRecord {
   duration: string | null;
   duration_seconds: number;
   video_url: string;
+  vcdn_video_id?: string | null;
+  vcdn_status?: string | null;
+  vcdn_playback_url?: string | null;
+  vcdn_embed_url?: string | null;
+  vcdn_thumbnail_url?: string | null;
+  media_provider?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -149,11 +161,32 @@ export const contentRepository = {
     const { rows } = await db.query(sql, allParams);
 
     const records = rows as ContentRecord[];
-    // Attach genres for each content item
-    return Promise.all(records.map(async r => ({
+    if (records.length === 0) return [];
+
+    // Batch fetch genres for all content items in a single query
+    const contentIds = records.map(r => r.id);
+    const placeholders = contentIds.map(() => '?').join(', ');
+    const { rows: genreRows } = await db.query(
+      `SELECT cg.content_id, g.name
+       FROM genres g
+       JOIN content_genres cg ON g.id = cg.genre_id
+       WHERE cg.content_id IN (${placeholders})
+       ORDER BY g.name ASC;`,
+      contentIds
+    );
+
+    const genresByContentId = new Map<string, string[]>();
+    for (const gr of genreRows as { content_id: string; name: string }[]) {
+      if (!genresByContentId.has(gr.content_id)) {
+        genresByContentId.set(gr.content_id, []);
+      }
+      genresByContentId.get(gr.content_id)!.push(gr.name);
+    }
+
+    return records.map(r => ({
       ...r,
-      genres: await contentRepository.getGenresForContent(r.id),
-    })));
+      genres: genresByContentId.get(r.id) || []
+    }));
   },
 
   async findByIdOrSlug(idOrSlug: string): Promise<ContentRecord | null> {
@@ -276,8 +309,11 @@ export const contentRepository = {
          id, type, title, slug, description, poster, backdrop,
          trailer_url, video_url, price, language, release_year,
          duration, age_rating, status, featured, category_label,
-         tagline, about, rating, director, cast_json, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+         tagline, about, rating, director, cast_json,
+         vcdn_video_id, vcdn_status, vcdn_playback_url,
+         vcdn_embed_url, vcdn_thumbnail_url, media_provider,
+         created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         item.id,
         item.type,
@@ -301,6 +337,12 @@ export const contentRepository = {
         item.rating || 8.0,
         item.director || null,
         item.cast_json || '[]',
+        item.vcdn_video_id || null,
+        item.vcdn_status || null,
+        item.vcdn_playback_url || null,
+        item.vcdn_embed_url || null,
+        item.vcdn_thumbnail_url || null,
+        item.media_provider || (item.vcdn_video_id ? 'VCDN' : 'LOCAL'),
         now,
         now,
       ]
@@ -332,6 +374,8 @@ export const contentRepository = {
       'trailer_url', 'video_url', 'price', 'language', 'release_year',
       'duration', 'age_rating', 'status', 'featured', 'category_label',
       'tagline', 'about', 'rating', 'director', 'cast_json',
+      'vcdn_video_id', 'vcdn_status', 'vcdn_playback_url',
+      'vcdn_embed_url', 'vcdn_thumbnail_url', 'media_provider'
     ];
 
     const setClauses: string[] = [];
@@ -437,14 +481,23 @@ export const contentRepository = {
     duration?: string;
     durationSeconds?: number;
     videoUrl: string;
+    vcdnVideoId?: string | null;
+    vcdnStatus?: string | null;
+    vcdnPlaybackUrl?: string | null;
+    vcdnEmbedUrl?: string | null;
+    vcdnThumbnailUrl?: string | null;
+    mediaProvider?: string | null;
   }): Promise<void> {
     const db = getAdapter();
     const now = new Date().toISOString();
     await db.run(
       `INSERT INTO episodes
          (id, season_id, episode_number, title, description,
-          thumbnail, duration, duration_seconds, video_url, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          thumbnail, duration, duration_seconds, video_url,
+          vcdn_video_id, vcdn_status, vcdn_playback_url,
+          vcdn_embed_url, vcdn_thumbnail_url, media_provider,
+          created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (id) DO UPDATE SET
          title = EXCLUDED.title,
          description = EXCLUDED.description,
@@ -452,6 +505,12 @@ export const contentRepository = {
          duration = EXCLUDED.duration,
          duration_seconds = EXCLUDED.duration_seconds,
          video_url = EXCLUDED.video_url,
+         vcdn_video_id = COALESCE(EXCLUDED.vcdn_video_id, episodes.vcdn_video_id),
+         vcdn_status = COALESCE(EXCLUDED.vcdn_status, episodes.vcdn_status),
+         vcdn_playback_url = COALESCE(EXCLUDED.vcdn_playback_url, episodes.vcdn_playback_url),
+         vcdn_embed_url = COALESCE(EXCLUDED.vcdn_embed_url, episodes.vcdn_embed_url),
+         vcdn_thumbnail_url = COALESCE(EXCLUDED.vcdn_thumbnail_url, episodes.vcdn_thumbnail_url),
+         media_provider = COALESCE(EXCLUDED.media_provider, episodes.media_provider),
          updated_at = EXCLUDED.updated_at;`,
       [
         ep.id,
@@ -463,6 +522,12 @@ export const contentRepository = {
         ep.duration || null,
         ep.durationSeconds || 0,
         ep.videoUrl,
+        ep.vcdnVideoId || null,
+        ep.vcdnStatus || null,
+        ep.vcdnPlaybackUrl || null,
+        ep.vcdnEmbedUrl || null,
+        ep.vcdnThumbnailUrl || null,
+        ep.mediaProvider || (ep.vcdnVideoId ? 'VCDN' : 'LOCAL'),
         now,
         now,
       ]
@@ -516,6 +581,7 @@ export const contentRepository = {
     const db = getAdapter();
     const allowedKeys: (keyof EpisodeRecord)[] = [
       'title', 'description', 'thumbnail', 'duration', 'duration_seconds', 'video_url', 'episode_number',
+      'vcdn_video_id', 'vcdn_status', 'vcdn_playback_url', 'vcdn_embed_url', 'vcdn_thumbnail_url', 'media_provider'
     ];
     const setClauses: string[] = [];
     const params: (string | number | null)[] = [];
@@ -535,6 +601,73 @@ export const contentRepository = {
       `UPDATE episodes SET ${setClauses.join(', ')} WHERE id = ?;`,
       params
     );
+  },
+
+  async findByVcdnVideoId(vcdnVideoId: string): Promise<ContentRecord | null> {
+    const db = getAdapter();
+    const { rows } = await db.query(`SELECT * FROM content WHERE vcdn_video_id = ? LIMIT 1;`, [vcdnVideoId]);
+    return (rows[0] as ContentRecord) || null;
+  },
+
+  async findEpisodeByVcdnVideoId(vcdnVideoId: string): Promise<EpisodeRecord | null> {
+    const db = getAdapter();
+    const { rows } = await db.query(`SELECT * FROM episodes WHERE vcdn_video_id = ? LIMIT 1;`, [vcdnVideoId]);
+    return (rows[0] as EpisodeRecord) || null;
+  },
+
+  async updateContentVcdnStatus(
+    vcdnVideoId: string,
+    status: string,
+    playbackUrl?: string,
+    embedUrl?: string,
+    thumbnailUrl?: string
+  ): Promise<void> {
+    const db = getAdapter();
+    const now = new Date().toISOString();
+    const updates: string[] = ['vcdn_status = ?', 'updated_at = ?'];
+    const params: any[] = [status, now];
+
+    if (playbackUrl) {
+      updates.push('vcdn_playback_url = ?', 'video_url = ?');
+      params.push(playbackUrl, playbackUrl);
+    }
+    if (embedUrl) {
+      updates.push('vcdn_embed_url = ?');
+      params.push(embedUrl);
+    }
+    if (thumbnailUrl) {
+      updates.push('vcdn_thumbnail_url = ?');
+      params.push(thumbnailUrl);
+    }
+    params.push(vcdnVideoId);
+
+    await db.run(
+      `UPDATE content SET ${updates.join(', ')} WHERE vcdn_video_id = ?;`,
+      params
+    );
+
+    // Also update matching episode if any
+    await db.run(
+      `UPDATE episodes SET ${updates.join(', ')} WHERE vcdn_video_id = ?;`,
+      params
+    );
+  },
+
+  async isVcdnVideoReferencedElsewhere(vcdnVideoId: string, excludeContentId?: string, excludeEpisodeId?: string): Promise<boolean> {
+    const db = getAdapter();
+    const { rows: contentRows } = await db.query(
+      `SELECT COUNT(*) as cnt FROM content WHERE vcdn_video_id = ? AND id != ?;`,
+      [vcdnVideoId, excludeContentId || '']
+    );
+    const contentCount = parseInt(contentRows[0]?.cnt || '0', 10);
+
+    const { rows: epRows } = await db.query(
+      `SELECT COUNT(*) as cnt FROM episodes WHERE vcdn_video_id = ? AND id != ?;`,
+      [vcdnVideoId, excludeEpisodeId || '']
+    );
+    const epCount = parseInt(epRows[0]?.cnt || '0', 10);
+
+    return (contentCount + epCount) > 0;
   },
 
   async syncGenres(contentId: string, genreIds: string[]): Promise<void> {

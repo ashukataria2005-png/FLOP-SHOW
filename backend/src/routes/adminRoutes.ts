@@ -6,6 +6,11 @@ import { requireAdmin } from '../middlewares/adminMiddleware.js';
 import { uploadMediaMiddleware, isVideoFile } from '../middlewares/uploadMiddleware.js';
 import { metadataImportService } from '../services/metadataImportService.js';
 import { cloudinaryService, isCloudinaryConfigured, cleanupLocalFile } from '../services/cloudinaryService.js';
+import { vcdnService } from '../services/vcdnService.js';
+import { isVcdnConfigured } from '../config/env.js';
+import { contentRepository } from '../repositories/contentRepository.js';
+import { mediaRepository } from '../repositories/mediaRepository.js';
+import { getAdapter } from '../db/adapter.js';
 
 export const adminRouter = Router();
 
@@ -160,6 +165,41 @@ adminRouter.post('/upload', (req: Request, res: Response, next) => {
     const localFilePath = req.file.path;
 
     try {
+      // 1. PRIMARY STREAMING STORAGE: VCDN for videos
+      if (isVid && isVcdnConfigured()) {
+        try {
+          const vcdnResult = await vcdnService.uploadVideo(localFilePath, req.file.originalname);
+          // Clean up temporary local staging file after successful VCDN upload
+          await cleanupLocalFile(localFilePath);
+
+          return res.status(201).json({
+            success: true,
+            url: vcdnResult.playbackUrl,
+            playbackUrl: vcdnResult.playbackUrl,
+            embedUrl: vcdnResult.embedUrl,
+            vcdnVideoId: vcdnResult.vcdnVideoId,
+            vcdnStatus: vcdnResult.vcdnStatus,
+            filename: req.file.filename,
+            originalName: req.file.originalname,
+            mimeType: 'application/x-mpegURL',
+            size: req.file.size,
+            provider: 'VCDN',
+          });
+        } catch (vcdnErr: any) {
+          console.error('[VCDN] Upload error:', vcdnErr.message);
+          // If VCDN fails and Cloudinary is configured, fallback to Cloudinary; otherwise return error
+          if (!isCloudinaryConfigured()) {
+            await cleanupLocalFile(localFilePath);
+            return res.status(500).json({
+              error: {
+                code: 'VCDN_UPLOAD_FAILED',
+                message: `Failed to upload video to VCDN: ${vcdnErr.message || 'Unknown error'}`,
+              },
+            });
+          }
+        }
+      }
+
       if (isCloudinaryConfigured()) {
         const uploadResult = isVid
           ? await cloudinaryService.uploadVideo(localFilePath, req.file.originalname)
@@ -180,7 +220,7 @@ adminRouter.post('/upload', (req: Request, res: Response, next) => {
         });
       }
 
-      // Safe fallback to local storage if Cloudinary credentials are not configured
+      // Safe fallback to local storage if VCDN / Cloudinary credentials are not configured
       const subfolder = isVid ? 'videos' : 'images';
       const relativeUrl = `/uploads/${subfolder}/${req.file.filename}`;
 
@@ -192,18 +232,50 @@ adminRouter.post('/upload', (req: Request, res: Response, next) => {
         mimeType: req.file.mimetype || (isVid ? 'video/mp4' : 'image/jpeg'),
         size: req.file.size,
         provider: 'LOCAL',
+        note: isVid ? 'VCDN is not configured (missing VCDN_API_KEY). Saved to local storage.' : undefined,
       });
     } catch (innerErr: any) {
-      // Clean up temporary local file if Cloudinary upload fails
+      // Clean up temporary local file if upload fails
       await cleanupLocalFile(localFilePath);
       return res.status(500).json({
         error: {
           code: 'UPLOAD_FAILED',
-          message: innerErr.message || 'Failed to upload media file to Cloudinary.',
+          message: innerErr.message || 'Failed to upload media file.',
         },
       });
     }
   });
+});
+
+// ----------------------------------------------------------------------------
+// 2B. VCDN STATUS CHECK & REAL-TIME SYNC
+// ----------------------------------------------------------------------------
+adminRouter.get('/media/vcdn/status/:id', async (req, res, next) => {
+  try {
+    const videoId = req.params.id;
+    if (!isVcdnConfigured()) {
+      return res.status(400).json({
+        error: { code: 'VCDN_NOT_CONFIGURED', message: 'VCDN_API_KEY is not configured.' },
+      });
+    }
+    const status = await vcdnService.getVideoStatus(videoId);
+
+    // If ready, sync database records in background
+    if (status.status === 'ready') {
+      const hlsUrl = status.playback?.hls || status.playbackUrl;
+      const embedUrl = status.playback?.embed || status.embedUrl;
+      const thumbUrl = status.thumbnails?.[0];
+      await mediaRepository.updateVcdnStatus(videoId, 'READY', hlsUrl, embedUrl, thumbUrl);
+      await contentRepository.updateContentVcdnStatus(videoId, 'READY', hlsUrl, embedUrl, thumbUrl);
+    } else if (status.status === 'failed') {
+      await mediaRepository.updateVcdnStatus(videoId, 'FAILED');
+      await contentRepository.updateContentVcdnStatus(videoId, 'FAILED');
+    }
+
+    res.json({ success: true, ...status });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ----------------------------------------------------------------------------
@@ -253,6 +325,15 @@ adminRouter.put('/content/:id', async (req, res, next) => {
 
 adminRouter.delete('/content/:id', async (req, res, next) => {
   try {
+    const content = await contentRepository.findByIdOrSlug(req.params.id);
+    if (content?.vcdn_video_id) {
+      const referencedElsewhere = await contentRepository.isVcdnVideoReferencedElsewhere(content.vcdn_video_id, content.id);
+      if (!referencedElsewhere) {
+        await vcdnService.deleteVideo(content.vcdn_video_id).catch(err => {
+          console.warn('[VCDN] Warning deleting content video:', err.message);
+        });
+      }
+    }
     await adminService.deleteContent(req.params.id);
     res.json({ success: true, message: `Content ${req.params.id} deleted successfully.` });
   } catch (err) {
@@ -362,8 +443,11 @@ adminRouter.post('/auto-import/import', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 adminRouter.post('/media', async (req, res, next) => {
   try {
-    const { contentId, episodeId, mediaType, sourceType, url, mimeType, duration, durationSeconds, thumbnail } =
-      req.body;
+    const {
+      contentId, episodeId, mediaType, sourceType, url, mimeType,
+      duration, durationSeconds, thumbnail,
+      vcdnVideoId, vcdnStatus, vcdnPlaybackUrl, vcdnEmbedUrl, vcdnThumbnailUrl, mediaProvider
+    } = req.body;
 
     if (!mediaType || (!contentId && !episodeId) || !url) {
       res.status(400).json({
@@ -382,6 +466,12 @@ adminRouter.post('/media', async (req, res, next) => {
         duration,
         durationSeconds,
         thumbnail,
+        vcdnVideoId,
+        vcdnStatus,
+        vcdnPlaybackUrl,
+        vcdnEmbedUrl,
+        vcdnThumbnailUrl,
+        mediaProvider,
       });
     } else {
       media = await mediaService.attachEpisodeMedia(episodeId, {
@@ -392,6 +482,12 @@ adminRouter.post('/media', async (req, res, next) => {
         duration,
         durationSeconds,
         thumbnail,
+        vcdnVideoId,
+        vcdnStatus,
+        vcdnPlaybackUrl,
+        vcdnEmbedUrl,
+        vcdnThumbnailUrl,
+        mediaProvider,
       });
     }
 
@@ -421,6 +517,15 @@ adminRouter.get('/episodes/:episodeId/media', async (req, res, next) => {
 
 adminRouter.delete('/media/:id', async (req, res, next) => {
   try {
+    const media = await mediaRepository.findById(req.params.id);
+    if (media?.vcdn_video_id) {
+      const referencedElsewhere = await mediaRepository.isVcdnVideoReferencedElsewhere(media.vcdn_video_id, media.id);
+      if (!referencedElsewhere) {
+        await vcdnService.deleteVideo(media.vcdn_video_id).catch(err => {
+          console.warn('[VCDN] Warning deleting media record video:', err.message);
+        });
+      }
+    }
     await mediaService.deleteMedia(req.params.id);
     res.json({ success: true, message: 'Media record deleted.' });
   } catch (err) {
@@ -549,6 +654,17 @@ adminRouter.put('/episodes/:id', async (req, res, next) => {
 
 adminRouter.delete('/episodes/:id', async (req, res, next) => {
   try {
+    const db = getAdapter();
+    const { rows } = await db.query('SELECT * FROM episodes WHERE id = ?', [req.params.id]);
+    const ep = rows[0] as any;
+    if (ep?.vcdn_video_id) {
+      const referencedElsewhere = await contentRepository.isVcdnVideoReferencedElsewhere(ep.vcdn_video_id, undefined, ep.id);
+      if (!referencedElsewhere) {
+        await vcdnService.deleteVideo(ep.vcdn_video_id).catch(err => {
+          console.warn('[VCDN] Warning deleting episode video:', err.message);
+        });
+      }
+    }
     await adminService.deleteEpisode(req.params.id);
     res.json({ success: true, message: 'Episode deleted.' });
   } catch (err) {

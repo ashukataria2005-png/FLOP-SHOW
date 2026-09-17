@@ -12,6 +12,12 @@ export interface MediaRecord {
   duration_seconds: number;
   thumbnail: string | null;
   is_active: number;
+  vcdn_video_id?: string | null;
+  vcdn_status?: string | null;
+  vcdn_playback_url?: string | null;
+  vcdn_embed_url?: string | null;
+  vcdn_thumbnail_url?: string | null;
+  media_provider?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -29,6 +35,12 @@ export const mediaRepository = {
     durationSeconds?: number;
     thumbnail?: string | null;
     isActive?: number;
+    vcdnVideoId?: string | null;
+    vcdnStatus?: string | null;
+    vcdnPlaybackUrl?: string | null;
+    vcdnEmbedUrl?: string | null;
+    vcdnThumbnailUrl?: string | null;
+    mediaProvider?: string | null;
     now: string;
   }): Promise<void> {
     const db = getAdapter();
@@ -52,8 +64,10 @@ export const mediaRepository = {
       `INSERT INTO media
          (id, content_id, episode_id, media_type, source_type,
           url, mime_type, duration, duration_seconds, thumbnail,
-          is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          is_active, vcdn_video_id, vcdn_status, vcdn_playback_url,
+          vcdn_embed_url, vcdn_thumbnail_url, media_provider,
+          created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         media.id,
         media.contentId || null,
@@ -66,6 +80,12 @@ export const mediaRepository = {
         media.durationSeconds || 0,
         media.thumbnail || null,
         media.isActive ?? 1,
+        media.vcdnVideoId || null,
+        media.vcdnStatus || null,
+        media.vcdnPlaybackUrl || null,
+        media.vcdnEmbedUrl || null,
+        media.vcdnThumbnailUrl || null,
+        media.mediaProvider || (media.vcdnVideoId ? 'VCDN' : 'LOCAL'),
         media.now,
         media.now,
       ]
@@ -77,6 +97,8 @@ export const mediaRepository = {
     const allowedKeys: (keyof MediaRecord)[] = [
       'url', 'source_type', 'media_type', 'mime_type',
       'duration', 'duration_seconds', 'thumbnail', 'is_active',
+      'vcdn_video_id', 'vcdn_status', 'vcdn_playback_url',
+      'vcdn_embed_url', 'vcdn_thumbnail_url', 'media_provider'
     ];
 
     const setClauses: string[] = [];
@@ -109,6 +131,57 @@ export const mediaRepository = {
     const db = getAdapter();
     const { rows } = await db.query(`SELECT * FROM media WHERE id = ?;`, [id]);
     return (rows[0] as MediaRecord) || null;
+  },
+
+  async findByVcdnVideoId(vcdnVideoId: string): Promise<MediaRecord[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT * FROM media WHERE vcdn_video_id = ? ORDER BY created_at DESC;`,
+      [vcdnVideoId]
+    );
+    return rows as MediaRecord[];
+  },
+
+  async updateVcdnStatus(
+    vcdnVideoId: string,
+    status: string,
+    playbackUrl?: string,
+    embedUrl?: string,
+    thumbnailUrl?: string
+  ): Promise<void> {
+    const db = getAdapter();
+    const now = new Date().toISOString();
+    const updates: string[] = ['vcdn_status = ?', 'updated_at = ?'];
+    const params: any[] = [status, now];
+
+    if (playbackUrl) {
+      updates.push('vcdn_playback_url = ?', 'url = ?');
+      params.push(playbackUrl, playbackUrl);
+    }
+    if (embedUrl) {
+      updates.push('vcdn_embed_url = ?');
+      params.push(embedUrl);
+    }
+    if (thumbnailUrl) {
+      updates.push('vcdn_thumbnail_url = ?');
+      params.push(thumbnailUrl);
+    }
+    params.push(vcdnVideoId);
+
+    await db.run(
+      `UPDATE media SET ${updates.join(', ')} WHERE vcdn_video_id = ?;`,
+      params
+    );
+  },
+
+  async isVcdnVideoReferencedElsewhere(vcdnVideoId: string, excludeMediaId?: string): Promise<boolean> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT COUNT(*) as cnt FROM media WHERE vcdn_video_id = ? AND id != ?;`,
+      [vcdnVideoId, excludeMediaId || '']
+    );
+    const count = parseInt(rows[0]?.cnt || '0', 10);
+    return count > 0;
   },
 
   async getMediaForContent(contentId: string, mediaType?: 'MAIN' | 'TRAILER'): Promise<MediaRecord[]> {

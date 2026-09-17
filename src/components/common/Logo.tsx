@@ -185,12 +185,12 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
               </svg>
             </div>
 
-            {/* Lens Focal Flare: exactly centered at lens opening (x = config.lensX, y = config.lensY) */}
+            {/* Full Vertical Aperture Illuminated Lens Gate: spans the complete lens opening */}
             <div
               className="cinematic-lens-flare"
               style={{
-                left: `${config.lensX - 5}px`,
-                top: `${config.lensY - 5}px`
+                left: `${config.lensX - 1.5}px`,
+                top: `${config.lensY - 5.5}px`
               }}
             />
 
@@ -385,14 +385,14 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             48.1%, 50.8% {
               clip-path: polygon(-60px -60px, 320px -60px, 320px 80px, -60px 80px);
             }
-            /* 2. EMERGENCE: Originates as a tight slit centered on the camera lens opening,
+            /* 2. EMERGENCE: Originates from the FULL vertical aperture of the camera lens (10.5px height),
                then continuously spreads outward into the full V-shaped projector cone */
             51.0% {
-              clip-path: polygon(-14px 11.75px, -8px 11.75px, -8px 15.75px, -14px 15.75px);
+              clip-path: polygon(-14px 8.5px, -6px 8.5px, -6px 19.0px, -14px 19.0px);
               animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
             }
             71.0% {
-              clip-path: polygon(-14px 11.75px, 200px -20px, 200px 48px, -14px 15.75px);
+              clip-path: polygon(-14px 8.5px, 200px -20px, 200px 48px, -14px 19.0px);
               animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
             }
             /* 3. Fully unclipped as projector beam fades, settling into crisp default state */
@@ -596,14 +596,14 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             }
           }
 
-          /* 7. LENS FOCAL FLARE: Origin centered exactly at camera lens opening */
+          /* 7. LENS APERTURE ILLUMINATION: Full vertical gate illumination across complete lens opening */
           .cinematic-lens-flare {
             position: absolute;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: radial-gradient(circle, #FFFFFF 0%, #FFE082 40%, #F5A623 75%, transparent 100%);
-            box-shadow: 0 0 10px #FFE082, 0 0 18px #F5A623;
+            width: 3px;
+            height: 11px;
+            border-radius: 1.5px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, #FFE082 50%, rgba(255, 255, 255, 0.95) 100%);
+            box-shadow: 0 0 8px #FFE082, 0 0 16px rgba(245, 166, 35, 0.8), 2px 0 6px #FFF;
             pointer-events: none;
             z-index: 3;
             animation: cinematicFlare 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
@@ -614,23 +614,23 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
           @keyframes cinematicFlare {
             0%, 47.0% {
               opacity: 0;
-              transform: scale(0.2);
+              transform: scaleY(0.2) scaleX(0.5);
             }
             50.0%, 71.0% {
               opacity: 1;
-              transform: scale(1);
+              transform: scaleY(1) scaleX(1);
             }
             73.5%, 76.0% {
               opacity: 0;
-              transform: scale(0.2);
+              transform: scaleY(0.2) scaleX(0.5);
             }
             76.1%, 100% {
               opacity: 0;
-              transform: scale(0.2);
+              transform: scaleY(0.2) scaleX(0.5);
             }
           }
 
-          /* 8. V-SHAPED PROJECTOR BEAM: Originates precisely from the center of the lens glass */
+          /* 8. V-SHAPED PROJECTOR BEAM: Originates from the FULL VERTICAL APERTURE of the camera lens */
           .cinematic-projector-beam {
             position: absolute;
             transform: translateY(-50%);
@@ -638,13 +638,13 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             height: 48px;
             pointer-events: none;
             z-index: 1;
-            /* Narrow horizontal slit centered vertically on the lens, spreading to full cone */
-            clip-path: polygon(0% 46%, 100% 0%, 100% 100%, 0% 54%);
+            /* Full vertical lens opening (39% to 61% = 10.5px aperture height) spreading to full cone */
+            clip-path: polygon(0% 39%, 100% 0%, 100% 100%, 0% 61%);
             background: linear-gradient(
               90deg,
-              rgba(255, 225, 100, 0.92) 0%,
-              rgba(245, 166, 35, 0.58) 25%,
-              rgba(245, 166, 35, 0.18) 68%,
+              rgba(255, 235, 130, 0.96) 0%,
+              rgba(245, 166, 35, 0.6) 24%,
+              rgba(245, 166, 35, 0.2) 68%,
               rgba(245, 166, 35, 0) 100%
             );
             filter: drop-shadow(0 0 10px rgba(245, 166, 35, 0.65));

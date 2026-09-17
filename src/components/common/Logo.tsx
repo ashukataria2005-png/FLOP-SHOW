@@ -105,7 +105,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
                 width: config.box,
                 height: config.box,
                 position: 'absolute',
-                top: '-0.75px',
+                top: '-2.25px',
                 left: 0,
                 display: 'flex',
                 alignItems: 'center',
@@ -191,7 +191,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
               className="cinematic-lens-flare"
               style={{
                 left: `${config.lensX - 1.5}px`,
-                top: `${config.lensY - 5.5}px`
+                top: `${config.lensY - 5.5 - 1.5}px`
               }}
             />
 
@@ -200,7 +200,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
               className="cinematic-projector-beam"
               style={{
                 left: `${config.lensX}px`,
-                top: `${config.lensY}px`
+                top: `${config.lensY - 1.5}px`
               }}
             />
           </>
@@ -249,61 +249,61 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
       {animated && (
         <style>{`
           /* ========================================================================= */
-          /* TIMING ARCHITECTURE (15.0s Total Seamless Loop with Calm Hold)            */
+          /* TIMING ARCHITECTURE (21.0s Total Loop: Animation + 10s+ Static Hold)      */
           /* ========================================================================= */
 
           /* 1. ORIGINAL FILM FRAME LOGO */
           .cinematic-original-logo {
-            animation: cinematicOriginalLogo 15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: cinematicOriginalLogo 21s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             transform-origin: center center;
             will-change: transform, opacity, filter;
           }
 
           @keyframes cinematicOriginalLogo {
-            /* Static initial rest */
-            0%, 15.8% {
+            /* Static initial rest: 0s to 2.37s */
+            0%, 11.3% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
               filter: none;
             }
-            /* Magnetic activation pulse */
-            16.2%, 16.7% {
+            /* Magnetic activation pulse: 2.44s to 2.50s */
+            11.6%, 11.9% {
               opacity: 1;
               transform: scale(1.06);
               filter: drop-shadow(0 0 10px rgba(245, 166, 35, 0.8));
             }
-            /* Magnetic pull phase: solidly visible, actively absorbing text */
-            16.8%, 31.7% {
+            /* Magnetic pull phase: 2.51s to 4.75s */
+            12.0%, 22.6% {
               opacity: 1;
               transform: scale(1.04);
               filter: drop-shadow(0 0 14px rgba(245, 166, 35, 0.9));
             }
-            /* All letters absorbed: Logo sits alone, solid and holding the swallowed text */
-            31.8%, 35.0% {
+            /* All letters absorbed: 4.76s to 5.25s */
+            22.7%, 25.0% {
               opacity: 1;
               transform: scale(1);
               filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.45));
             }
-            /* Smooth morph into vintage camera */
-            37.9%, 39.6% {
+            /* Morph into camera: 5.69s to 5.94s */
+            27.1%, 28.3% {
               opacity: 0;
               transform: scale(0.85) rotate(-6deg);
               filter: blur(1.5px);
             }
-            /* Hidden while camera is active */
-            39.7%, 63.8% {
+            /* Hidden while camera is active: 5.95s to 9.56s */
+            28.4%, 45.5% {
               opacity: 0;
               transform: scale(0.85) rotate(0deg);
               filter: blur(1.5px);
             }
-            /* Smooth morph back from camera */
-            67.1%, 68.8% {
+            /* Morph back from camera: 10.06s to 10.31s */
+            47.9%, 49.1% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
               filter: blur(0px);
             }
-            /* Static final rest before seamless loop (4.69s at end + 2.50s at start = 7.19s calm hold) */
-            68.9%, 100% {
+            /* 10+ SECONDS COMPLETELY CALM STATIC HOLD (10.31s to 21.0s = 10.69s at end + 2.37s at start = 13.06s total) */
+            49.2%, 100% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
               filter: none;
@@ -319,41 +319,41 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             box-shadow: 0 0 14px rgba(245, 166, 35, 0.6), inset 0 0 10px rgba(245, 166, 35, 0.35);
             pointer-events: none;
             z-index: 1;
-            animation: cinematicMagneticAura 15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: cinematicMagneticAura 21s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             transform-origin: center center;
             will-change: transform, opacity;
           }
 
           @keyframes cinematicMagneticAura {
-            0%, 15.8% {
+            0%, 11.3% {
               opacity: 0;
               transform: scale(0.9);
             }
-            16.2%, 16.7% {
+            11.6%, 11.9% {
               opacity: 0.85;
               transform: scale(1.18);
             }
-            20.0% {
+            14.3% {
               opacity: 0.7;
               transform: scale(1.1);
             }
-            23.3% {
+            16.7% {
               opacity: 0.95;
               transform: scale(1.22);
             }
-            27.5% {
+            19.6% {
               opacity: 0.8;
               transform: scale(1.14);
             }
-            31.7% {
+            22.6% {
               opacity: 0.85;
               transform: scale(1.2);
             }
-            32.1%, 33.3% {
+            22.9%, 23.8% {
               opacity: 0;
               transform: scale(0.85);
             }
-            33.4%, 100% {
+            23.9%, 100% {
               opacity: 0;
               transform: scale(0.9);
             }
@@ -361,54 +361,54 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
 
           /* 3. CONTINUOUS WORDMARK TRACK:
              - Absorption: uniform continuous pull carrying letters directly toward the exact logo center (-30px)
-             - Emergence: begins at 45.8% AFTER the yellow projector beam has fired and established (41.7%).
+             - Emergence: begins at 32.7% (6.88s) AFTER projector beam has already fired and expanded (29.8% = 6.25s).
                Emerge as an intact, uncropped miniature (scale 0.05) from inside the full 10.5px lens aperture.
-               ONE single continuous unbroken curve to resting position (60.0%) with ZERO intermediate stops or clipping.
-             - Noticeable calm hold: 63.3% to 100% (and 0% to 16.7%) resting peacefully in original state. */
+               ONE single continuous unbroken curve to resting position (42.9%) with ZERO intermediate stops or clipping.
+             - 10+ seconds static hold: 45.2% to 100% (11.5s) resting completely static in default state. */
           .cinematic-wordmark-track {
-            animation: cinematicWordmarkTrack 15s cubic-bezier(0.35, 0, 0.25, 1) infinite;
+            animation: cinematicWordmarkTrack 21s cubic-bezier(0.35, 0, 0.25, 1) infinite;
             transform-origin: left center;
             will-change: transform, opacity, filter;
           }
 
           @keyframes cinematicWordmarkTrack {
-            /* 1. Static initial rest */
-            0%, 16.7% {
+            /* 1. Static initial rest: 0s to 2.5s */
+            0%, 11.9% {
               opacity: 1;
               transform: translate(0px, 0px) scale(1);
               filter: none;
               animation-timing-function: linear;
             }
             /* 2. Magnetic pull toward logo center (-138px): uniform continuous pull */
-            31.7% {
+            22.6% {
               opacity: 1;
               transform: translate(-138px, 0px) scale(1);
               filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.45));
               animation-timing-function: step-end;
             }
             /* 3. Swallowed & hidden inside logo/camera while beam fires first */
-            31.8%, 45.7% {
+            22.7%, 32.6% {
               opacity: 0;
               transform: translate(var(--emerge-x, -14px), var(--emerge-y, 3.75px)) scale(0.05);
               filter: drop-shadow(0 0 14px #FFE082) brightness(1.5);
             }
-            /* 4. EMERGENCE: Starts at 45.8% AFTER the projector beam has already fired and expanded.
-               Begins as a completely intact, uncropped miniature (scale 0.05) from the illuminated lens opening.
-               Smoothly and continuously expands outward through the beam cone into final size and position. */
-            45.8% {
+            /* 4. EMERGENCE: Starts at 32.7% AFTER projector beam has already fired and expanded (29.8%).
+               Begins as a completely intact, uncropped miniature (scale 0.05) from illuminated lens opening.
+               Smoothly and continuously expands outward through beam cone into final size and position. */
+            32.7% {
               opacity: 1;
               transform: translate(var(--emerge-x, -14px), var(--emerge-y, 3.75px)) scale(0.05);
               filter: drop-shadow(0 0 10px #FFE082) brightness(1.35);
               animation-timing-function: cubic-bezier(0.22, 0.75, 0.35, 1);
             }
-            60.0% {
+            42.9% {
               opacity: 1;
               transform: translate(0px, 0px) scale(1.0);
               filter: drop-shadow(0 0 4px rgba(245, 166, 35, 0.25)) brightness(1.03);
               animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
             }
-            /* 5. Subtle settling into crisp default state as projector beam fades */
-            63.3%, 100% {
+            /* 5. Crisp default state & 10+ SECONDS CALM STATIC HOLD (45.2% to 100% = 11.5s) */
+            45.2%, 100% {
               opacity: 1;
               transform: translate(0px, 0px) scale(1.0);
               filter: none;
@@ -427,110 +427,110 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             display: inline-block;
           }
 
-          /* Letter 0: 'F' (starts at 0px -> enters zone at 18.3% -> absorbed at exact centre at 19.9%) */
-          .cinematic-letter-0 { animation: cinematicLetter0 15s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+          /* Letter 0: 'F' (starts at 0px -> enters zone at 13.1% -> absorbed at exact centre at 14.2%) */
+          .cinematic-letter-0 { animation: cinematicLetter0 21s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter0 {
-            0%, 18.3% { opacity: 1; transform: scaleX(1) scaleY(1); }
-            19.0% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
-            19.5% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            19.9%, 45.7% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            45.8%, 100% { opacity: 1; transform: scale(1); }
+            0%, 13.1% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            13.6% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            13.9% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            14.2%, 32.6% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            32.7%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 1: 'L' (starts at 14.1px -> enters zone at 20.0% -> absorbed at exact centre at 21.5%) */
-          .cinematic-letter-1 { animation: cinematicLetter1 15s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+          /* Letter 1: 'L' (starts at 14.1px -> enters zone at 14.3% -> absorbed at exact centre at 15.4%) */
+          .cinematic-letter-1 { animation: cinematicLetter1 21s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter1 {
-            0%, 20.0% { opacity: 1; transform: scaleX(1) scaleY(1); }
-            20.6% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
-            21.1% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            21.5%, 45.7% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            45.8%, 100% { opacity: 1; transform: scale(1); }
+            0%, 14.3% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            14.7% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            15.1% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            15.4%, 32.6% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            32.7%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 2: 'O' (starts at 27.2px -> enters zone at 21.6% -> absorbed at exact centre at 22.9%) */
-          .cinematic-letter-2 { animation: cinematicLetter2 15s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+          /* Letter 2: 'O' (starts at 27.2px -> enters zone at 15.4% -> absorbed at exact centre at 16.4%) */
+          .cinematic-letter-2 { animation: cinematicLetter2 21s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter2 {
-            0%, 21.6% { opacity: 1; transform: scaleX(1) scaleY(1); }
-            22.1% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
-            22.5% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            22.9%, 45.7% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            45.8%, 100% { opacity: 1; transform: scale(1); }
+            0%, 15.4% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            15.8% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            16.1% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            16.4%, 32.6% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            32.7%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 3: 'P' (starts at 44.3px -> enters zone at 23.2% -> absorbed at exact centre at 24.8%) */
-          .cinematic-letter-3 { animation: cinematicLetter3 15s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+          /* Letter 3: 'P' (starts at 44.3px -> enters zone at 16.6% -> absorbed at exact centre at 17.7%) */
+          .cinematic-letter-3 { animation: cinematicLetter3 21s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter3 {
-            0%, 23.2% { opacity: 1; transform: scaleX(1) scaleY(1); }
-            23.8% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
-            24.3% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            24.8%, 45.7% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            45.8%, 100% { opacity: 1; transform: scale(1); }
+            0%, 16.6% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            17.0% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            17.3% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            17.7%, 32.6% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            32.7%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 4: 'S' (starts at 59.4px -> enters zone at 24.9% -> absorbed at exact centre at 26.4%) */
-          .cinematic-letter-4 { animation: cinematicLetter4 15s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+          /* Letter 4: 'S' (starts at 59.4px -> enters zone at 17.8% -> absorbed at exact centre at 18.9%) */
+          .cinematic-letter-4 { animation: cinematicLetter4 21s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter4 {
-            0%, 24.9% { opacity: 1; transform: scaleX(1) scaleY(1); }
-            25.5% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
-            26.0% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            26.4%, 45.7% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            45.8%, 100% { opacity: 1; transform: scale(1); }
+            0%, 17.8% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            18.2% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            18.6% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            18.9%, 32.6% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            32.7%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 5: 'H' (starts at 74.0px -> enters zone at 26.5% -> absorbed at exact centre at 28.0%) */
-          .cinematic-letter-5 { animation: cinematicLetter5 15s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+          /* Letter 5: 'H' (starts at 74.0px -> enters zone at 18.9% -> absorbed at exact centre at 20.0%) */
+          .cinematic-letter-5 { animation: cinematicLetter5 21s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter5 {
-            0%, 26.5% { opacity: 1; transform: scaleX(1) scaleY(1); }
-            27.1% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
-            27.6% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            28.0%, 45.7% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            45.8%, 100% { opacity: 1; transform: scale(1); }
+            0%, 18.9% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            19.3% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            19.7% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            20.0%, 32.6% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            32.7%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 6: 'O' (starts at 90.6px -> enters zone at 28.2% -> absorbed at exact centre at 29.8%) */
-          .cinematic-letter-6 { animation: cinematicLetter6 15s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+          /* Letter 6: 'O' (starts at 90.6px -> enters zone at 20.1% -> absorbed at exact centre at 21.2%) */
+          .cinematic-letter-6 { animation: cinematicLetter6 21s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter6 {
-            0%, 28.2% { opacity: 1; transform: scaleX(1) scaleY(1); }
-            28.8% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
-            29.3% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            29.8%, 45.7% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            45.8%, 100% { opacity: 1; transform: scale(1); }
+            0%, 20.1% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            20.5% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            20.9% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            21.2%, 32.6% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            32.7%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 7: 'W' (starts at 107.7px -> enters zone at 29.9% -> absorbed at exact centre at 31.7%) */
-          .cinematic-letter-7 { animation: cinematicLetter7 15s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+          /* Letter 7: 'W' (starts at 107.7px -> enters zone at 21.4% -> absorbed at exact centre at 22.6%) */
+          .cinematic-letter-7 { animation: cinematicLetter7 21s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter7 {
-            0%, 29.9% { opacity: 1; transform: scaleX(1) scaleY(1); }
-            30.6% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
-            31.2% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            31.7%, 45.7% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            45.8%, 100% { opacity: 1; transform: scale(1); }
+            0%, 21.4% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            21.8% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            22.3% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            22.6%, 32.6% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            32.7%, 100% { opacity: 1; transform: scale(1); }
           }
 
           /* 5. VINTAGE MOVIE CAMERA */
           .cinematic-camera-logo {
-            animation: cinematicCameraLogo 15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: cinematicCameraLogo 21s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             transform-origin: center center;
             will-change: transform, opacity, filter;
           }
 
           @keyframes cinematicCameraLogo {
-            0%, 35.0% {
+            0%, 25.0% {
               opacity: 0;
               transform: scale(0.85) rotate(6deg);
               filter: blur(1.5px);
             }
-            39.2%, 61.7% {
+            28.0%, 44.0% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
               filter: blur(0px);
             }
-            63.8%, 68.3% {
+            45.5%, 48.8% {
               opacity: 0;
               transform: scale(0.85) rotate(-6deg);
               filter: blur(1.5px);
             }
-            68.4%, 100% {
+            48.9%, 100% {
               opacity: 0;
               transform: scale(0.85);
             }
@@ -565,25 +565,25 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             box-shadow: 0 0 8px #FFE082, 0 0 16px rgba(245, 166, 35, 0.8), 2px 0 6px #FFF;
             pointer-events: none;
             z-index: 3;
-            animation: cinematicFlare 15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: cinematicFlare 21s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             transform-origin: center center;
             will-change: transform, opacity;
           }
 
           @keyframes cinematicFlare {
-            0%, 40.0% {
+            0%, 28.6% {
               opacity: 0;
               transform: scaleY(0.2) scaleX(0.5);
             }
-            41.3%, 59.2% {
+            29.5%, 42.3% {
               opacity: 1;
               transform: scaleY(1) scaleX(1);
             }
-            61.3%, 63.3% {
+            43.8%, 45.2% {
               opacity: 0;
               transform: scaleY(0.2) scaleX(0.5);
             }
-            63.4%, 100% {
+            45.3%, 100% {
               opacity: 0;
             }
           }
@@ -607,31 +607,31 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             );
             filter: drop-shadow(0 0 10px rgba(245, 166, 35, 0.65));
             transform-origin: left center;
-            animation: cinematicBeam 15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: cinematicBeam 21s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             will-change: transform, opacity;
           }
 
           @keyframes cinematicBeam {
-            0%, 40.8% {
+            0%, 29.2% {
               opacity: 0;
               transform: translateY(-50%) scaleX(0.04);
             }
-            /* Beam fires at 41.7% — establishing golden projector light BEFORE text appears */
-            41.7% {
+            /* Beam fires at 29.8% (6.25s) — establishing golden projector light BEFORE text appears */
+            29.8% {
               opacity: 0.95;
               transform: translateY(-50%) scaleX(0.06);
               animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
             }
-            46.7%, 59.2% {
+            33.3%, 42.3% {
               opacity: 0.95;
               transform: translateY(-50%) scaleX(1.0);
               animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
             }
-            61.3%, 63.3% {
+            43.8%, 45.2% {
               opacity: 0;
               transform: translateY(-50%) scaleX(0.9);
             }
-            63.4%, 100% {
+            45.3%, 100% {
               opacity: 0;
               transform: translateY(-50%) scaleX(0.04);
             }

@@ -108,7 +108,7 @@ export const ContentSection: React.FC<ContentSectionProps> = ({
             display: 'flex',
             gap: '16px',
             overflowX: 'auto',
-            padding: '4px 20px 16px clamp(16px, 1.8vw, 24px)',
+            padding: '4px 20px 16px clamp(28px, 3.5vw, 48px)',
             scrollSnapType: 'x mandatory',
             scrollbarWidth: 'none',
             msOverflowStyle: 'none'

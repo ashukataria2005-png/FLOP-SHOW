@@ -66,8 +66,12 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Derived loading state for backwards compatibility
+  const isLoading = isInitialLoading || isBuffering;
 
   // Advertisement Pre-roll State
   const [adConfig, setAdConfig] = useState<AdConfig | null>(null);
@@ -129,11 +133,20 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   useEffect(() => {
     if (!source?.url) return;
     setErrorMessage(null);
-    setIsLoading(true);
+    setIsInitialLoading(!isYouTube);
+    setIsBuffering(false);
     setCurrentTime(source.initialTimeSeconds || 0);
     setDuration(0);
     setIsPlaying(false);
-  }, [source?.url]);
+  }, [source?.url, isYouTube]);
+
+  // YouTube trailer safety: clear loading state as soon as iframe is mounted
+  useEffect(() => {
+    if (isYouTube) {
+      setIsInitialLoading(false);
+      setIsBuffering(false);
+    }
+  }, [isYouTube, source?.url]);
 
   const seekToInitialTime = useCallback((vid: HTMLVideoElement) => {
     const target = sourceRef.current?.initialTimeSeconds;
@@ -256,7 +269,8 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             }
             videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
           }
-          setIsLoading(false);
+          setIsInitialLoading(false);
+          setIsBuffering(false);
           clearInterval(interval);
         }
       } catch {
@@ -297,7 +311,8 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setIsLoading(false);
+        setIsInitialLoading(false);
+        setIsBuffering(false);
         setErrorMessage(null);
         seekToInitialTime(video);
         video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
@@ -324,7 +339,8 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
               console.error('[HLS] Fatal unrecoverable error:', data);
               hls.destroy();
               hlsRef.current = null;
-              setIsLoading(false);
+              setIsInitialLoading(false);
+              setIsBuffering(false);
               setIsPlaying(false);
               setErrorMessage('Adaptive HLS stream failed to load. The video may still be transcoding or unavailable.');
               break;
@@ -429,7 +445,8 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
 
   const handleRetry = () => {
     setErrorMessage(null);
-    setIsLoading(true);
+    setIsInitialLoading(true);
+    setIsBuffering(false);
     if (hlsRef.current && source?.url) {
       hlsRef.current.loadSource(source.url);
       hlsRef.current.startLoad();
@@ -482,6 +499,12 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     const dur = videoRef.current.duration || source.durationSeconds || 1;
     setCurrentTime(cur);
     setDuration(dur);
+    if (isBuffering) {
+      setIsBuffering(false);
+    }
+    if (isInitialLoading && cur > 0) {
+      setIsInitialLoading(false);
+    }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -558,6 +581,10 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
           <iframe
             src={youtubeInfo.embedUrl}
             title={source.title}
+            onLoad={() => {
+              setIsInitialLoading(false);
+              setIsBuffering(false);
+            }}
             style={{
               width: '100%',
               height: '100%',
@@ -666,7 +693,8 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
               const vid = videoRef.current;
               setDuration(vid.duration);
               seekToInitialTime(vid);
-              setIsLoading(false);
+              setIsInitialLoading(false);
+              setIsBuffering(false);
               setErrorMessage(null);
               vid.play()
                 .then(() => setIsPlaying(true))
@@ -679,28 +707,41 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             }}
             onCanPlay={() => {
               if (videoRef.current) seekToInitialTime(videoRef.current);
-              setIsLoading(false);
+              setIsInitialLoading(false);
+              setIsBuffering(false);
             }}
-            onWaiting={() => setIsLoading(true)}
-            onStalled={() => setIsLoading(true)}
+            onWaiting={() => {
+              if (!isInitialLoading) {
+                setIsBuffering(true);
+              }
+            }}
+            onStalled={() => {
+              if (!isInitialLoading) {
+                setIsBuffering(true);
+              }
+            }}
             onPlaying={() => {
-              setIsLoading(false);
+              setIsInitialLoading(false);
+              setIsBuffering(false);
               setIsPlaying(true);
               setErrorMessage(null);
             }}
             onPause={() => {
               setIsPlaying(false);
+              setIsBuffering(false);
               if (videoRef.current && videoRef.current.duration > 0) {
                 recordProgress(videoRef.current.currentTime, videoRef.current.duration);
               }
             }}
             onSeeked={() => {
+              setIsBuffering(false);
               if (videoRef.current && videoRef.current.duration > 0) {
                 recordProgress(videoRef.current.currentTime, videoRef.current.duration);
               }
             }}
             onError={() => {
-              setIsLoading(false);
+              setIsInitialLoading(false);
+              setIsBuffering(false);
               setIsPlaying(false);
               const mediaErr = videoRef.current?.error;
               let detailMsg = 'The video stream or media file could not be loaded. Please verify the URL or try again later.';
@@ -758,8 +799,8 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
         </>
       )}
 
-      {/* Loading Spinner — overlaid on video, does NOT hide the video element */}
-      {isLoading && (
+      {/* 1. Initial Cold-Start Loading Spinner & Overlay — only before media is ready and not YouTube */}
+      {isInitialLoading && !isYouTube && !errorMessage && (
         <div
           style={{
             position: 'absolute',
@@ -773,7 +814,39 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
           }}
         >
           <Loader2 size={44} className="spin" color="var(--brand-gold, #F5C518)" />
-          <span style={{ fontSize: '14px', fontWeight: 600 }}>Loading media...</span>
+          <span style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.02em', color: '#E5E7EB' }}>
+            Loading media...
+          </span>
+        </div>
+      )}
+
+      {/* 2. Mid-stream Buffering Spinner — sleek spinner without blocking text */}
+      {isBuffering && !isInitialLoading && isPlaying && !errorMessage && (
+        <div
+          style={{
+            position: 'absolute',
+            zIndex: 15,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none'
+          }}
+        >
+          <div
+            style={{
+              padding: '14px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(10, 10, 16, 0.75)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
+            }}
+          >
+            <Loader2 size={36} className="spin" color="var(--brand-gold, #F5C518)" />
+          </div>
         </div>
       )}
 

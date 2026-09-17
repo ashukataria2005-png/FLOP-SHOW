@@ -18,6 +18,16 @@ export interface TodayStats {
   windowEnd: string;
 }
 
+export interface AdMediaItem {
+  id: string;
+  type: 'IMAGE' | 'VIDEO';
+  url: string;
+  name: string;
+  size?: number;
+  mimeType?: string;
+  createdAt: string;
+}
+
 export interface DashboardStats {
   totalUsers: number;
   totalMovies: number;
@@ -30,6 +40,7 @@ export interface DashboardStats {
     totalRechargeRupees: number;
     totalTransactions: number;
   };
+  accountingResetAt?: string | null;
   todayStats: TodayStats;
   currentTrending1: {
     id: string;
@@ -102,6 +113,27 @@ export const adminService = {
   async getDashboardStats(tzOffsetMinutes?: number): Promise<DashboardStats> {
     const db = getAdapter();
     const { startISO, endISO, calendarDate } = getDayBounds(tzOffsetMinutes);
+    const settings = await this.getSettings();
+    const resetAt = settings.finance_analytics_reset_at || null;
+
+    const purchasesQuery = resetAt
+      ? db.query("SELECT COUNT(*) as c FROM purchases WHERE status = 'COMPLETED' AND purchased_at >= ?", [resetAt])
+      : db.query("SELECT COUNT(*) as c FROM purchases WHERE status = 'COMPLETED'");
+
+    const revenueQuery = resetAt
+      ? db.query("SELECT COALESCE(SUM(amount_paid), 0) as s FROM purchases WHERE status = 'COMPLETED' AND purchased_at >= ?", [resetAt])
+      : db.query("SELECT COALESCE(SUM(amount_paid), 0) as s FROM purchases WHERE status = 'COMPLETED'");
+
+    const rechargeQuery = resetAt
+      ? db.query("SELECT COALESCE(SUM(amount), 0) as s FROM wallet_transactions WHERE type = 'RECHARGE' AND created_at >= ?", [resetAt])
+      : db.query("SELECT COALESCE(SUM(amount), 0) as s FROM wallet_transactions WHERE type = 'RECHARGE'");
+
+    const txCountQuery = resetAt
+      ? db.query("SELECT COUNT(*) as c FROM wallet_transactions WHERE created_at >= ?", [resetAt])
+      : db.query("SELECT COUNT(*) as c FROM wallet_transactions");
+
+    const effectiveTodayPurchasesStart = (resetAt && resetAt > startISO) ? resetAt : startISO;
+    const effectiveTodayUpiStart = (resetAt && resetAt > startISO) ? resetAt : startISO;
 
     const [
       { rows: [userCountRow] },
@@ -127,17 +159,17 @@ export const adminService = {
       db.query("SELECT COUNT(*) as c FROM content WHERE type = 'SERIES'"),
       db.query("SELECT COUNT(*) as c FROM content WHERE status = 'PUBLISHED'"),
       db.query("SELECT COUNT(*) as c FROM content WHERE status != 'PUBLISHED'"),
-      db.query("SELECT COUNT(*) as c FROM purchases WHERE status = 'COMPLETED'"),
-      db.query("SELECT COALESCE(SUM(amount_paid), 0) as s FROM purchases WHERE status = 'COMPLETED'"),
-      db.query("SELECT COALESCE(SUM(amount), 0) as s FROM wallet_transactions WHERE type = 'RECHARGE'"),
-      db.query("SELECT COUNT(*) as c FROM wallet_transactions"),
+      purchasesQuery,
+      revenueQuery,
+      rechargeQuery,
+      txCountQuery,
       db.query(
         "SELECT COUNT(*) as c, COALESCE(SUM(amount_paid), 0) as s FROM purchases WHERE status = 'COMPLETED' AND purchased_at >= ? AND purchased_at <= ?",
-        [startISO, endISO]
+        [effectiveTodayPurchasesStart, endISO]
       ),
       db.query(
         "SELECT COUNT(*) as c, COALESCE(SUM(amount), 0) as s FROM upi_payment_requests WHERE status = 'APPROVED' AND ((processed_at >= ? AND processed_at <= ?) OR (processed_at IS NULL AND created_at >= ? AND created_at <= ?))",
-        [startISO, endISO, startISO, endISO]
+        [effectiveTodayUpiStart, endISO, effectiveTodayUpiStart, endISO]
       ),
       db.query(
         "SELECT COUNT(*) as c FROM users WHERE role = 'USER' AND created_at >= ? AND created_at <= ?",
@@ -209,6 +241,7 @@ export const adminService = {
         totalTransactions: getCount(txCountRow),
       },
       todayStats,
+      accountingResetAt: resetAt,
       currentTrending1,
       recentlyAddedContent: (recentlyAddedRows as any[]).map(r => ({
         id: r.id,
@@ -867,6 +900,55 @@ export const adminService = {
 
     await this.updateSettings(toUpdate);
     return this.getAdsConfig();
+  },
+
+  async getAdMediaLibrary(type?: 'IMAGE' | 'VIDEO'): Promise<AdMediaItem[]> {
+    const settings = await this.getSettings();
+    let library: AdMediaItem[] = [];
+    if (settings.ad_media_library) {
+      try {
+        library = JSON.parse(settings.ad_media_library);
+      } catch {
+        library = [];
+      }
+    }
+    if (type) {
+      return library.filter(item => item.type === type);
+    }
+    return library;
+  },
+
+  async addAdMediaItems(items: Array<{ type: 'IMAGE' | 'VIDEO'; url: string; name: string; size?: number; mimeType?: string }>): Promise<AdMediaItem[]> {
+    const library = await this.getAdMediaLibrary();
+    const newEntries: AdMediaItem[] = items.map(item => ({
+      id: `ad-media-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      type: item.type,
+      url: item.url,
+      name: item.name,
+      size: item.size,
+      mimeType: item.mimeType,
+      createdAt: new Date().toISOString()
+    }));
+    const updated = [...newEntries, ...library];
+    await this.updateSettings({ ad_media_library: JSON.stringify(updated) });
+    return updated;
+  },
+
+  async deleteAdMediaItem(id: string): Promise<boolean> {
+    const library = await this.getAdMediaLibrary();
+    const updated = library.filter(item => item.id !== id);
+    await this.updateSettings({ ad_media_library: JSON.stringify(updated) });
+    return true;
+  },
+
+  async resetFinancialAnalytics(): Promise<{ success: boolean; resetAt: string; message: string }> {
+    const now = new Date().toISOString();
+    await this.updateSettings({ finance_analytics_reset_at: now });
+    return {
+      success: true,
+      resetAt: now,
+      message: 'Platform financial and transactional analytics summary counters have been reset successfully. A fresh accounting period has started.'
+    };
   },
 
   async getUserDetails(userId: string): Promise<any> {

@@ -24,6 +24,7 @@ import { AdminPaymentsPage } from './pages/admin/AdminPaymentsPage';
 import { AdminUpiSettingsPage } from './pages/admin/AdminUpiSettingsPage';
 import { AdminFinancePage } from './pages/admin/AdminFinancePage';
 import { AdminFreeContentPage } from './pages/admin/AdminFreeContentPage';
+import { AdminResetPage } from './pages/admin/AdminResetPage';
 import { PurchaseModal } from './components/purchase/PurchaseModal';
 import { RechargeModal } from './components/wallet/RechargeModal';
 import { AuthModal } from './components/auth/AuthModal';
@@ -90,6 +91,9 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   if (cleanPath === '/admin/settings') {
     return { tab: 'admin-settings' };
   }
+  if (cleanPath === '/admin/reset') {
+    return { tab: 'admin-reset' };
+  }
   if (cleanPath.startsWith('/admin')) {
     return { tab: 'admin' };
   }
@@ -147,6 +151,8 @@ export function tabToPath(tab: string, param?: string): string {
       return '/admin/design';
     case 'admin-settings':
       return '/admin/settings';
+    case 'admin-reset':
+      return '/admin/reset';
     case 'search':
       return '/search';
     case 'library':
@@ -296,7 +302,8 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-design' && <AdminDesignPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings'].includes(currentTab) && (
+          {currentTab === 'admin-reset' && <AdminResetPage onNavigateTab={handleNavigate} />}
+          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings', 'admin-reset'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>

@@ -28,7 +28,8 @@ import {
   LogOut,
   Eye,
   EyeOff,
-  Gift
+  Gift,
+  RotateCcw
 } from 'lucide-react';
 
 const ADMIN_QUICK_LOGIN_KEY = 'flopshow_admin_quick_login';
@@ -130,6 +131,14 @@ const navGroups: NavGroup[] = [
     items: [
       { id: 'admin-settings', label: 'General Settings', icon: Sliders },
       { id: 'admin-design', label: 'App Design & Themes', icon: Palette }
+    ]
+  },
+  {
+    id: 'group-reset',
+    title: 'SYSTEM / RESET',
+    icon: RotateCcw,
+    items: [
+      { id: 'admin-reset', label: 'Reset Analytics & Financials', icon: RotateCcw }
     ]
   }
 ];

@@ -133,18 +133,27 @@ export const paymentRequestRepository = {
     );
   },
 
-  async getMetrics(): Promise<PaymentMetrics> {
+  async getMetrics(resetAt?: string): Promise<PaymentMetrics> {
     const db = getAdapter();
-    const { rows } = await db.query(
-      `SELECT
-         COUNT(CASE WHEN status = 'PENDING' THEN 1 END) AS pending_count,
-         COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount ELSE 0 END), 0) AS pending_amount,
-         COUNT(CASE WHEN status = 'APPROVED' THEN 1 END) AS approved_count,
-         COALESCE(SUM(CASE WHEN status = 'APPROVED' THEN amount ELSE 0 END), 0) AS approved_amount,
-         COUNT(CASE WHEN status = 'REJECTED' THEN 1 END) AS rejected_count,
-         COALESCE(SUM(CASE WHEN status = 'REJECTED' THEN amount ELSE 0 END), 0) AS rejected_amount
-       FROM upi_payment_requests;`
-    );
+    const query = resetAt
+      ? `SELECT
+           COUNT(CASE WHEN status = 'PENDING' THEN 1 END) AS pending_count,
+           COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount ELSE 0 END), 0) AS pending_amount,
+           COUNT(CASE WHEN status = 'APPROVED' AND processed_at >= ? THEN 1 END) AS approved_count,
+           COALESCE(SUM(CASE WHEN status = 'APPROVED' AND processed_at >= ? THEN amount ELSE 0 END), 0) AS approved_amount,
+           COUNT(CASE WHEN status = 'REJECTED' AND processed_at >= ? THEN 1 END) AS rejected_count,
+           COALESCE(SUM(CASE WHEN status = 'REJECTED' AND processed_at >= ? THEN amount ELSE 0 END), 0) AS rejected_amount
+         FROM upi_payment_requests;`
+      : `SELECT
+           COUNT(CASE WHEN status = 'PENDING' THEN 1 END) AS pending_count,
+           COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount ELSE 0 END), 0) AS pending_amount,
+           COUNT(CASE WHEN status = 'APPROVED' THEN 1 END) AS approved_count,
+           COALESCE(SUM(CASE WHEN status = 'APPROVED' THEN amount ELSE 0 END), 0) AS approved_amount,
+           COUNT(CASE WHEN status = 'REJECTED' THEN 1 END) AS rejected_count,
+           COALESCE(SUM(CASE WHEN status = 'REJECTED' THEN amount ELSE 0 END), 0) AS rejected_amount
+         FROM upi_payment_requests;`;
+    const params = resetAt ? [resetAt, resetAt, resetAt, resetAt] : [];
+    const { rows } = await db.query(query, params);
 
     const r = rows[0] || {};
     return {

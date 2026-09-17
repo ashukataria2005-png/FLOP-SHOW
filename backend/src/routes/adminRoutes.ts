@@ -3,7 +3,7 @@ import { adminService } from '../services/adminService.js';
 import { mediaService } from '../services/mediaService.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import { requireAdmin } from '../middlewares/adminMiddleware.js';
-import { uploadMediaMiddleware, isVideoFile } from '../middlewares/uploadMiddleware.js';
+import { uploadMediaMiddleware, isVideoFile, isImageFile } from '../middlewares/uploadMiddleware.js';
 import { metadataImportService } from '../services/metadataImportService.js';
 import { cloudinaryService, isCloudinaryConfigured, cleanupLocalFile } from '../services/cloudinaryService.js';
 import { vcdnService } from '../services/vcdnService.js';
@@ -165,77 +165,12 @@ adminRouter.post('/upload', (req: Request, res: Response, next) => {
     const localFilePath = req.file.path;
 
     try {
-      // 1. PRIMARY STREAMING STORAGE: VCDN for videos
-      if (isVid && isVcdnConfigured()) {
-        try {
-          const vcdnResult = await vcdnService.uploadVideo(localFilePath, req.file.originalname);
-          // Clean up temporary local staging file after successful VCDN upload
-          await cleanupLocalFile(localFilePath);
-
-          return res.status(201).json({
-            success: true,
-            url: vcdnResult.playbackUrl,
-            playbackUrl: vcdnResult.playbackUrl,
-            embedUrl: vcdnResult.embedUrl,
-            vcdnVideoId: vcdnResult.vcdnVideoId,
-            vcdnStatus: vcdnResult.vcdnStatus,
-            filename: req.file.filename,
-            originalName: req.file.originalname,
-            mimeType: 'application/x-mpegURL',
-            size: req.file.size,
-            provider: 'VCDN',
-          });
-        } catch (vcdnErr: any) {
-          console.error('[VCDN] Upload error:', vcdnErr.message);
-          // If VCDN fails and Cloudinary is configured, fallback to Cloudinary; otherwise return error
-          if (!isCloudinaryConfigured()) {
-            await cleanupLocalFile(localFilePath);
-            return res.status(500).json({
-              error: {
-                code: 'VCDN_UPLOAD_FAILED',
-                message: `Failed to upload video to VCDN: ${vcdnErr.message || 'Unknown error'}`,
-              },
-            });
-          }
-        }
-      }
-
-      if (isCloudinaryConfigured()) {
-        const uploadResult = isVid
-          ? await cloudinaryService.uploadVideo(localFilePath, req.file.originalname)
-          : await cloudinaryService.uploadImage(localFilePath, req.file.originalname);
-
-        // Clean up temporary local staging file after successful Cloudinary upload
-        await cleanupLocalFile(localFilePath);
-
-        return res.status(201).json({
-          success: true,
-          url: uploadResult.url,
-          filename: req.file.filename,
-          originalName: req.file.originalname,
-          mimeType: req.file.mimetype || (isVid ? 'video/mp4' : 'image/jpeg'),
-          size: uploadResult.bytes || req.file.size,
-          provider: 'CLOUDINARY',
-          publicId: uploadResult.publicId,
-        });
-      }
-
-      // Safe fallback to local storage if VCDN / Cloudinary credentials are not configured
-      const subfolder = isVid ? 'videos' : 'images';
-      const relativeUrl = `/uploads/${subfolder}/${req.file.filename}`;
-
+      const result = await uploadSingleMediaFile(req.file);
       return res.status(201).json({
         success: true,
-        url: relativeUrl,
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        mimeType: req.file.mimetype || (isVid ? 'video/mp4' : 'image/jpeg'),
-        size: req.file.size,
-        provider: 'LOCAL',
-        note: isVid ? 'VCDN is not configured (missing VCDN_API_KEY). Saved to local storage.' : undefined,
+        ...result
       });
     } catch (innerErr: any) {
-      // Clean up temporary local file if upload fails
       await cleanupLocalFile(localFilePath);
       return res.status(500).json({
         error: {
@@ -821,7 +756,7 @@ adminRouter.delete('/spotlights/:id', async (req, res, next) => {
 });
 
 // ----------------------------------------------------------------------------
-// 8. ADVERTISEMENT CONFIGURATION
+// 8. ADVERTISEMENT CONFIGURATION & MEDIA LIBRARY
 // ----------------------------------------------------------------------------
 adminRouter.get('/ads', async (_req, res, next) => {
   try {
@@ -840,3 +775,186 @@ adminRouter.put('/ads', async (req, res, next) => {
     next(err);
   }
 });
+
+adminRouter.get('/ads/library', async (req, res, next) => {
+  try {
+    const type = req.query.type as ('IMAGE' | 'VIDEO') | undefined;
+    const items = await adminService.getAdMediaLibrary(type);
+    res.json({ success: true, items });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/ads/library', async (req, res, next) => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Items array is required.' } });
+    }
+    const updated = await adminService.addAdMediaItems(items);
+    res.json({ success: true, library: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/ads/library/upload', (req: Request, res: Response, next) => {
+  uploadMediaMiddleware.array('files', 15)(req, res, async (err: any) => {
+    if (err) {
+      return res.status(400).json({ error: { code: 'UPLOAD_ERROR', message: err.message || 'File upload error.' } });
+    }
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: { code: 'NO_FILES', message: 'No media files were selected.' } });
+    }
+
+    const targetType = ((req.query.type || req.body.type || 'IMAGE') as string).toUpperCase() === 'VIDEO' ? 'VIDEO' : 'IMAGE';
+
+    // Strict validation: Photo Ads only accept images; Video Ads only accept videos
+    if (targetType === 'IMAGE') {
+      for (const file of files) {
+        if (!isImageFile(file)) {
+          for (const f of files) await cleanupLocalFile(f.path);
+          return res.status(400).json({
+            error: {
+              code: 'INVALID_FILE_TYPE',
+              message: `File "${file.originalname}" is not an image file. Photo Ads media library accepts photo/image files only (JPG, PNG, WebP, GIF, AVIF).`
+            }
+          });
+        }
+      }
+    } else {
+      for (const file of files) {
+        if (!isVideoFile(file)) {
+          for (const f of files) await cleanupLocalFile(f.path);
+          return res.status(400).json({
+            error: {
+              code: 'INVALID_FILE_TYPE',
+              message: `File "${file.originalname}" is not a video file. Video Ads media library accepts video files only (MP4, WebM, MOV, M4V).`
+            }
+          });
+        }
+      }
+    }
+
+    try {
+      const addedItems: Array<{ type: 'IMAGE' | 'VIDEO'; url: string; name: string; size: number; mimeType: string }> = [];
+      for (const file of files) {
+        const uploadResult = await uploadSingleMediaFile(file);
+        addedItems.push({
+          type: targetType,
+          url: uploadResult.url,
+          name: file.originalname,
+          size: file.size,
+          mimeType: uploadResult.mimeType
+        });
+      }
+
+      const updatedLibrary = await adminService.addAdMediaItems(addedItems);
+      res.status(201).json({
+        success: true,
+        message: `${addedItems.length} media file(s) added to Advertisement Media Library.`,
+        added: addedItems,
+        library: updatedLibrary
+      });
+    } catch (uploadErr: any) {
+      for (const f of files) await cleanupLocalFile(f.path);
+      res.status(500).json({
+        error: { code: 'UPLOAD_FAILED', message: uploadErr.message || 'Failed to upload ad media files.' }
+      });
+    }
+  });
+});
+
+adminRouter.delete('/ads/library/:id', async (req, res, next) => {
+  try {
+    await adminService.deleteAdMediaItem(req.params.id);
+    const library = await adminService.getAdMediaLibrary();
+    res.json({ success: true, message: 'Media item deleted from library.', library });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ----------------------------------------------------------------------------
+// 9. FINANCIAL ANALYTICS RESET (RESET PLATFORM REVENUE & TRANSACTION COUNTERS ONLY)
+// ----------------------------------------------------------------------------
+adminRouter.post('/reset-financial-analytics', async (_req, res, next) => {
+  try {
+    const result = await adminService.resetFinancialAnalytics();
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+async function uploadSingleMediaFile(file: Express.Multer.File): Promise<{
+  url: string;
+  playbackUrl?: string;
+  embedUrl?: string;
+  vcdnVideoId?: string;
+  vcdnStatus?: string;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  provider?: string;
+  note?: string;
+}> {
+  const isVid = isVideoFile(file);
+  const localFilePath = file.path;
+
+  if (isVid && isVcdnConfigured()) {
+    try {
+      const vcdnResult = await vcdnService.uploadVideo(localFilePath, file.originalname);
+      await cleanupLocalFile(localFilePath);
+      return {
+        url: vcdnResult.playbackUrl,
+        playbackUrl: vcdnResult.playbackUrl,
+        embedUrl: vcdnResult.embedUrl,
+        vcdnVideoId: vcdnResult.vcdnVideoId,
+        vcdnStatus: vcdnResult.vcdnStatus,
+        filename: file.filename,
+        originalName: file.originalname,
+        mimeType: 'application/x-mpegURL',
+        size: file.size,
+        provider: 'VCDN',
+      };
+    } catch (vcdnErr: any) {
+      console.error('[VCDN] Upload error:', vcdnErr.message);
+      if (!isCloudinaryConfigured()) {
+        await cleanupLocalFile(localFilePath);
+        throw new Error(`Failed to upload video to VCDN: ${vcdnErr.message || 'Unknown error'}`);
+      }
+    }
+  }
+
+  if (isCloudinaryConfigured()) {
+    const uploadResult = isVid
+      ? await cloudinaryService.uploadVideo(localFilePath, file.originalname)
+      : await cloudinaryService.uploadImage(localFilePath, file.originalname);
+    await cleanupLocalFile(localFilePath);
+    return {
+      url: uploadResult.url,
+      filename: file.filename,
+      originalName: file.originalname,
+      mimeType: file.mimetype || (isVid ? 'video/mp4' : 'image/jpeg'),
+      size: uploadResult.bytes || file.size,
+      provider: 'CLOUDINARY',
+    };
+  }
+
+  // Safe fallback to local storage
+  const subfolder = isVid ? 'videos' : 'images';
+  const relativeUrl = `/uploads/${subfolder}/${file.filename}`;
+  return {
+    url: relativeUrl,
+    filename: file.filename,
+    originalName: file.originalname,
+    mimeType: file.mimetype || (isVid ? 'video/mp4' : 'image/jpeg'),
+    size: file.size,
+    provider: 'LOCAL',
+    note: isVid ? 'VCDN is not configured. Saved to local storage.' : undefined,
+  };
+}

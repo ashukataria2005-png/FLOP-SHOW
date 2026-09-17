@@ -1080,6 +1080,57 @@ export const api = {
       return data;
     },
 
+    async getAdMediaLibrary(type?: 'IMAGE' | 'VIDEO') {
+      const qs = type ? `?type=${type}` : '';
+      const data = await request<{ success: boolean; items: any[] }>(`/admin/ads/library${qs}`);
+      return data.items || [];
+    },
+
+    async uploadAdMedia(files: FileList | File[], type: 'IMAGE' | 'VIDEO' = 'IMAGE') {
+      const formData = new FormData();
+      const fileArray = Array.from(files);
+      for (const f of fileArray) {
+        formData.append('files', f, f.name);
+      }
+      return new Promise<{ success: boolean; message: string; added: any[]; library: any[] }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE_URL}/admin/ads/library/upload?type=${type}`, true);
+        xhr.timeout = 10 * 60 * 1000;
+        const token = adminTokenStorage.get() || tokenStorage.get();
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
+        xhr.onload = () => {
+          let data: any = {};
+          try {
+            data = JSON.parse(xhr.responseText);
+          } catch {
+            data = { error: { message: `Server error ${xhr.status}` } };
+          }
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(data);
+          } else {
+            reject(new Error(data?.error?.message || `Upload failed with status ${xhr.status}.`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error uploading advertisement media.'));
+        xhr.ontimeout = () => reject(new Error('Upload timed out.'));
+        xhr.send(formData);
+      });
+    },
+
+    async deleteAdMedia(id: string) {
+      return request<{ success: boolean; message: string; library: any[] }>(`/admin/ads/library/${id}`, {
+        method: 'DELETE'
+      });
+    },
+
+    async resetFinancialAnalytics() {
+      return request<{ success: boolean; resetAt: string; message: string }>('/admin/reset-financial-analytics', {
+        method: 'POST'
+      });
+    },
+
     async createSeason(contentId: string, seasonNumber: number, title: string) {
       return request<{ success: boolean; seasonId: string }>(`/admin/content/${contentId}/seasons`, {
         method: 'POST',

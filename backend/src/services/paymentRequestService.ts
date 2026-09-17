@@ -158,7 +158,9 @@ export const paymentRequestService = {
    * Admin: Get dashboard metrics.
    */
   async getMetrics(): Promise<PaymentMetrics> {
-    return paymentRequestRepository.getMetrics();
+    const settings = await adminService.getSettings();
+    const resetAt = settings.finance_analytics_reset_at || undefined;
+    return paymentRequestRepository.getMetrics(resetAt);
   },
 
   /**

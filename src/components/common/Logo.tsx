@@ -598,8 +598,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             height: 48px;
             pointer-events: none;
             z-index: 1;
-            /* Full vertical lens opening (39% to 63% = aligns exactly with upper and lower lens corners) */
-            clip-path: polygon(0% 39%, 100% 0%, 100% 100%, 0% 63%);
+            /* Full vertical lens opening (37% to 63% = aligns exactly with upper and lower lens corners) */
+            clip-path: polygon(0% 37%, 100% 0%, 100% 100%, 0% 63%);
             background: linear-gradient(
               90deg,
               rgba(255, 235, 130, 0.96) 0%,

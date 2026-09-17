@@ -23,35 +23,48 @@ function byGenre(catalog: ContentItem[], ...genres: string[]): ContentItem[] {
     item.genres.some(g => lower.includes(g.toLowerCase()))
   );
 }
+ 
+// Fast in-memory cache to ensure instant rendering on tab switch/return
+let cachedHero: ContentItem | null = null;
+let cachedSpotlights: ContentItem[] = [];
 
 export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavigate }) => {
   const { watchProgress, catalog } = useApp();
   const activeCatalog = catalog || [];
-  const [dedicatedHero, setDedicatedHero] = useState<ContentItem | null>(null);
-  const [spotlights, setSpotlights] = useState<ContentItem[]>([]);
+  const [dedicatedHero, setDedicatedHero] = useState<ContentItem | null>(() => cachedHero);
+  const [spotlights, setSpotlights] = useState<ContentItem[]>(() => cachedSpotlights);
 
   useEffect(() => {
     let mounted = true;
     api.content.getHero().then(h => {
+      if (h) cachedHero = h;
       if (mounted) setDedicatedHero(h);
     }).catch(() => {});
+
     api.content.getSpotlights().then(items => {
       if (mounted) {
         if (items && items.length > 0) {
+          cachedSpotlights = items;
           setSpotlights(items);
         } else {
           api.content.getSpotlight().then(s => {
-            if (mounted && s) setSpotlights([s]);
+            if (mounted && s) {
+              cachedSpotlights = [s];
+              setSpotlights([s]);
+            }
           }).catch(() => {});
         }
       }
     }).catch(() => {
       api.content.getSpotlight().then(s => {
-        if (mounted && s) setSpotlights([s]);
+        if (mounted && s) {
+          cachedSpotlights = [s];
+          setSpotlights([s]);
+        }
       }).catch(() => {});
     });
     return () => { mounted = false; };
-  }, [catalog]);
+  }, [activeCatalog.length]);
 
   // Home Hero: dedicated hero item set by admin, or first featured item
   const heroItem = activeCatalog.find(item => item.isHero) || dedicatedHero || undefined;
@@ -78,64 +91,88 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     return result;
   }, [watchProgress, activeCatalog]);
 
-  // ── Trending: Trending #1 first, then others ────────────────────────────────
-  const trending1 = activeCatalog.find(c => c.trendingPosition === 1);
-  const trendingItems = [
-    ...(trending1 ? [trending1] : []),
-    ...activeCatalog.filter(c => c.id !== trending1?.id).slice(0, 7)
-  ];
+  // Memoize all category & genre slices for instant smooth rendering
+  const {
+    trendingItems,
+    topRated,
+    actionItems,
+    comedyItems,
+    thrillerItems,
+    crimeItems,
+    dramaItems,
+    sciFiItems,
+    romanceItems,
+    horrorItems,
+    fantasyItems,
+    mysteryItems,
+    movieItems,
+    seriesItems,
+    spidermanItems,
+    marvelItems,
+    dcItems,
+    hboItems,
+    warnerBrosItems,
+    universalItems,
+    sonyItems,
+    paramountItems,
+    disneyItems,
+    newReleases,
+    indianItems,
+    intlItems,
+    freeItems
+  } = React.useMemo(() => {
+    const trending1 = activeCatalog.find(c => c.trendingPosition === 1);
+    const trending = [
+      ...(trending1 ? [trending1] : []),
+      ...activeCatalog.filter(c => c.id !== trending1?.id).slice(0, 7)
+    ];
 
-  // ── Top Rated: real rating field ≥ 8.5, sorted descending ───────────────────
-  const topRated = [...activeCatalog]
-    .filter(c => typeof c.rating === 'number' && c.rating >= 8.0)
-    .sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    const rated = [...activeCatalog]
+      .filter(c => typeof c.rating === 'number' && c.rating >= 8.0)
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
-  // ── Genre rows — using ACTUAL genre metadata stored in DB ────────────────────
-  const actionItems   = byGenre(activeCatalog, 'Action');
-  const comedyItems   = byGenre(activeCatalog, 'Comedy');
-  const thrillerItems = byGenre(activeCatalog, 'Thriller');
-  const crimeItems    = byGenre(activeCatalog, 'Crime');
-  const dramaItems    = byGenre(activeCatalog, 'Drama');
-  const sciFiItems    = byGenre(activeCatalog, 'Sci-Fi', 'Science Fiction', 'Sci Fi');
-  const romanceItems  = byGenre(activeCatalog, 'Romance');
-  const horrorItems   = byGenre(activeCatalog, 'Horror');
-  const fantasyItems  = byGenre(activeCatalog, 'Fantasy', 'Adventure');
-  const mysteryItems  = byGenre(activeCatalog, 'Mystery');
+    const indianLanguages = ['hindi', 'telugu', 'tamil', 'malayalam', 'marathi', 'punjabi', 'kannada', 'bengali'];
+    const indian = activeCatalog.filter(c =>
+      indianLanguages.includes((c.language || '').toLowerCase())
+    );
 
-  // ── By content type ─────────────────────────────────────────────────────────
-  const movieItems  = activeCatalog.filter(c => c.type === 'movie');
-  const seriesItems = activeCatalog.filter(c => c.type === 'series');
+    const intl = activeCatalog.filter(c => {
+      const lang = (c.language || '').toLowerCase();
+      return !indianLanguages.includes(lang) && lang !== 'english' && lang !== '';
+    });
 
-  // ── Famous Hollywood & Studio Collections ──────────────────────────────────
-  const spidermanItems  = byGenre(activeCatalog, 'Spider-Man');
-  const marvelItems     = byGenre(activeCatalog, 'Marvel');
-  const dcItems         = byGenre(activeCatalog, 'DC');
-  const hboItems        = byGenre(activeCatalog, 'HBO');
-  const warnerBrosItems = byGenre(activeCatalog, 'Warner Bros.');
-  const universalItems  = byGenre(activeCatalog, 'Universal Pictures');
-  const sonyItems       = byGenre(activeCatalog, 'Sony Pictures');
-  const paramountItems  = byGenre(activeCatalog, 'Paramount Pictures');
-  const disneyItems     = byGenre(activeCatalog, 'Disney');
-
-  // ── New Releases: 2024 onwards, sorted newest first ─────────────────────────
-  const newReleases = [...activeCatalog]
-    .filter(c => (c.releaseYear || 0) >= 2024)
-    .sort((a, b) => (b.releaseYear || 0) - (a.releaseYear || 0));
-
-  // ── Language rows — using ACTUAL language field ──────────────────────────────
-  // Indian content: Hindi + Telugu + Tamil + Malayalam + Marathi etc.
-  const indianLanguages = ['hindi', 'telugu', 'tamil', 'malayalam', 'marathi', 'punjabi', 'kannada', 'bengali'];
-  const indianItems = activeCatalog.filter(c =>
-    indianLanguages.includes((c.language || '').toLowerCase())
-  );
-  // International (non-Indian, non-English for a "World Cinema" feel)
-  const intlItems = activeCatalog.filter(c => {
-    const lang = (c.language || '').toLowerCase();
-    return !indianLanguages.includes(lang) && lang !== 'english' && lang !== '';
-  });
-
-  // ── Free Content: items that are 100% free (price === 0 or isFree) ───────────
-  const freeItems = activeCatalog.filter(c => c.isFree || c.price === 0);
+    return {
+      trendingItems: trending,
+      topRated: rated,
+      actionItems: byGenre(activeCatalog, 'Action'),
+      comedyItems: byGenre(activeCatalog, 'Comedy'),
+      thrillerItems: byGenre(activeCatalog, 'Thriller'),
+      crimeItems: byGenre(activeCatalog, 'Crime'),
+      dramaItems: byGenre(activeCatalog, 'Drama'),
+      sciFiItems: byGenre(activeCatalog, 'Sci-Fi', 'Science Fiction', 'Sci Fi'),
+      romanceItems: byGenre(activeCatalog, 'Romance'),
+      horrorItems: byGenre(activeCatalog, 'Horror'),
+      fantasyItems: byGenre(activeCatalog, 'Fantasy', 'Adventure'),
+      mysteryItems: byGenre(activeCatalog, 'Mystery'),
+      movieItems: activeCatalog.filter(c => c.type === 'movie'),
+      seriesItems: activeCatalog.filter(c => c.type === 'series'),
+      spidermanItems: byGenre(activeCatalog, 'Spider-Man'),
+      marvelItems: byGenre(activeCatalog, 'Marvel'),
+      dcItems: byGenre(activeCatalog, 'DC'),
+      hboItems: byGenre(activeCatalog, 'HBO'),
+      warnerBrosItems: byGenre(activeCatalog, 'Warner Bros.'),
+      universalItems: byGenre(activeCatalog, 'Universal Pictures'),
+      sonyItems: byGenre(activeCatalog, 'Sony Pictures'),
+      paramountItems: byGenre(activeCatalog, 'Paramount Pictures'),
+      disneyItems: byGenre(activeCatalog, 'Disney'),
+      newReleases: [...activeCatalog]
+        .filter(c => (c.releaseYear || 0) >= 2024)
+        .sort((a, b) => (b.releaseYear || 0) - (a.releaseYear || 0)),
+      indianItems: indian,
+      intlItems: intl,
+      freeItems: activeCatalog.filter(c => c.isFree || c.price === 0)
+    };
+  }, [activeCatalog]);
 
   // Collect all active catalog content rows in order
   const contentRows: React.ReactNode[] = [];

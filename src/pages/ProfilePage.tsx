@@ -50,6 +50,9 @@ interface ProfilePageProps {
   initialSection?: 'profile' | 'wallet' | 'settings';
 }
 
+// In-memory cache for instant switching between profile tabs
+let cachedRechargeRequests: UserPaymentRequest[] = [];
+
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSection = 'profile' }) => {
   const {
     user,
@@ -66,7 +69,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
   } = useApp();
 
   const [activeSection, setActiveSection] = useState<'profile' | 'wallet' | 'settings'>(initialSection);
-  const [rechargeRequests, setRechargeRequests] = useState<UserPaymentRequest[]>([]);
+  const [rechargeRequests, setRechargeRequests] = useState<UserPaymentRequest[]>(() => cachedRechargeRequests);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(user.name);
@@ -119,6 +122,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     try {
       const res = await api.payments.getMyRequests();
       if (res && res.requests) {
+        cachedRechargeRequests = res.requests;
         setRechargeRequests(res.requests);
       }
     } catch {

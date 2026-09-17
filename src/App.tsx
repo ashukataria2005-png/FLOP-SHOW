@@ -386,24 +386,24 @@ const AppContent: React.FC = () => {
           />
         ) : (
           <>
-            {currentTab === 'discover' && (
+            <div style={{ display: currentTab === 'discover' ? 'block' : 'none' }}>
               <DiscoverPage onSelectItem={handleSelectItem} onNavigate={handleNavigate} />
-            )}
+            </div>
             {currentTab === 'search' && (
               <SearchPage onSelectItem={handleSelectItem} />
             )}
             {currentTab === 'library' && (
               <LibraryPage onSelectItem={handleSelectItem} onNavigate={handleNavigate} />
             )}
-            {currentTab === 'wallet' && (
-              <ProfilePage initialSection="wallet" onNavigate={handleNavigate} />
-            )}
-            {currentTab === 'settings' && (
-              <ProfilePage initialSection="settings" onNavigate={handleNavigate} />
-            )}
-            {currentTab === 'profile' && (
+            {(currentTab === 'wallet' || currentTab === 'settings' || currentTab === 'profile') && (
               <ProfilePage
-                initialSection={adminParam === 'wallet' ? 'wallet' : adminParam === 'settings' ? 'settings' : 'profile'}
+                initialSection={
+                  currentTab === 'wallet' || adminParam === 'wallet'
+                    ? 'wallet'
+                    : currentTab === 'settings' || adminParam === 'settings'
+                    ? 'settings'
+                    : 'profile'
+                }
                 onNavigate={handleNavigate}
               />
             )}

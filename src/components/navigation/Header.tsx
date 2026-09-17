@@ -11,12 +11,21 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
   const { user, walletBalance } = useApp();
 
+  const handleHomeNavigation = () => {
+    if (currentTab === 'discover') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      onNavigate('discover');
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  };
+
   return (
     <header
       style={{
         position: 'sticky',
         top: 0,
-        zIndex: 90,
+        zIndex: 100,
         backgroundColor: 'rgba(9, 9, 14, 0.88)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
@@ -30,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
       }}
     >
       {/* Brand Logo */}
-      <Logo size="md" animated onClick={() => onNavigate('discover')} />
+      <Logo size="md" animated onClick={handleHomeNavigation} />
 
       {/* Desktop Navigation Links */}
       <nav
@@ -42,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
         className="desktop-nav-links"
       >
         <button
-          onClick={() => onNavigate('discover')}
+          onClick={handleHomeNavigation}
           style={{
             color: currentTab === 'discover' ? 'var(--brand-gold)' : 'var(--text-secondary)',
             fontWeight: currentTab === 'discover' ? 700 : 500,

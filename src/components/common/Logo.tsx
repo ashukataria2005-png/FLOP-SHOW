@@ -206,7 +206,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
         )}
       </div>
 
-      {/* Brand Wordmark: continuous track translation with coordinated progressive letter-by-letter compression */}
+      {/* Brand Wordmark: continuous track translation with coordinated progressive letter-by-letter absorption */}
       <span
         className={animated ? 'cinematic-wordmark-track' : undefined}
         style={{
@@ -260,7 +260,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
 
           @keyframes cinematicOriginalLogo {
             /* Static initial rest */
-            0%, 18.0% {
+            0%, 19.0% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
               filter: none;
@@ -272,13 +272,13 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
               filter: drop-shadow(0 0 10px rgba(245, 166, 35, 0.8));
             }
             /* Magnetic pull phase: solidly visible, actively absorbing text */
-            20.1%, 37.5% {
+            20.1%, 38.0% {
               opacity: 1;
               transform: scale(1.04);
               filter: drop-shadow(0 0 14px rgba(245, 166, 35, 0.9));
             }
             /* All letters absorbed: Logo sits alone, solid and holding the swallowed text */
-            37.6%, 42.0% {
+            38.1%, 42.0% {
               opacity: 1;
               transform: scale(1);
               filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.45));
@@ -324,7 +324,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
           }
 
           @keyframes cinematicMagneticAura {
-            0%, 18.0% {
+            0%, 19.0% {
               opacity: 0;
               transform: scale(0.9);
             }
@@ -340,176 +340,169 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
               opacity: 0.95;
               transform: scale(1.22);
             }
-            32.5% {
+            33.0% {
               opacity: 0.8;
               transform: scale(1.14);
             }
-            37.5%, 39.5% {
+            38.0% {
+              opacity: 0.85;
+              transform: scale(1.2);
+            }
+            38.5%, 40.0% {
               opacity: 0;
               transform: scale(0.85);
             }
-            39.6%, 100% {
+            40.1%, 100% {
               opacity: 0;
               transform: scale(0.9);
             }
           }
 
           /* 3. CONTINUOUS WORDMARK TRACK:
-             - Absorption: carries wordmark to logo portal
-             - Emergence: originates at TINY LENS OPENING and progressively expands outward inside the light tunnel */
+             - Absorption: uniform continuous pull carrying letters directly toward the exact logo center (-30px)
+             - Emergence: ONE single continuous unbroken curve from lens center origin to resting position,
+               ZERO intermediate stops, plateaus, or hesitations */
           .cinematic-wordmark-track {
-            animation: cinematicWordmarkTrack 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            animation: cinematicWordmarkTrack 12.5s cubic-bezier(0.35, 0, 0.25, 1) infinite;
             transform-origin: left center;
             will-change: transform, opacity, filter;
           }
 
           @keyframes cinematicWordmarkTrack {
-            /* Static initial rest */
+            /* 1. Static initial rest */
             0%, 20.0% {
               opacity: 1;
               transform: translate(0px, 0px) scale(1);
               filter: none;
+              animation-timing-function: linear;
             }
-            /* Pure unbroken continuous magnetic pull carrying wordmark into logo portal */
-            37.5% {
+            /* 2. Magnetic pull toward logo center (-138px): uniform continuous pull */
+            38.0% {
               opacity: 1;
-              transform: translate(-145px, 0px) scale(1);
-              filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.5));
+              transform: translate(-138px, 0px) scale(1);
+              filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.45));
+              animation-timing-function: step-end;
             }
-            /* Swallowed & hidden inside logo/camera */
-            37.6%, 53.9% {
+            /* 3. Swallowed & hidden inside logo/camera */
+            38.1%, 53.9% {
               opacity: 0;
-              transform: translate(var(--emerge-x, -14px), var(--emerge-y, 3.75px)) scale(0.04);
-              filter: drop-shadow(0 0 16px #FFE082) brightness(1.6);
+              transform: translate(var(--emerge-x, -14px), var(--emerge-y, 3.75px)) scale(0.03);
+              filter: drop-shadow(0 0 14px #FFE082) brightness(1.5);
             }
-            /* EMERGENCE: Starts as a microscopic seed inside the EXACT lens aperture center */
+            /* 4. EMERGENCE: ONE SINGLE CONTINUOUS UNBROKEN MOTION
+               Starts as a tiny seed at the EXACT lens aperture center, inside the yellow beam.
+               Smoothly and continuously expands and glides forward into its final position.
+               Zero intermediate keyframes, zero pause, zero stutter, zero hesitation. */
             54.0% {
-              opacity: 0;
-              transform: translate(var(--emerge-x, -14px), var(--emerge-y, 3.75px)) scale(0.04);
-              filter: drop-shadow(0 0 16px #FFE082) brightness(1.6);
-            }
-            55.5% {
-              opacity: 0.9;
-              transform: translate(calc(var(--emerge-x, -14px) * 0.85), calc(var(--emerge-y, 3.75px) * 0.85)) scale(0.16);
-              filter: drop-shadow(0 0 14px rgba(255, 215, 0, 0.95)) brightness(1.5);
-            }
-            59.0% {
-              opacity: 0.95;
-              transform: translate(calc(var(--emerge-x, -14px) * 0.6), calc(var(--emerge-y, 3.75px) * 0.6)) scale(0.42);
-              filter: drop-shadow(0 0 12px rgba(245, 166, 35, 0.9)) brightness(1.35);
-            }
-            64.0% {
               opacity: 1;
-              transform: translate(calc(var(--emerge-x, -14px) * 0.3), calc(var(--emerge-y, 3.75px) * 0.3)) scale(0.72);
-              filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.7)) brightness(1.2);
+              transform: translate(var(--emerge-x, -14px), var(--emerge-y, 3.75px)) scale(0.03);
+              filter: drop-shadow(0 0 12px #FFE082) brightness(1.35);
+              animation-timing-function: cubic-bezier(0.2, 0.85, 0.32, 1);
             }
-            70.0% {
+            72.5% {
               opacity: 1;
               transform: translate(0px, 0px) scale(1.0);
-              filter: drop-shadow(0 0 5px rgba(245, 166, 35, 0.4)) brightness(1.08);
+              filter: drop-shadow(0 0 4px rgba(245, 166, 35, 0.25)) brightness(1.03);
+              animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
             }
-            /* Beam fades, text settles into crisp default */
-            76.0% {
-              opacity: 1;
-              transform: translate(0px, 0px) scale(1.0);
-              filter: none;
-            }
-            76.1%, 100% {
+            /* 5. Subtle settling into crisp default state as projector beam fades */
+            77.0%, 100% {
               opacity: 1;
               transform: translate(0px, 0px) scale(1.0);
               filter: none;
             }
           }
 
-          /* 4. PROGRESSIVE PER-LETTER COMPRESSION (CHIRAG-GENIE / PORTAL ABSORPTION):
-             - Each letter stays full size (scale 1) until it enters the magnetic pull zone.
-             - Leading letters compress first, trailing letters follow sequentially.
-             - As each letter enters the portal, it narrows horizontally (scaleX) and disappears inside the logo.
-             - Last O and W stay full size until their turn, then physically enter and compress into the logo. */
+          /* 4. PROGRESSIVE PER-LETTER COMPRESSION INTO EXACT LOGO CENTRE (-30px):
+             - Each letter stays 100% full-sized (scale: 1) until it enters the logo attraction zone.
+             - As it travels toward the logo center (-30px), ONLY THAT LEADING LETTER progressively compresses horizontally.
+             - Letters behind remain completely normal sized until their turn.
+             - At the exact logo centre (-30px), the letter reaches near-zero width/scale and disappears.
+             - No letter ever travels past the logo centre! */
           .cinematic-letter {
             will-change: transform, opacity;
-            transform-origin: center center;
+            transform-origin: left center;
             display: inline-block;
           }
 
-          /* Letter 0: 'F' (Closest to logo, compresses first) */
+          /* Letter 0: 'F' (starts at 0px -> enters zone at 22.0% -> absorbed at exact centre at 23.9%) */
           .cinematic-letter-0 { animation: cinematicLetter0 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter0 {
-            0%, 20.0% { opacity: 1; transform: scale(1); }
-            21.2% { opacity: 1; transform: scaleX(0.72) scaleY(0.95) translateX(-1px); }
-            22.2% { opacity: 0.85; transform: scaleX(0.38) scaleY(0.85) translateX(-3px); }
-            23.2%, 54.0% { opacity: 0; transform: scale(0.06) translateX(-8px); }
-            54.5%, 100% { opacity: 1; transform: scale(1); }
+            0%, 22.0% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            22.8% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            23.4% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            23.9%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            54.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 1: 'L' */
+          /* Letter 1: 'L' (starts at 14.1px -> enters zone at 24.0% -> absorbed at exact centre at 25.8%) */
           .cinematic-letter-1 { animation: cinematicLetter1 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter1 {
-            0%, 21.2% { opacity: 1; transform: scale(1); }
-            22.5% { opacity: 1; transform: scaleX(0.72) scaleY(0.95) translateX(-1px); }
-            23.8% { opacity: 0.85; transform: scaleX(0.38) scaleY(0.85) translateX(-3px); }
-            24.8%, 54.0% { opacity: 0; transform: scale(0.06) translateX(-8px); }
-            54.5%, 100% { opacity: 1; transform: scale(1); }
+            0%, 24.0% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            24.7% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            25.3% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            25.8%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            54.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 2: 'O' */
+          /* Letter 2: 'O' (starts at 27.2px -> enters zone at 25.9% -> absorbed at exact centre at 27.5%) */
           .cinematic-letter-2 { animation: cinematicLetter2 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter2 {
-            0%, 22.8% { opacity: 1; transform: scale(1); }
-            24.2% { opacity: 1; transform: scaleX(0.72) scaleY(0.95) translateX(-1px); }
-            25.4% { opacity: 0.85; transform: scaleX(0.38) scaleY(0.85) translateX(-3px); }
-            26.4%, 54.0% { opacity: 0; transform: scale(0.06) translateX(-8px); }
-            54.5%, 100% { opacity: 1; transform: scale(1); }
+            0%, 25.9% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            26.5% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            27.0% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            27.5%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            54.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 3: 'P' */
+          /* Letter 3: 'P' (starts at 44.3px -> enters zone at 27.8% -> absorbed at exact centre at 29.7%) */
           .cinematic-letter-3 { animation: cinematicLetter3 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter3 {
-            0%, 24.4% { opacity: 1; transform: scale(1); }
-            25.8% { opacity: 1; transform: scaleX(0.72) scaleY(0.95) translateX(-1px); }
-            27.0% { opacity: 0.85; transform: scaleX(0.38) scaleY(0.85) translateX(-3px); }
-            28.0%, 54.0% { opacity: 0; transform: scale(0.06) translateX(-8px); }
-            54.5%, 100% { opacity: 1; transform: scale(1); }
+            0%, 27.8% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            28.5% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            29.1% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            29.7%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            54.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 4: 'S' */
+          /* Letter 4: 'S' (starts at 59.4px -> enters zone at 29.9% -> absorbed at exact centre at 31.7%) */
           .cinematic-letter-4 { animation: cinematicLetter4 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter4 {
-            0%, 26.0% { opacity: 1; transform: scale(1); }
-            27.4% { opacity: 1; transform: scaleX(0.72) scaleY(0.95) translateX(-1px); }
-            28.6% { opacity: 0.85; transform: scaleX(0.38) scaleY(0.85) translateX(-3px); }
-            29.6%, 54.0% { opacity: 0; transform: scale(0.06) translateX(-8px); }
-            54.5%, 100% { opacity: 1; transform: scale(1); }
+            0%, 29.9% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            30.6% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            31.2% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            31.7%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            54.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 5: 'H' */
+          /* Letter 5: 'H' (starts at 74.0px -> enters zone at 31.8% -> absorbed at exact centre at 33.6%) */
           .cinematic-letter-5 { animation: cinematicLetter5 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter5 {
-            0%, 27.6% { opacity: 1; transform: scale(1); }
-            29.0% { opacity: 1; transform: scaleX(0.72) scaleY(0.95) translateX(-1px); }
-            30.2% { opacity: 0.85; transform: scaleX(0.38) scaleY(0.85) translateX(-3px); }
-            31.4%, 54.0% { opacity: 0; transform: scale(0.06) translateX(-8px); }
-            54.5%, 100% { opacity: 1; transform: scale(1); }
+            0%, 31.8% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            32.5% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            33.1% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            33.6%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            54.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 6: 'O' */
+          /* Letter 6: 'O' (starts at 90.6px -> enters zone at 33.8% -> absorbed at exact centre at 35.7%) */
           .cinematic-letter-6 { animation: cinematicLetter6 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter6 {
-            0%, 29.4% { opacity: 1; transform: scale(1); }
-            31.0% { opacity: 1; transform: scaleX(0.72) scaleY(0.95) translateX(-1px); }
-            32.4% { opacity: 0.85; transform: scaleX(0.38) scaleY(0.85) translateX(-3px); }
-            33.6%, 54.0% { opacity: 0; transform: scale(0.06) translateX(-8px); }
-            54.5%, 100% { opacity: 1; transform: scale(1); }
+            0%, 33.8% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            34.5% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            35.1% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            35.7%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            54.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* Letter 7: 'W' (Trailing letter, stays full size until wave reaches it, then compresses and enters logo) */
+          /* Letter 7: 'W' (starts at 107.7px -> enters zone at 35.9% -> absorbed at exact centre at 38.0%) */
           .cinematic-letter-7 { animation: cinematicLetter7 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
           @keyframes cinematicLetter7 {
-            0%, 31.4% { opacity: 1; transform: scale(1); }
-            33.6% { opacity: 1; transform: scaleX(0.72) scaleY(0.95) translateX(-1px); }
-            35.4% { opacity: 0.85; transform: scaleX(0.38) scaleY(0.85) translateX(-3px); }
-            37.2%, 54.0% { opacity: 0; transform: scale(0.06) translateX(-8px); }
-            54.5%, 100% { opacity: 1; transform: scale(1); }
+            0%, 35.9% { opacity: 1; transform: scaleX(1) scaleY(1); }
+            36.7% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
+            37.4% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
+            38.0%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            54.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
           /* 5. VINTAGE MOVIE CAMERA */

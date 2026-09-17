@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   Eye,
   X,
-  Plus,
   Trash2,
   Check
 } from 'lucide-react';
@@ -49,11 +48,10 @@ export const AdminAdsPage: React.FC<AdminAdsPageProps> = () => {
   // Media Library State
   const [mediaLibrary, setMediaLibrary] = useState<any[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
-  const [libraryUploading, setLibraryUploading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
+  const urlDropdownRef = useRef<HTMLDivElement>(null);
+  const [showUrlDropdown, setShowUrlDropdown] = useState(false);
 
   const fetchMediaLibrary = async () => {
     try {
@@ -93,75 +91,68 @@ export const AdminAdsPage: React.FC<AdminAdsPageProps> = () => {
     fetchMediaLibrary();
   }, []);
 
-  // Handle Multiple Photo Uploads (Strictly image files only)
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Close URL dropdown on click outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (urlDropdownRef.current && !urlDropdownRef.current.contains(e.target as Node)) {
+        setShowUrlDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  // Handle Media File Upload via existing upload button (automatically saved to My Library)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (!file.type.startsWith('image/')) {
-        showToast(`File "${file.name}" is not an image file. Photo Ads media library accepts photo/image files only.`, 'error');
-        if (photoInputRef.current) photoInputRef.current.value = '';
-        return;
+    const fileList = Array.from(files);
+
+    // Strictly validate media types
+    if (type === 'IMAGE') {
+      for (const file of fileList) {
+        if (!file.type.startsWith('image/')) {
+          showToast(`File "${file.name}" is not an image file. Photo/Image Advertisement accepts images only.`, 'error');
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+      }
+    } else {
+      for (const file of fileList) {
+        if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|webm|mov|m4v)$/i)) {
+          showToast(`File "${file.name}" is not a video file. Video Advertisement accepts videos only.`, 'error');
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
       }
     }
 
     try {
-      setLibraryUploading(true);
-      const res = await api.admin.uploadAdMedia(files, 'IMAGE');
+      setUploading(true);
+      const res = await api.admin.uploadAdMedia(fileList, type);
       if (res.library) {
         setMediaLibrary(res.library);
       }
-      showToast(`${files.length} photo(s) added to Advertisement Media Library!`, 'success');
-      if (res.added && res.added.length > 0 && !mediaUrl) {
+      if (res.added && res.added.length > 0) {
         setMediaUrl(res.added[0].url);
-        setType('IMAGE');
+        showToast(
+          `${fileList.length} ${type === 'IMAGE' ? 'image(s)' : 'video(s)'} uploaded and saved to My Library!`,
+          'success'
+        );
       }
     } catch (err: any) {
-      showToast(err.message || 'Failed to upload photo ad media.', 'error');
+      showToast(err.message || 'Failed to upload ad media.', 'error');
     } finally {
-      setLibraryUploading(false);
-      if (photoInputRef.current) photoInputRef.current.value = '';
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  // Handle Multiple Video Uploads (Strictly video files only)
-  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|webm|mov|m4v)$/i)) {
-        showToast(`File "${file.name}" is not a video file. Video Ads media library accepts video files only.`, 'error');
-        if (videoInputRef.current) videoInputRef.current.value = '';
-        return;
-      }
-    }
-
-    try {
-      setLibraryUploading(true);
-      const res = await api.admin.uploadAdMedia(files, 'VIDEO');
-      if (res.library) {
-        setMediaLibrary(res.library);
-      }
-      showToast(`${files.length} video(s) added to Advertisement Media Library!`, 'success');
-      if (res.added && res.added.length > 0 && !mediaUrl) {
-        setMediaUrl(res.added[0].url);
-        setType('VIDEO');
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to upload video ad media.', 'error');
-    } finally {
-      setLibraryUploading(false);
-      if (videoInputRef.current) videoInputRef.current.value = '';
-    }
-  };
-
-  // Handle Media Item Deletion (Explicit admin action)
-  const handleDeleteMedia = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to remove "${name}" from the Advertisement Media Library? Existing active ads will remain functional.`)) {
+  // Handle Media Item Deletion with safe handling for active ad
+  const handleDeleteMedia = async (e: React.MouseEvent, id: string, name: string, itemUrl: string) => {
+    e.stopPropagation();
+    if (!window.confirm(`Are you sure you want to delete "${name}" from My Library?`)) {
       return;
     }
     try {
@@ -171,17 +162,17 @@ export const AdminAdsPage: React.FC<AdminAdsPageProps> = () => {
       } else {
         setMediaLibrary(prev => prev.filter(item => item.id !== id));
       }
-      showToast(`"${name}" removed from library.`, 'info');
-    } catch (err: any) {
-      showToast(err.message || 'Failed to remove media item from library.', 'error');
-    }
-  };
 
-  // Select existing uploaded media as active ad without re-uploading
-  const handleSelectActiveMedia = (item: any) => {
-    setMediaUrl(item.url);
-    setType(item.type);
-    showToast(`"${item.name}" selected as active ${item.type === 'IMAGE' ? 'Photo' : 'Video'} Ad. Click "Save Changes" to apply.`, 'info');
+      // Safe handling: if deleted item is current active ad URL, clear it safely
+      if (mediaUrl.trim() === itemUrl.trim()) {
+        setMediaUrl('');
+        showToast(`"${name}" was deleted. Active ad URL cleared safely.`, 'info');
+      } else {
+        showToast(`"${name}" removed from My Library.`, 'info');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete media item from library.', 'error');
+    }
   };
 
   // Handle Save
@@ -211,26 +202,6 @@ export const AdminAdsPage: React.FC<AdminAdsPageProps> = () => {
       showToast(err.message || 'Failed to save advertisement settings.', 'error');
     } finally {
       setSaving(false);
-    }
-  };
-
-  // Handle Media File Upload
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setUploading(true);
-      const res = await api.admin.uploadFile(file);
-      if (res.url) {
-        setMediaUrl(res.url);
-        showToast('Ad media file uploaded successfully!', 'success');
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to upload media file. You can also paste a direct URL.', 'error');
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -285,6 +256,7 @@ export const AdminAdsPage: React.FC<AdminAdsPageProps> = () => {
 
   const canSkipNow = skipEnabled && simElapsed >= skipAfterSeconds;
   const skipCountdown = Math.max(0, skipAfterSeconds - simElapsed);
+  const currentLibraryItems = mediaLibrary.filter(m => m.type === type);
 
   return (
     <div style={{ padding: '32px 24px', maxWidth: '1000px', margin: '0 auto' }}>
@@ -443,31 +415,180 @@ export const AdminAdsPage: React.FC<AdminAdsPageProps> = () => {
           {/* Media URL & Upload */}
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#9CA3AF', marginBottom: '8px' }}>
-              Media Source ({type === 'IMAGE' ? 'Image URL or Upload' : 'Video URL or MP4/WebM Upload'})
+              Media Source ({type === 'IMAGE' ? 'Photo / Image URL or Upload' : 'Video URL or MP4/WebM Upload'})
             </label>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <input
-                type="text"
-                value={mediaUrl}
-                onChange={e => setMediaUrl(e.target.value)}
-                placeholder={type === 'IMAGE' ? 'https://example.com/ad-poster.jpg' : 'https://example.com/ad-spot.mp4'}
-                style={{
-                  flex: 1,
-                  minWidth: '260px',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: '#FFFFFF',
-                  fontSize: '14px',
-                  outline: 'none'
-                }}
-              />
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1, minWidth: '260px', position: 'relative' }}>
+                <input
+                  type="text"
+                  value={mediaUrl}
+                  onChange={e => setMediaUrl(e.target.value)}
+                  onFocus={() => setShowUrlDropdown(true)}
+                  onClick={() => setShowUrlDropdown(true)}
+                  placeholder={type === 'IMAGE' ? 'https://example.com/ad-poster.jpg' : 'https://example.com/ad-spot.mp4'}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: showUrlDropdown ? '1px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.12)',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    outline: 'none',
+                    transition: 'border-color 0.15s'
+                  }}
+                />
+
+                {/* Dropdown Options directly beneath URL field */}
+                {showUrlDropdown && (
+                  <div
+                    ref={urlDropdownRef}
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 6px)',
+                      left: 0,
+                      right: 0,
+                      backgroundColor: '#161622',
+                      borderRadius: '10px',
+                      border: '1px solid var(--brand-gold, #F5C518)',
+                      boxShadow: '0 12px 36px rgba(0,0,0,0.85)',
+                      maxHeight: '260px',
+                      overflowY: 'auto',
+                      zIndex: 100,
+                      padding: '8px'
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        borderBottom: '1px solid rgba(255,255,255,0.08)',
+                        marginBottom: '6px'
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          color: 'var(--brand-gold, #F5C518)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em'
+                        }}
+                      >
+                        Select from {type === 'IMAGE' ? 'Photo' : 'Video'} My Library ({currentLibraryItems.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowUrlDropdown(false)}
+                        style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: '2px' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    {currentLibraryItems.length === 0 ? (
+                      <div style={{ padding: '16px', textAlign: 'center', fontSize: '12px', color: '#9CA3AF' }}>
+                        No {type === 'IMAGE' ? 'photos' : 'videos'} saved in My Library yet. Click &quot;Upload Media&quot; to add.
+                      </div>
+                    ) : (
+                      currentLibraryItems.map(item => {
+                        const isSelected = mediaUrl.trim() === item.url.trim();
+                        return (
+                          <div
+                            key={item.id}
+                            onMouseDown={e => {
+                              e.preventDefault();
+                              setMediaUrl(item.url);
+                              setShowUrlDropdown(false);
+                              showToast(`Selected "${item.name}" from library.`, 'info');
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              padding: '8px 10px',
+                              borderRadius: '8px',
+                              backgroundColor: isSelected ? 'rgba(245, 197, 24, 0.15)' : 'transparent',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.15s'
+                            }}
+                            onMouseEnter={e => {
+                              if (!isSelected) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
+                            }}
+                            onMouseLeave={e => {
+                              if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: '38px',
+                                height: '38px',
+                                borderRadius: '6px',
+                                overflow: 'hidden',
+                                backgroundColor: '#000',
+                                flexShrink: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              {item.type === 'IMAGE' ? (
+                                <img
+                                  src={item.url}
+                                  alt={item.name}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              ) : (
+                                <VideoIcon size={18} color="var(--brand-gold, #F5C518)" />
+                              )}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontSize: '13px',
+                                  fontWeight: 700,
+                                  color: isSelected ? 'var(--brand-gold, #F5C518)' : '#FFFFFF',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {item.name}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#6B7280' }}>
+                                {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Permanent'}
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 800,
+                                  color: 'var(--brand-gold, #F5C518)'
+                                }}
+                              >
+                                <Check size={14} />
+                                <span>Active</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
 
               <input
                 ref={fileInputRef}
                 type="file"
                 accept={type === 'IMAGE' ? 'image/*' : 'video/*'}
+                multiple
                 style={{ display: 'none' }}
                 onChange={handleFileUpload}
               />
@@ -494,6 +615,255 @@ export const AdminAdsPage: React.FC<AdminAdsPageProps> = () => {
                 <span>Upload Media</span>
               </button>
             </div>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* MY LIBRARY (Dedicated for active ad type: IMAGE or VIDEO)                 */}
+          {/* ========================================================================= */}
+          <div
+            style={{
+              marginTop: '8px',
+              padding: '16px',
+              borderRadius: '12px',
+              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.08)'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '12px',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {type === 'IMAGE' ? (
+                  <ImageIcon size={18} color="var(--brand-gold, #F5C518)" />
+                ) : (
+                  <VideoIcon size={18} color="var(--brand-gold, #F5C518)" />
+                )}
+                <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                  My Library
+                </h3>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    color: '#9CA3AF'
+                  }}
+                >
+                  {currentLibraryItems.length} {type === 'IMAGE' ? 'image(s)' : 'video(s)'} saved
+                </span>
+              </div>
+
+              <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                Click any item to use as active ad • One-click selection
+              </span>
+            </div>
+
+            {loadingLibrary ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#9CA3AF' }}>
+                <Loader2 size={18} className="animate-spin" style={{ margin: '0 auto 6px' }} />
+                <span style={{ fontSize: '12px' }}>Loading library...</span>
+              </div>
+            ) : currentLibraryItems.length === 0 ? (
+              <div
+                style={{
+                  padding: '24px',
+                  textAlign: 'center',
+                  backgroundColor: 'rgba(255, 255, 255, 0.01)',
+                  borderRadius: '10px',
+                  border: '1px dashed rgba(255, 255, 255, 0.1)',
+                  color: '#6B7280'
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF', marginBottom: '4px' }}>
+                  No {type === 'IMAGE' ? 'images' : 'videos'} in My Library yet
+                </div>
+                <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                  Upload files using the &quot;Upload Media&quot; button above. They will be permanently stored here.
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  gap: '12px'
+                }}
+              >
+                {currentLibraryItems.map(item => {
+                  const isActive = mediaUrl.trim() === item.url.trim();
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        setMediaUrl(item.url);
+                        showToast(`Selected "${item.name}" as active ${type === 'IMAGE' ? 'Photo' : 'Video'} Ad!`, 'info');
+                      }}
+                      style={{
+                        backgroundColor: isActive ? 'rgba(245, 197, 24, 0.1)' : 'rgba(255, 255, 255, 0.03)',
+                        borderRadius: '10px',
+                        border: isActive ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.08)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={e => {
+                        if (!isActive) e.currentTarget.style.borderColor = 'rgba(245, 197, 24, 0.4)';
+                      }}
+                      onMouseLeave={e => {
+                        if (!isActive) e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                      }}
+                    >
+                      {/* Preview Media */}
+                      <div
+                        style={{
+                          height: '110px',
+                          backgroundColor: '#0A0A10',
+                          position: 'relative',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        {item.type === 'IMAGE' ? (
+                          <img
+                            src={item.url}
+                            alt={item.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <>
+                            <video
+                              src={item.url}
+                              preload="metadata"
+                              muted
+                              playsInline
+                              style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
+                            />
+                            <div
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: 'rgba(0, 0, 0, 0.3)'
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'var(--brand-gold, #F5C518)',
+                                  border: '1px solid rgba(245, 197, 24, 0.4)'
+                                }}
+                              >
+                                <Play size={14} style={{ marginLeft: '2px' }} />
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {isActive && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '6px',
+                              left: '6px',
+                              backgroundColor: 'var(--brand-gold, #F5C518)',
+                              color: '#000000',
+                              padding: '2px 6px',
+                              borderRadius: '5px',
+                              fontSize: '9.5px',
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+                              zIndex: 2
+                            }}
+                          >
+                            <Check size={11} strokeWidth={3} />
+                            <span>ACTIVE AD</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Bottom Info & Delete Button at right corner */}
+                      <div
+                        style={{
+                          padding: '8px 10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px'
+                        }}
+                      >
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              color: isActive ? 'var(--brand-gold, #F5C518)' : '#FFFFFF',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title={item.name}
+                          >
+                            {item.name}
+                          </div>
+                          <div style={{ fontSize: '10.5px', color: '#6B7280' }}>
+                            {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Permanent'}
+                          </div>
+                        </div>
+
+                        {/* Delete button at the right corner */}
+                        <button
+                          type="button"
+                          onClick={e => handleDeleteMedia(e, item.id, item.name, item.url)}
+                          title="Delete from My Library"
+                          style={{
+                            padding: '6px',
+                            borderRadius: '6px',
+                            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            color: '#EF4444',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            transition: 'background-color 0.15s'
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.25)')}
+                          onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)')}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Ad Label & Clickthrough URL */}
@@ -581,545 +951,6 @@ export const AdminAdsPage: React.FC<AdminAdsPageProps> = () => {
             </div>
           )}
 
-          </div>
-
-        {/* ========================================================================= */}
-        {/* CARD 2A: PHOTO AD MEDIA STORAGE                                          */}
-        {/* ========================================================================= */}
-        <div
-          style={{
-            backgroundColor: 'var(--bg-surface, #12121A)',
-            borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px'
-          }}
-        >
-          {/* Header & Add Media Action */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '12px'
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ImageIcon size={18} color="var(--brand-gold, #F5C518)" />
-                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
-                  Photo Ad Media Storage
-                </h3>
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    color: '#9CA3AF'
-                  }}
-                >
-                  {mediaLibrary.filter(m => m.type === 'IMAGE').length} image(s) stored
-                </span>
-              </div>
-              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0' }}>
-                Store permanent photo ads (JPG, PNG, WebP, GIF). Upload multiple photos at once. Click &quot;Use as Active Ad&quot; to activate without re-uploading.
-              </p>
-            </div>
-
-            <div>
-              <input
-                ref={photoInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                style={{ display: 'none' }}
-                onChange={handlePhotoUpload}
-              />
-              <button
-                type="button"
-                onClick={() => photoInputRef.current?.click()}
-                disabled={libraryUploading}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 18px',
-                  borderRadius: '8px',
-                  backgroundColor: 'rgba(245, 197, 24, 0.18)',
-                  border: '1px solid var(--brand-gold, #F5C518)',
-                  color: 'var(--brand-gold, #F5C518)',
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  cursor: libraryUploading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 14px rgba(245, 197, 24, 0.2)'
-                }}
-              >
-                {libraryUploading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                <span>+ Add Media (Upload Photos)</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Photos Grid */}
-          {loadingLibrary ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: '#9CA3AF' }}>
-              <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-              <span style={{ fontSize: '12px' }}>Loading photo library...</span>
-            </div>
-          ) : mediaLibrary.filter(m => m.type === 'IMAGE').length === 0 ? (
-            <div
-              style={{
-                padding: '28px',
-                textAlign: 'center',
-                backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                borderRadius: '12px',
-                border: '1px dashed rgba(255, 255, 255, 0.12)',
-                color: '#9CA3AF'
-              }}
-            >
-              <ImageIcon size={32} style={{ margin: '0 auto 8px', color: '#6B7280' }} />
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF', marginBottom: '4px' }}>
-                No photos in Media Storage yet
-              </div>
-              <div style={{ fontSize: '12px', color: '#6B7280', maxWidth: '420px', margin: '0 auto' }}>
-                Click &quot;+ Add Media&quot; above to select and upload multiple ad images. They will stay permanently available here.
-              </div>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                gap: '14px'
-              }}
-            >
-              {mediaLibrary
-                .filter(m => m.type === 'IMAGE')
-                .map(item => {
-                  const isActive = type === 'IMAGE' && mediaUrl.trim() === item.url.trim();
-                  return (
-                    <div
-                      key={item.id}
-                      style={{
-                        backgroundColor: isActive ? 'rgba(245, 197, 24, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-                        borderRadius: '12px',
-                        border: isActive ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.08)',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: '130px',
-                          backgroundColor: '#0A0A10',
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        <img
-                          src={item.url}
-                          alt={item.name}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                        {isActive && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: '8px',
-                              right: '8px',
-                              backgroundColor: 'var(--brand-gold, #F5C518)',
-                              color: '#000000',
-                              padding: '3px 8px',
-                              borderRadius: '6px',
-                              fontSize: '10px',
-                              fontWeight: 800,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
-                            }}
-                          >
-                            <Check size={12} strokeWidth={3} />
-                            <span>ACTIVE PHOTO AD</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
-                        <div>
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              color: '#FFFFFF',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              marginBottom: '4px'
-                            }}
-                            title={item.name}
-                          >
-                            {item.name}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#6B7280' }}>
-                            {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Permanent'}
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
-                          {isActive ? (
-                            <div
-                              style={{
-                                flex: 1,
-                                padding: '7px 8px',
-                                borderRadius: '6px',
-                                backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                                color: 'var(--brand-gold, #F5C518)',
-                                fontSize: '11px',
-                                fontWeight: 800,
-                                textAlign: 'center'
-                              }}
-                            >
-                              Current Active Ad
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleSelectActiveMedia(item)}
-                              style={{
-                                flex: 1,
-                                padding: '7px 8px',
-                                borderRadius: '6px',
-                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                border: '1px solid rgba(255, 255, 255, 0.15)',
-                                color: '#FFFFFF',
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Use as Active Ad
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMedia(item.id, item.name)}
-                            title="Delete from library"
-                            style={{
-                              padding: '6px',
-                              borderRadius: '6px',
-                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                              border: '1px solid rgba(239, 68, 68, 0.25)',
-                              color: '#EF4444',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-
-        {/* ========================================================================= */}
-        {/* CARD 2B: VIDEO AD MEDIA STORAGE                                          */}
-        {/* ========================================================================= */}
-        <div
-          style={{
-            backgroundColor: 'var(--bg-surface, #12121A)',
-            borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px'
-          }}
-        >
-          {/* Header & Add Media Action */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '12px'
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <VideoIcon size={18} color="var(--brand-gold, #F5C518)" />
-                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
-                  Video Ad Media Storage
-                </h3>
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    color: '#9CA3AF'
-                  }}
-                >
-                  {mediaLibrary.filter(m => m.type === 'VIDEO').length} video(s) stored
-                </span>
-              </div>
-              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0' }}>
-                Store permanent video ads (MP4, WebM, MOV, M4V). Upload multiple videos at once. Click &quot;Use as Active Ad&quot; to activate without re-uploading.
-              </p>
-            </div>
-
-            <div>
-              <input
-                ref={videoInputRef}
-                type="file"
-                accept="video/*"
-                multiple
-                style={{ display: 'none' }}
-                onChange={handleVideoUpload}
-              />
-              <button
-                type="button"
-                onClick={() => videoInputRef.current?.click()}
-                disabled={libraryUploading}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 18px',
-                  borderRadius: '8px',
-                  backgroundColor: 'rgba(245, 197, 24, 0.18)',
-                  border: '1px solid var(--brand-gold, #F5C518)',
-                  color: 'var(--brand-gold, #F5C518)',
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  cursor: libraryUploading ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 14px rgba(245, 197, 24, 0.2)'
-                }}
-              >
-                {libraryUploading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                <span>+ Add Media (Upload Videos)</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Videos Grid */}
-          {loadingLibrary ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: '#9CA3AF' }}>
-              <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-              <span style={{ fontSize: '12px' }}>Loading video library...</span>
-            </div>
-          ) : mediaLibrary.filter(m => m.type === 'VIDEO').length === 0 ? (
-            <div
-              style={{
-                padding: '28px',
-                textAlign: 'center',
-                backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                borderRadius: '12px',
-                border: '1px dashed rgba(255, 255, 255, 0.12)',
-                color: '#9CA3AF'
-              }}
-            >
-              <VideoIcon size={32} style={{ margin: '0 auto 8px', color: '#6B7280' }} />
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF', marginBottom: '4px' }}>
-                No videos in Media Storage yet
-              </div>
-              <div style={{ fontSize: '12px', color: '#6B7280', maxWidth: '420px', margin: '0 auto' }}>
-                Click &quot;+ Add Media&quot; above to select and upload multiple ad videos. They will stay permanently available here.
-              </div>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                gap: '14px'
-              }}
-            >
-              {mediaLibrary
-                .filter(m => m.type === 'VIDEO')
-                .map(item => {
-                  const isActive = type === 'VIDEO' && mediaUrl.trim() === item.url.trim();
-                  return (
-                    <div
-                      key={item.id}
-                      style={{
-                        backgroundColor: isActive ? 'rgba(245, 197, 24, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-                        borderRadius: '12px',
-                        border: isActive ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.08)',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: '130px',
-                          backgroundColor: '#0A0A10',
-                          position: 'relative',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        <video
-                          src={item.url}
-                          preload="metadata"
-                          muted
-                          playsInline
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                        <div
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: 'rgba(0, 0, 0, 0.3)'
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: '36px',
-                              height: '36px',
-                              borderRadius: '50%',
-                              backgroundColor: 'rgba(0, 0, 0, 0.65)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'var(--brand-gold, #F5C518)',
-                              border: '1px solid rgba(245, 197, 24, 0.4)'
-                            }}
-                          >
-                            <Play size={16} style={{ marginLeft: '2px' }} />
-                          </div>
-                        </div>
-
-                        {isActive && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: '8px',
-                              right: '8px',
-                              backgroundColor: 'var(--brand-gold, #F5C518)',
-                              color: '#000000',
-                              padding: '3px 8px',
-                              borderRadius: '6px',
-                              fontSize: '10px',
-                              fontWeight: 800,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                              zIndex: 2
-                            }}
-                          >
-                            <Check size={12} strokeWidth={3} />
-                            <span>ACTIVE VIDEO AD</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
-                        <div>
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              color: '#FFFFFF',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              marginBottom: '4px'
-                            }}
-                            title={item.name}
-                          >
-                            {item.name}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#6B7280' }}>
-                            {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Permanent'}
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
-                          {isActive ? (
-                            <div
-                              style={{
-                                flex: 1,
-                                padding: '7px 8px',
-                                borderRadius: '6px',
-                                backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                                color: 'var(--brand-gold, #F5C518)',
-                                fontSize: '11px',
-                                fontWeight: 800,
-                                textAlign: 'center'
-                              }}
-                            >
-                              Current Active Ad
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleSelectActiveMedia(item)}
-                              style={{
-                                flex: 1,
-                                padding: '7px 8px',
-                                borderRadius: '6px',
-                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                border: '1px solid rgba(255, 255, 255, 0.15)',
-                                color: '#FFFFFF',
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Use as Active Ad
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMedia(item.id, item.name)}
-                            title="Delete from library"
-                            style={{
-                              padding: '6px',
-                              borderRadius: '6px',
-                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                              border: '1px solid rgba(239, 68, 68, 0.25)',
-                              color: '#EF4444',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
         </div>
 
         {/* CARD 3: DURATION & SKIP TIMERS */}

@@ -36,7 +36,7 @@ export const ContentSection: React.FC<ContentSectionProps> = ({
           display: 'flex',
           alignItems: 'flex-end',
           justifyContent: 'space-between',
-          padding: '0 20px',
+          padding: '0 20px 0 clamp(28px, 3.5vw, 48px)',
           marginBottom: '14px'
         }}
       >
@@ -108,7 +108,7 @@ export const ContentSection: React.FC<ContentSectionProps> = ({
             display: 'flex',
             gap: '16px',
             overflowX: 'auto',
-            padding: '4px 20px 16px',
+            padding: '4px 20px 16px clamp(28px, 3.5vw, 48px)',
             scrollSnapType: 'x mandatory',
             scrollbarWidth: 'none',
             msOverflowStyle: 'none'
@@ -167,7 +167,7 @@ export const ContentSection: React.FC<ContentSectionProps> = ({
           border-color: var(--brand-gold);
         }
         .section-scroll-arrow.left {
-          left: 6px;
+          left: 8px;
         }
         .section-scroll-arrow.right {
           right: 6px;

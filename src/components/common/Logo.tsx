@@ -31,6 +31,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
   };
 
   const config = iconSizes[size];
+  // Locked vertical alignment for camera + lens flare + beam (0.30px extra up from -2.50px)
+  const cameraOffsetY = 2.80;
 
   return (
     <div
@@ -98,14 +100,14 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
 
         {animated && (
           <>
-            {/* Vintage Movie Camera (Morphed State) */}
+            {/* Vintage Movie Camera (Morphed State): perfectly synchronized with beam origin */}
             <div
               className="cinematic-camera-logo"
               style={{
                 width: config.box,
                 height: config.box,
                 position: 'absolute',
-                top: '-2.25px',
+                top: `-${cameraOffsetY}px`,
                 left: 0,
                 display: 'flex',
                 alignItems: 'center',
@@ -191,7 +193,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
               className="cinematic-lens-flare"
               style={{
                 left: `${config.lensX - 1.5}px`,
-                top: `${config.lensY - 5.5 - 1.5}px`
+                top: `${config.lensY - 5.5 - cameraOffsetY}px`
               }}
             />
 
@@ -200,7 +202,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
               className="cinematic-projector-beam"
               style={{
                 left: `${config.lensX}px`,
-                top: `${config.lensY - 1.5}px`
+                top: `${config.lensY - cameraOffsetY}px`
               }}
             />
           </>

@@ -11,7 +11,6 @@ import {
   Sparkles,
   TrendingUp,
   Wallet,
-  Sliders,
   CreditCard,
   Crown,
   X,
@@ -22,7 +21,8 @@ import {
   Calendar,
   ChevronRight,
   Copy,
-  Check
+  Check,
+  Zap
 } from 'lucide-react';
 
 interface TodayStats {
@@ -189,24 +189,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     day: 'numeric'
   });
 
-  // Quick Action navigation cards
+  // Quick Action navigation cards in exact requested sequence:
+  // 1. Add Movie, 2. Add Series, 3. Quick Add, 4. Trending #1, 5. Hero Banner, 6. Cinematic Spotlight, 7. UPI Settings, 8. Verify Payments, 9. All Transactions
   const quickNavItems = [
-    {
-      label: 'Hero Banner',
-      desc: 'Configure Discover page top hero',
-      action: () => onNavigateTab('admin-hero'),
-      icon: Crown,
-      color: '#EC4899'
-    },
-    {
-      label: 'Trending #1 Showcase',
-      desc: stats.currentTrending1
-        ? `#1: ${stats.currentTrending1.title} (${stats.currentTrending1.type}) • Manage in Catalog`
-        : 'Catalog Trending #1 showcase title',
-      action: () => onNavigateTab('admin-content'),
-      icon: TrendingUp,
-      color: '#F5C518'
-    },
     {
       label: 'Add Movie',
       desc: 'Publish a single cinematic film',
@@ -222,18 +207,27 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       color: '#8B5CF6'
     },
     {
-      label: 'Verify Payments',
-      desc: 'Inspect pending UTR submissions & approve',
-      action: () => onNavigateTab('admin-payments'),
-      icon: ShieldCheck,
-      color: '#10B981'
+      label: 'Quick Add',
+      desc: 'One-click auto-fill movie or series via ID',
+      action: () => onNavigateTab('admin-quick-add'),
+      icon: Zap,
+      color: '#EAB308'
     },
     {
-      label: 'UPI Settings',
-      desc: 'Configure receiver UPI ID & preview QR',
-      action: () => onNavigateTab('admin-upi-settings'),
-      icon: Wallet,
+      label: 'Trending #1',
+      desc: stats.currentTrending1
+        ? `#1: ${stats.currentTrending1.title} (${stats.currentTrending1.type}) • Manage in Catalog`
+        : 'Catalog Trending #1 showcase title',
+      action: () => onNavigateTab('admin-trending'),
+      icon: TrendingUp,
       color: '#F5C518'
+    },
+    {
+      label: 'Hero Banner',
+      desc: 'Configure Discover page top hero',
+      action: () => onNavigateTab('admin-hero'),
+      icon: Crown,
+      color: '#EC4899'
     },
     {
       label: 'Cinematic Spotlight',
@@ -243,18 +237,25 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       color: '#3B82F6'
     },
     {
+      label: 'UPI Settings',
+      desc: 'Configure receiver UPI ID & preview QR',
+      action: () => onNavigateTab('admin-upi-settings'),
+      icon: Wallet,
+      color: '#F5C518'
+    },
+    {
+      label: 'Verify Payments',
+      desc: 'Inspect pending UTR submissions & approve',
+      action: () => onNavigateTab('admin-payments'),
+      icon: ShieldCheck,
+      color: '#10B981'
+    },
+    {
       label: 'All Transactions',
       desc: 'Complete credit and debit ledger',
       action: () => onNavigateTab('admin-transactions'),
       icon: CreditCard,
       color: '#14B8A6'
-    },
-    {
-      label: 'General Settings',
-      desc: 'Platform identity and system controls',
-      action: () => onNavigateTab('admin-settings'),
-      icon: Sliders,
-      color: '#6366F1'
     }
   ];
 

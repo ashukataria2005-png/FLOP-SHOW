@@ -62,6 +62,9 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   if (cleanPath === '/admin/quick-add') {
     return { tab: 'admin-quick-add' };
   }
+  if (cleanPath === '/admin/trending') {
+    return { tab: 'admin-trending' };
+  }
   if (cleanPath.startsWith('/admin/editor')) {
     const parts = cleanPath.split('/');
     const param = parts[3];
@@ -133,6 +136,8 @@ export function tabToPath(tab: string, param?: string): string {
       return '/admin/ads';
     case 'admin-quick-add':
       return '/admin/quick-add';
+    case 'admin-trending':
+      return '/admin/trending';
     case 'admin-editor':
       return param ? `/admin/editor/${param}` : '/admin/editor';
     case 'admin-users':
@@ -280,9 +285,10 @@ const AppContent: React.FC = () => {
           onExitAdmin={() => handleNavigate('discover')}
         >
           {currentTab === 'admin-dashboard' && <AdminDashboardPage onNavigateTab={handleNavigate} />}
-          {currentTab === 'admin-content' && (
+          {(currentTab === 'admin-content' || currentTab === 'admin-trending') && (
             <AdminContentPage
               initialTypeFilter={adminParam === 'movie' ? 'MOVIE' : adminParam === 'series' ? 'SERIES' : 'ALL'}
+              initialTrendingFilter={currentTab === 'admin-trending' || adminParam === 'trending' ? 'TRENDING' : 'ALL'}
               onNavigateTab={handleNavigate}
             />
           )}

@@ -29,7 +29,8 @@ import {
   Eye,
   EyeOff,
   Gift,
-  RotateCcw
+  RotateCcw,
+  TrendingUp
 } from 'lucide-react';
 
 const ADMIN_QUICK_LOGIN_KEY = 'flopshow_admin_quick_login';
@@ -96,6 +97,7 @@ const navGroups: NavGroup[] = [
     icon: Crown,
     items: [
       { id: 'admin-hero', label: 'Hero Banner', icon: Crown },
+      { id: 'admin-trending', label: 'Trending #1', icon: TrendingUp },
       { id: 'admin-spotlight', label: 'Cinematic Spotlight', icon: Sparkles }
     ]
   },

@@ -16,8 +16,7 @@ import {
   X,
   Plus,
   Trash2,
-  Check,
-  FolderOpen
+  Check
 } from 'lucide-react';
 
 interface AdminAdsPageProps {
@@ -582,309 +581,545 @@ export const AdminAdsPage: React.FC<AdminAdsPageProps> = () => {
             </div>
           )}
 
-          {/* ---------------------------------------------------------------- */}
-          {/* ADVERTISEMENT MEDIA LIBRARY SECTION                             */}
-          {/* ---------------------------------------------------------------- */}
+          </div>
+
+        {/* ========================================================================= */}
+        {/* CARD 2A: PHOTO AD MEDIA STORAGE                                          */}
+        {/* ========================================================================= */}
+        <div
+          style={{
+            backgroundColor: 'var(--bg-surface, #12121A)',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}
+        >
+          {/* Header & Add Media Action */}
           <div
             style={{
-              marginTop: '12px',
-              paddingTop: '20px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px'
             }}
           >
-            {/* Header & Add Media Action */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '12px',
-                marginBottom: '16px'
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <FolderOpen size={18} color="var(--brand-gold, #F5C518)" />
-                  <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
-                    {type === 'IMAGE' ? 'Photo Ads Media Library' : 'Video Ads Media Library'}
-                  </h3>
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      color: '#9CA3AF'
-                    }}
-                  >
-                    {mediaLibrary.filter(m => m.type === type).length} item(s) stored
-                  </span>
-                </div>
-                <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0' }}>
-                  {type === 'IMAGE'
-                    ? 'Upload multiple ad photos (JPG, PNG, WebP) to your permanent library. Select any uploaded photo below to activate it without re-uploading.'
-                    : 'Upload multiple ad videos (MP4, WebM) to your permanent library. Select any uploaded video below to activate it without re-uploading.'}
-                </p>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ImageIcon size={18} color="var(--brand-gold, #F5C518)" />
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                  Photo Ad Media Storage
+                </h3>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    color: '#9CA3AF'
+                  }}
+                >
+                  {mediaLibrary.filter(m => m.type === 'IMAGE').length} image(s) stored
+                </span>
               </div>
-
-              {/* Dedicated Add Media Buttons */}
-              <div>
-                {type === 'IMAGE' ? (
-                  <>
-                    <input
-                      ref={photoInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      style={{ display: 'none' }}
-                      onChange={handlePhotoUpload}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => photoInputRef.current?.click()}
-                      disabled={libraryUploading}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '10px 18px',
-                        borderRadius: '8px',
-                        backgroundColor: 'rgba(245, 197, 24, 0.18)',
-                        border: '1px solid var(--brand-gold, #F5C518)',
-                        color: 'var(--brand-gold, #F5C518)',
-                        fontSize: '13px',
-                        fontWeight: 800,
-                        cursor: libraryUploading ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 4px 14px rgba(245, 197, 24, 0.2)'
-                      }}
-                    >
-                      {libraryUploading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                      <span>Add Media (Upload Photos)</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <input
-                      ref={videoInputRef}
-                      type="file"
-                      accept="video/*"
-                      multiple
-                      style={{ display: 'none' }}
-                      onChange={handleVideoUpload}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => videoInputRef.current?.click()}
-                      disabled={libraryUploading}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '10px 18px',
-                        borderRadius: '8px',
-                        backgroundColor: 'rgba(245, 197, 24, 0.18)',
-                        border: '1px solid var(--brand-gold, #F5C518)',
-                        color: 'var(--brand-gold, #F5C518)',
-                        fontSize: '13px',
-                        fontWeight: 800,
-                        cursor: libraryUploading ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 4px 14px rgba(245, 197, 24, 0.2)'
-                      }}
-                    >
-                      {libraryUploading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                      <span>Add Media (Upload Videos)</span>
-                    </button>
-                  </>
-                )}
-              </div>
+              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0' }}>
+                Store permanent photo ads (JPG, PNG, WebP, GIF). Upload multiple photos at once. Click &quot;Use as Active Ad&quot; to activate without re-uploading.
+              </p>
             </div>
 
-            {/* Media Library Grid */}
-            {loadingLibrary ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: '#9CA3AF' }}>
-                <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-                <span style={{ fontSize: '12px' }}>Loading media library...</span>
-              </div>
-            ) : mediaLibrary.filter(m => m.type === type).length === 0 ? (
-              <div
+            <div>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={handlePhotoUpload}
+              />
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={libraryUploading}
                 style={{
-                  padding: '28px',
-                  textAlign: 'center',
-                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                  borderRadius: '12px',
-                  border: '1px dashed rgba(255, 255, 255, 0.12)',
-                  color: '#9CA3AF'
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 18px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(245, 197, 24, 0.18)',
+                  border: '1px solid var(--brand-gold, #F5C518)',
+                  color: 'var(--brand-gold, #F5C518)',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  cursor: libraryUploading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(245, 197, 24, 0.2)'
                 }}
               >
-                <FolderOpen size={32} style={{ margin: '0 auto 8px', color: '#6B7280' }} />
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF', marginBottom: '4px' }}>
-                  No {type === 'IMAGE' ? 'photos' : 'videos'} in media library yet
-                </div>
-                <div style={{ fontSize: '12px', color: '#6B7280', maxWidth: '420px', margin: '0 auto' }}>
-                  Click &quot;Add Media&quot; above to upload multiple {type === 'IMAGE' ? 'ad images' : 'ad videos'}. They will be permanently stored here for quick selection anytime.
-                </div>
+                {libraryUploading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                <span>+ Add Media (Upload Photos)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Photos Grid */}
+          {loadingLibrary ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: '#9CA3AF' }}>
+              <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 8px' }} />
+              <span style={{ fontSize: '12px' }}>Loading photo library...</span>
+            </div>
+          ) : mediaLibrary.filter(m => m.type === 'IMAGE').length === 0 ? (
+            <div
+              style={{
+                padding: '28px',
+                textAlign: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                borderRadius: '12px',
+                border: '1px dashed rgba(255, 255, 255, 0.12)',
+                color: '#9CA3AF'
+              }}
+            >
+              <ImageIcon size={32} style={{ margin: '0 auto 8px', color: '#6B7280' }} />
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF', marginBottom: '4px' }}>
+                No photos in Media Storage yet
               </div>
-            ) : (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                  gap: '14px'
-                }}
-              >
-                {mediaLibrary
-                  .filter(m => m.type === type)
-                  .map(item => {
-                    const isActive = mediaUrl.trim() === item.url.trim();
-                    return (
+              <div style={{ fontSize: '12px', color: '#6B7280', maxWidth: '420px', margin: '0 auto' }}>
+                Click &quot;+ Add Media&quot; above to select and upload multiple ad images. They will stay permanently available here.
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                gap: '14px'
+              }}
+            >
+              {mediaLibrary
+                .filter(m => m.type === 'IMAGE')
+                .map(item => {
+                  const isActive = type === 'IMAGE' && mediaUrl.trim() === item.url.trim();
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        backgroundColor: isActive ? 'rgba(245, 197, 24, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                        borderRadius: '12px',
+                        border: isActive ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.08)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
                       <div
-                        key={item.id}
                         style={{
-                          backgroundColor: isActive ? 'rgba(245, 197, 24, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-                          borderRadius: '12px',
-                          border: isActive ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.08)',
-                          overflow: 'hidden',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          transition: 'all 0.15s ease'
+                          height: '130px',
+                          backgroundColor: '#0A0A10',
+                          position: 'relative',
+                          overflow: 'hidden'
                         }}
                       >
-                        {/* Thumbnail / Preview */}
+                        <img
+                          src={item.url}
+                          alt={item.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                        {isActive && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '8px',
+                              right: '8px',
+                              backgroundColor: 'var(--brand-gold, #F5C518)',
+                              color: '#000000',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
+                            }}
+                          >
+                            <Check size={12} strokeWidth={3} />
+                            <span>ACTIVE PHOTO AD</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
+                        <div>
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              color: '#FFFFFF',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              marginBottom: '4px'
+                            }}
+                            title={item.name}
+                          >
+                            {item.name}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#6B7280' }}>
+                            {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Permanent'}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                          {isActive ? (
+                            <div
+                              style={{
+                                flex: 1,
+                                padding: '7px 8px',
+                                borderRadius: '6px',
+                                backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                                color: 'var(--brand-gold, #F5C518)',
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                textAlign: 'center'
+                              }}
+                            >
+                              Current Active Ad
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleSelectActiveMedia(item)}
+                              style={{
+                                flex: 1,
+                                padding: '7px 8px',
+                                borderRadius: '6px',
+                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                color: '#FFFFFF',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Use as Active Ad
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMedia(item.id, item.name)}
+                            title="Delete from library"
+                            style={{
+                              padding: '6px',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              color: '#EF4444',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+
+        {/* ========================================================================= */}
+        {/* CARD 2B: VIDEO AD MEDIA STORAGE                                          */}
+        {/* ========================================================================= */}
+        <div
+          style={{
+            backgroundColor: 'var(--bg-surface, #12121A)',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}
+        >
+          {/* Header & Add Media Action */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <VideoIcon size={18} color="var(--brand-gold, #F5C518)" />
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                  Video Ad Media Storage
+                </h3>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    color: '#9CA3AF'
+                  }}
+                >
+                  {mediaLibrary.filter(m => m.type === 'VIDEO').length} video(s) stored
+                </span>
+              </div>
+              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '4px 0 0' }}>
+                Store permanent video ads (MP4, WebM, MOV, M4V). Upload multiple videos at once. Click &quot;Use as Active Ad&quot; to activate without re-uploading.
+              </p>
+            </div>
+
+            <div>
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={handleVideoUpload}
+              />
+              <button
+                type="button"
+                onClick={() => videoInputRef.current?.click()}
+                disabled={libraryUploading}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 18px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(245, 197, 24, 0.18)',
+                  border: '1px solid var(--brand-gold, #F5C518)',
+                  color: 'var(--brand-gold, #F5C518)',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  cursor: libraryUploading ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(245, 197, 24, 0.2)'
+                }}
+              >
+                {libraryUploading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                <span>+ Add Media (Upload Videos)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Videos Grid */}
+          {loadingLibrary ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: '#9CA3AF' }}>
+              <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 8px' }} />
+              <span style={{ fontSize: '12px' }}>Loading video library...</span>
+            </div>
+          ) : mediaLibrary.filter(m => m.type === 'VIDEO').length === 0 ? (
+            <div
+              style={{
+                padding: '28px',
+                textAlign: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                borderRadius: '12px',
+                border: '1px dashed rgba(255, 255, 255, 0.12)',
+                color: '#9CA3AF'
+              }}
+            >
+              <VideoIcon size={32} style={{ margin: '0 auto 8px', color: '#6B7280' }} />
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF', marginBottom: '4px' }}>
+                No videos in Media Storage yet
+              </div>
+              <div style={{ fontSize: '12px', color: '#6B7280', maxWidth: '420px', margin: '0 auto' }}>
+                Click &quot;+ Add Media&quot; above to select and upload multiple ad videos. They will stay permanently available here.
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                gap: '14px'
+              }}
+            >
+              {mediaLibrary
+                .filter(m => m.type === 'VIDEO')
+                .map(item => {
+                  const isActive = type === 'VIDEO' && mediaUrl.trim() === item.url.trim();
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        backgroundColor: isActive ? 'rgba(245, 197, 24, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                        borderRadius: '12px',
+                        border: isActive ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.08)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: '130px',
+                          backgroundColor: '#0A0A10',
+                          position: 'relative',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        <video
+                          src={item.url}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
                         <div
                           style={{
-                            height: '120px',
-                            backgroundColor: '#0A0A10',
-                            position: 'relative',
+                            position: 'absolute',
+                            inset: 0,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            overflow: 'hidden'
+                            backgroundColor: 'rgba(0, 0, 0, 0.3)'
                           }}
                         >
-                          {item.type === 'IMAGE' ? (
-                            <img
-                              src={item.url}
-                              alt={item.name}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', color: '#9CA3AF' }}>
-                              <VideoIcon size={32} color="var(--brand-gold, #F5C518)" />
-                              <span style={{ fontSize: '11px', fontWeight: 600 }}>Video Ad Asset</span>
-                            </div>
-                          )}
-
-                          {/* Active Badge */}
-                          {isActive && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: '8px',
-                                right: '8px',
-                                backgroundColor: 'var(--brand-gold, #F5C518)',
-                                color: '#000000',
-                                padding: '3px 8px',
-                                borderRadius: '6px',
-                                fontSize: '10px',
-                                fontWeight: 800,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
-                              }}
-                            >
-                              <Check size={12} strokeWidth={3} />
-                              <span>ACTIVE AD</span>
-                            </div>
-                          )}
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--brand-gold, #F5C518)',
+                              border: '1px solid rgba(245, 197, 24, 0.4)'
+                            }}
+                          >
+                            <Play size={16} style={{ marginLeft: '2px' }} />
+                          </div>
                         </div>
 
-                        {/* Details & Actions */}
-                        <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
-                          <div>
+                        {isActive && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '8px',
+                              right: '8px',
+                              backgroundColor: 'var(--brand-gold, #F5C518)',
+                              color: '#000000',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                              zIndex: 2
+                            }}
+                          >
+                            <Check size={12} strokeWidth={3} />
+                            <span>ACTIVE VIDEO AD</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
+                        <div>
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              color: '#FFFFFF',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              marginBottom: '4px'
+                            }}
+                            title={item.name}
+                          >
+                            {item.name}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#6B7280' }}>
+                            {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Permanent'}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                          {isActive ? (
                             <div
                               style={{
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                color: '#FFFFFF',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                marginBottom: '4px'
+                                flex: 1,
+                                padding: '7px 8px',
+                                borderRadius: '6px',
+                                backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                                color: 'var(--brand-gold, #F5C518)',
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                textAlign: 'center'
                               }}
-                              title={item.name}
                             >
-                              {item.name}
+                              Current Active Ad
                             </div>
-                            <div style={{ fontSize: '11px', color: '#6B7280' }}>
-                              {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Stored'}
-                            </div>
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
-                            {isActive ? (
-                              <div
-                                style={{
-                                  flex: 1,
-                                  padding: '6px 8px',
-                                  borderRadius: '6px',
-                                  backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                                  color: 'var(--brand-gold, #F5C518)',
-                                  fontSize: '11px',
-                                  fontWeight: 800,
-                                  textAlign: 'center'
-                                }}
-                              >
-                                Selected Active
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleSelectActiveMedia(item)}
-                                style={{
-                                  flex: 1,
-                                  padding: '6px 8px',
-                                  borderRadius: '6px',
-                                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                                  color: '#FFFFFF',
-                                  fontSize: '11px',
-                                  fontWeight: 700,
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Set as Active {item.type === 'IMAGE' ? 'Photo' : 'Video'}
-                              </button>
-                            )}
-
+                          ) : (
                             <button
                               type="button"
-                              onClick={() => handleDeleteMedia(item.id, item.name)}
-                              title="Delete from library"
+                              onClick={() => handleSelectActiveMedia(item)}
                               style={{
-                                padding: '6px',
+                                flex: 1,
+                                padding: '7px 8px',
                                 borderRadius: '6px',
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                border: '1px solid rgba(239, 68, 68, 0.25)',
-                                color: '#EF4444',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
+                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                color: '#FFFFFF',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer'
                               }}
                             >
-                              <Trash2 size={13} />
+                              Use as Active Ad
                             </button>
-                          </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMedia(item.id, item.name)}
+                            title="Delete from library"
+                            style={{
+                              padding: '6px',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              color: '#EF4444',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
                         </div>
                       </div>
-                    );
-                  })}
-              </div>
-            )}
-          </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
 
         {/* CARD 3: DURATION & SKIP TIMERS */}

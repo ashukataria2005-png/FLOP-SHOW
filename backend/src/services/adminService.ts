@@ -920,7 +920,11 @@ export const adminService = {
 
   async addAdMediaItems(items: Array<{ type: 'IMAGE' | 'VIDEO'; url: string; name: string; size?: number; mimeType?: string }>): Promise<AdMediaItem[]> {
     const library = await this.getAdMediaLibrary();
-    const newEntries: AdMediaItem[] = items.map(item => ({
+    // Avoid duplicate entries for the exact same media URL
+    const existingUrls = new Set(library.map(i => i.url.trim()));
+    const toAdd = items.filter(item => !existingUrls.has(item.url.trim()));
+
+    const newEntries: AdMediaItem[] = toAdd.map(item => ({
       id: `ad-media-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       type: item.type,
       url: item.url,

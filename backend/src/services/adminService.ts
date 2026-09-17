@@ -526,6 +526,11 @@ export const adminService = {
     if (updates.trailer_url === undefined && anyUpdates.trailerUrl !== undefined) {
       updates.trailer_url = anyUpdates.trailerUrl;
     }
+    if (updates.trailer_url === '' || updates.trailer_url === null) {
+      updates.trailer_url = null;
+      const db = getAdapter();
+      await db.run('UPDATE media SET is_active = 0 WHERE content_id = ? AND media_type = ?;', [existing.id, 'TRAILER']);
+    }
     if (updates.video_url === undefined && anyUpdates.videoUrl !== undefined) {
       updates.video_url = anyUpdates.videoUrl;
     }

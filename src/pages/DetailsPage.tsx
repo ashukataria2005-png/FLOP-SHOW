@@ -278,14 +278,16 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
             </button>
 
             {/* Watch Trailer CTA */}
-            <button
-              onClick={() => playTrailer(currentItem)}
-              className="btn btn-secondary btn-lg"
-              style={{ minWidth: '150px' }}
-            >
-              <Video size={18} color="var(--brand-gold)" />
-              <span>Watch Trailer</span>
-            </button>
+            {Boolean(currentItem.trailerUrl) && (
+              <button
+                onClick={() => playTrailer(currentItem)}
+                className="btn btn-secondary btn-lg"
+                style={{ minWidth: '150px' }}
+              >
+                <Video size={18} color="var(--brand-gold)" />
+                <span>Watch Trailer</span>
+              </button>
+            )}
 
             <button
               onClick={() => toggleMyList(currentItem.id)}

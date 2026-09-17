@@ -18,5 +18,6 @@ export interface WatchProgress {
   episodeId?: string;
   seasonNumber?: number;
   episodeNumber?: number;
+  completed?: boolean;
   updatedAt: string;
 }

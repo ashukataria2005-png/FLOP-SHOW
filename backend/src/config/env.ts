@@ -2,8 +2,11 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 
-// Load .env from project root
+// Load .env from project root or parent directory if in backend
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+if (fs.existsSync(path.resolve(process.cwd(), '..', '.env'))) {
+  dotenv.config({ path: path.resolve(process.cwd(), '..', '.env') });
+}
 
 const rawPort = process.env.PORT;
 const parsedPort = rawPort ? parseInt(rawPort, 10) : 5000;

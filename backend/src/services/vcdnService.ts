@@ -72,14 +72,15 @@ export class VcdnService {
    * Step 1: Initialize an upload session on VCDN
    * POST https://cdn.vcdn.me/api/v1/upload/init
    */
-  async initUpload(params: { filename: string; title: string }): Promise<VcdnInitResponse> {
+  async initUpload(params: { filename: string; title: string; size: number }): Promise<VcdnInitResponse> {
     const url = `${VCDN_BASE_URL}/api/v1/upload/init`;
     const res = await fetch(url, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({
         filename: params.filename,
-        title: params.title || params.filename
+        title: params.title || params.filename,
+        size: params.size
       })
     });
 
@@ -128,6 +129,7 @@ export class VcdnService {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({
+        uploadId: uploadId,
         upload_id: uploadId
       })
     });
@@ -237,7 +239,8 @@ export class VcdnService {
     // 1. Initialize upload session
     const init = await this.initUpload({
       filename: originalName,
-      title: cleanTitle
+      title: cleanTitle,
+      size: fileSize
     });
 
     const uploadId = init.uploadId;

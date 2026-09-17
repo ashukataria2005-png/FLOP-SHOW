@@ -237,6 +237,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
           // Sync wallet transactions from backend
           syncTransactions();
+
+          // Sync watch progress from backend
+          syncProgressFromBackend();
         }
       }).catch(async (err: any) => {
         const isAuthRejection = err?.status === 401 || err?.code === 'INVALID_TOKEN' || err?.code === 'UNAUTHORIZED';
@@ -418,6 +421,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }).catch(() => { /* keep the empty reset */ });
     // Sync wallet transactions
     syncTransactions();
+    // Sync watch progress from backend
+    syncProgressFromBackend();
   };
 
   const signup = (userId: string, name: string, email: string, serverWalletBalance?: number) => {
@@ -483,6 +488,46 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     } catch {
       // Keep existing transactions in state if network is unavailable
+    }
+  };
+
+  // Sync watch progress from backend database and merge with local state
+  const syncProgressFromBackend = async () => {
+    try {
+      const records = await api.library.getAllProgress();
+      if (records && Array.isArray(records)) {
+        const serverProgress: WatchProgress[] = records.map((r: any) => ({
+          contentId: r.content_id || r.contentId,
+          contentType: r.episode_id ? 'series' : 'movie',
+          title: r.title || '',
+          posterUrl: r.poster || '',
+          percent: typeof r.progress_percent === 'number' ? r.progress_percent : 0,
+          currentTime: typeof r.current_time_seconds === 'number' ? r.current_time_seconds : 0,
+          duration: typeof r.duration_seconds === 'number' ? r.duration_seconds : 0,
+          episodeId: r.episode_id || undefined,
+          completed: Boolean(r.completed === 1 || r.completed === true || r.progress_percent >= 90),
+          updatedAt: r.updated_at || formatCurrentDate()
+        }));
+
+        setWatchProgress(prev => {
+          const map = new Map<string, WatchProgress>();
+          const makeKey = (p: WatchProgress) => `${p.contentId}:${p.episodeId || 'movie'}`;
+
+          for (const item of serverProgress) {
+            map.set(makeKey(item), item);
+          }
+          for (const item of prev) {
+            const key = makeKey(item);
+            const existing = map.get(key);
+            if (!existing || new Date(item.updatedAt).getTime() >= new Date(existing.updatedAt).getTime()) {
+              map.set(key, item);
+            }
+          }
+          return Array.from(map.values());
+        });
+      }
+    } catch {
+      // Keep cached progress if offline
     }
   };
 
@@ -627,18 +672,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // Watch Progress
+  // Watch Progress (Null-Safe Movie vs Episode Specific)
   const getProgress = (contentId: string, episodeId?: string): WatchProgress | undefined => {
     if (episodeId) {
       return watchProgress.find(p => p.contentId === contentId && p.episodeId === episodeId)
         || watchProgress.find(p => p.episodeId === episodeId);
     }
+    // For movie or overall series:
+    // If movie entry exists (no episodeId), return it
+    const movieEntry = watchProgress.find(p => p.contentId === contentId && !p.episodeId);
+    if (movieEntry) return movieEntry;
+    // Otherwise return the latest progress for this content (e.g. series most recent episode)
     return watchProgress.find(p => p.contentId === contentId);
   };
 
   const saveWatchProgress = (progressData: Omit<WatchProgress, 'updatedAt'>) => {
+    const isCompleted = progressData.completed !== undefined
+      ? progressData.completed
+      : (progressData.percent >= 90);
+
     const entry: WatchProgress = {
       ...progressData,
+      completed: isCompleted,
       updatedAt: formatCurrentDate()
     };
 
@@ -647,7 +702,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (progressData.episodeId) {
           return !(p.contentId === progressData.contentId && p.episodeId === progressData.episodeId);
         }
-        return p.contentId !== progressData.contentId;
+        return !(p.contentId === progressData.contentId && !p.episodeId);
       });
       return [entry, ...filtered];
     });
@@ -713,9 +768,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
         }
 
-        const existingProgress = getProgress(content.id);
-        if (existingProgress?.episodeId && content.seasons) {
-          ep = content.seasons.flatMap(s => s.episodes).find(e => e.id === existingProgress.episodeId);
+        // Select the episode from progress: prioritize the latest in-progress episode
+        const seriesProgress = watchProgress.filter(p => p.contentId === content.id && p.episodeId);
+        const activeEpProgress = seriesProgress.find(p => !p.completed && (p.percent || 0) < 90) || seriesProgress[0];
+        if (activeEpProgress?.episodeId && content.seasons) {
+          ep = content.seasons.flatMap(s => s.episodes).find(e => e.id === activeEpProgress.episodeId);
         }
         if (!ep && content.seasons && content.seasons.length > 0) {
           for (const s of content.seasons) {
@@ -809,6 +866,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const resolvedUrl = resolveMediaUrl(sourceUrl, API_BASE_URL);
     const progress = ep ? getProgress(content.id, ep.id) : getProgress(content.id);
 
+    // If item was already completed (>= 90%), restart from beginning (0s); otherwise resume exact position
+    const resumeTime = (progress && !progress.completed && (progress.percent || 0) < 90) ? (progress.currentTime || 0) : 0;
+
     setActiveMediaSource({
       title: content.title,
       subtitle,
@@ -817,7 +877,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       poster: ep?.thumbnailUrl || content.backdropUrl || content.posterUrl,
       contentId: content.id,
       episodeId,
-      initialTimeSeconds: progress?.currentTime || 0,
+      initialTimeSeconds: resumeTime,
       vcdnStatus: activeVcdnStatus || (content as any)?.vcdnStatus
     });
   };

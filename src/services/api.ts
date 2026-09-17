@@ -582,6 +582,11 @@ export const api = {
       });
     },
 
+    async getAllProgress() {
+      const data = await request<{ count: number; progress: any[] }>('/library/progress');
+      return data.progress;
+    },
+
     async getProgress(contentId: string, episodeId?: string) {
       const epParam = episodeId ? `?episodeId=${episodeId}` : '';
       const data = await request<{ progress: any }>(`/library/progress/${contentId}${epParam}`);

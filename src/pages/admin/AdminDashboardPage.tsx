@@ -192,6 +192,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   // Quick Action navigation cards
   const quickNavItems = [
     {
+      label: 'Hero Banner',
+      desc: 'Configure Discover page top hero',
+      action: () => onNavigateTab('admin-hero'),
+      icon: Crown,
+      color: '#EC4899'
+    },
+    {
       label: 'Trending #1 Showcase',
       desc: stats.currentTrending1
         ? `#1: ${stats.currentTrending1.title} (${stats.currentTrending1.type}) • Manage in Catalog`
@@ -227,13 +234,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       action: () => onNavigateTab('admin-upi-settings'),
       icon: Wallet,
       color: '#F5C518'
-    },
-    {
-      label: 'Hero Banner',
-      desc: 'Configure Discover page top hero',
-      action: () => onNavigateTab('admin-hero'),
-      icon: Crown,
-      color: '#EC4899'
     },
     {
       label: 'Cinematic Spotlight',

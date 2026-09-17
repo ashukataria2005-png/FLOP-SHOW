@@ -56,10 +56,27 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
   // Home Hero: dedicated hero item set by admin, or first featured item
   const heroItem = activeCatalog.find(item => item.isHero) || dedicatedHero || undefined;
 
-  // ── In-progress: items currently being watched ──────────────────────────────
-  const inProgressItems = watchProgress
-    .map(wp => activeCatalog.find(item => item.id === wp.contentId))
-    .filter((item): item is ContentItem => item !== undefined);
+  // ── In-progress: items currently being watched (with completion threshold & deduplication) ───
+  const inProgressItems = React.useMemo(() => {
+    const activeProgress = watchProgress.filter(wp => {
+      const isCompleted = Boolean(wp.completed || (typeof wp.percent === 'number' && wp.percent >= 90));
+      const hasStarted = typeof wp.currentTime === 'number' && wp.currentTime > 2;
+      return !isCompleted && hasStarted;
+    });
+
+    const seenContentIds = new Set<string>();
+    const result: ContentItem[] = [];
+    for (const wp of activeProgress) {
+      if (!seenContentIds.has(wp.contentId)) {
+        seenContentIds.add(wp.contentId);
+        const item = activeCatalog.find(c => c.id === wp.contentId);
+        if (item) {
+          result.push(item);
+        }
+      }
+    }
+    return result;
+  }, [watchProgress, activeCatalog]);
 
   // ── Trending: Trending #1 first, then others ────────────────────────────────
   const trending1 = activeCatalog.find(c => c.trendingPosition === 1);

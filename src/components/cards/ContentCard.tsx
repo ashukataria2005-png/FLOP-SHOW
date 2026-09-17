@@ -119,7 +119,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, onSelect, width 
         </div>
 
         {/* Watch progress indicator bar at the bottom of the poster */}
-        {progress && progress.percent > 0 && (
+        {progress && progress.percent > 0 && !progress.completed && progress.percent < 90 && (
           <div
             style={{
               position: 'absolute',

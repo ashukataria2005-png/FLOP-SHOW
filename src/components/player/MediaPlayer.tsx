@@ -118,6 +118,13 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     return () => { active = false; };
   }, [source?.contentId, source?.episodeId, source?.mediaType]);
 
+  const hasSeekedRef = useRef(false);
+  const sourceRef = useRef(source);
+  useEffect(() => {
+    sourceRef.current = source;
+    hasSeekedRef.current = false;
+  }, [source?.url, source?.contentId, source?.episodeId]);
+
   // Reset player state whenever the source URL changes
   useEffect(() => {
     if (!source?.url) return;
@@ -128,42 +135,63 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     setIsPlaying(false);
   }, [source?.url]);
 
+  const seekToInitialTime = useCallback((vid: HTMLVideoElement) => {
+    const target = sourceRef.current?.initialTimeSeconds;
+    if (typeof target === 'number' && target > 1 && !hasSeekedRef.current) {
+      hasSeekedRef.current = true;
+      try {
+        vid.currentTime = target;
+        setCurrentTime(target);
+      } catch (err) {
+        console.warn('[Player] Initial seek failed:', err);
+      }
+    }
+  }, []);
+
   // Sync watch progress to backend & local context
   const recordProgress = useCallback((curTime: number, durTime: number) => {
-    if (!source || !source.contentId || source.mediaType === 'TRAILER' || durTime <= 0) return;
+    const curSource = sourceRef.current;
+    if (!curSource || !curSource.contentId || curSource.mediaType === 'TRAILER' || durTime <= 0) return;
+
+    // Guard against overwriting an existing saved position on initial unbuffered mount
+    if (curTime < 1 && curSource.initialTimeSeconds && curSource.initialTimeSeconds > 2) {
+      return;
+    }
 
     const percent = Math.min(100, Math.round((curTime / durTime) * 100));
+    const isCompleted = percent >= 90;
 
     // Save to local context & storage
     saveWatchProgress({
-      contentId: source.contentId,
-      contentType: source.episodeId ? 'series' : 'movie',
-      title: source.title,
-      posterUrl: source.poster || '',
+      contentId: curSource.contentId,
+      contentType: curSource.episodeId ? 'series' : 'movie',
+      title: curSource.title,
+      posterUrl: curSource.poster || '',
       percent,
       currentTime: Math.round(curTime),
       duration: Math.round(durTime),
-      episodeId: source.episodeId
+      episodeId: curSource.episodeId,
+      completed: isCompleted
     });
 
     // Save to backend database API
     api.library.saveProgress({
-      contentId: source.contentId,
-      episodeId: source.episodeId,
+      contentId: curSource.contentId,
+      episodeId: curSource.episodeId,
       progressPercent: percent,
       currentTimeSeconds: Math.round(curTime),
       durationSeconds: Math.round(durTime)
     }).catch(() => {
       // Background sync, suppress transient offline errors
     });
-  }, [source, saveWatchProgress]);
+  }, [saveWatchProgress]);
 
   // Periodic watch progress interval (every 5 seconds)
   useEffect(() => {
     const isYT = source ? parseYouTubeUrl(source.url).isYouTube : false;
     if (!isYT && isPlaying) {
       progressIntervalRef.current = window.setInterval(() => {
-        if (videoRef.current) {
+        if (videoRef.current && videoRef.current.duration > 0) {
           recordProgress(videoRef.current.currentTime, videoRef.current.duration);
         }
       }, 5000);
@@ -176,16 +204,71 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     };
   }, [isPlaying, source, recordProgress]);
 
-  // Save progress on unmount / close
+  // Save progress on unmount / close and tab unload
   useEffect(() => {
-    return () => {
-      const isYT = source ? parseYouTubeUrl(source.url).isYouTube : false;
-      if (videoRef.current && !isYT) {
-        recordProgress(videoRef.current.currentTime, videoRef.current.duration);
+    const handleSaveOnExit = () => {
+      const vid = videoRef.current;
+      const curSource = sourceRef.current;
+      if (vid && curSource && curSource.mediaType !== 'TRAILER' && vid.duration > 0 && vid.currentTime > 1) {
+        recordProgress(vid.currentTime, vid.duration);
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleSaveOnExit();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleSaveOnExit);
+    window.addEventListener('pagehide', handleSaveOnExit);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      handleSaveOnExit();
+      window.removeEventListener('beforeunload', handleSaveOnExit);
+      window.removeEventListener('pagehide', handleSaveOnExit);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [recordProgress]);
+
+  // Poll VCDN transcoding status if video is PROCESSING
+  useEffect(() => {
+    if (!source || source.vcdnStatus !== 'PROCESSING' || !source.contentId) return;
+
+    let active = true;
+    const interval = setInterval(async () => {
+      try {
+        const mediaRes = source.episodeId
+          ? await api.media.getEpisodeMedia(source.episodeId, 'MAIN')
+          : await api.media.getContentMedia(source.contentId!, 'MAIN');
+
+        if (!active) return;
+        const newStatus = (mediaRes as any)?.vcdnStatus;
+        if (newStatus === 'READY' && mediaRes?.url) {
+          if (videoRef.current) {
+            if (hlsRef.current) {
+              hlsRef.current.loadSource(mediaRes.url);
+              hlsRef.current.startLoad();
+            } else {
+              videoRef.current.src = mediaRes.url;
+              videoRef.current.load();
+            }
+            videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+          }
+          setIsLoading(false);
+          clearInterval(interval);
+        }
+      } catch {
+        // Continue polling
+      }
+    }, 6000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [source?.contentId, source?.episodeId, source?.vcdnStatus]);
 
   // Initialize video stream: Adaptive HLS via hls.js or native HTML5 video
   useEffect(() => {
@@ -216,9 +299,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
         setErrorMessage(null);
-        if (source.initialTimeSeconds && source.initialTimeSeconds > 5) {
-          video.currentTime = source.initialTimeSeconds;
-        }
+        seekToInitialTime(video);
         video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
       });
 
@@ -416,6 +497,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     const target = Math.max(0, Math.min(duration, videoRef.current.currentTime + seconds));
     videoRef.current.currentTime = target;
     setCurrentTime(target);
+    recordProgress(target, duration);
   };
 
   const toggleMute = () => {
@@ -534,6 +616,37 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
               </div>
             </div>
           )}
+          {source.vcdnStatus === 'FAILED' && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '72px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 35,
+                backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                border: '1px solid rgba(239, 68, 68, 0.5)',
+                backdropFilter: 'blur(12px)',
+                borderRadius: '12px',
+                padding: '12px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                maxWidth: '90%',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)'
+              }}
+            >
+              <AlertCircle size={20} color="#EF4444" style={{ flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#EF4444' }}>
+                  VCDN Transcoding Notice
+                </div>
+                <div style={{ fontSize: '12px', color: '#D1D5DB' }}>
+                  Adaptive stream processing encountered an issue. Playback will fall back to direct media stream if available.
+                </div>
+              </div>
+            </div>
+          )}
           <video
             ref={videoRef}
             poster={source.poster}
@@ -552,9 +665,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
               if (!videoRef.current) return;
               const vid = videoRef.current;
               setDuration(vid.duration);
-              if (source.initialTimeSeconds && source.initialTimeSeconds > 5) {
-                vid.currentTime = source.initialTimeSeconds;
-              }
+              seekToInitialTime(vid);
               setIsLoading(false);
               setErrorMessage(null);
               vid.play()
@@ -566,7 +677,10 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
                   setIsPlaying(false);
                 });
             }}
-            onCanPlay={() => setIsLoading(false)}
+            onCanPlay={() => {
+              if (videoRef.current) seekToInitialTime(videoRef.current);
+              setIsLoading(false);
+            }}
             onWaiting={() => setIsLoading(true)}
             onStalled={() => setIsLoading(true)}
             onPlaying={() => {
@@ -574,7 +688,17 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
               setIsPlaying(true);
               setErrorMessage(null);
             }}
-            onPause={() => setIsPlaying(false)}
+            onPause={() => {
+              setIsPlaying(false);
+              if (videoRef.current && videoRef.current.duration > 0) {
+                recordProgress(videoRef.current.currentTime, videoRef.current.duration);
+              }
+            }}
+            onSeeked={() => {
+              if (videoRef.current && videoRef.current.duration > 0) {
+                recordProgress(videoRef.current.currentTime, videoRef.current.duration);
+              }
+            }}
             onError={() => {
               setIsLoading(false);
               setIsPlaying(false);

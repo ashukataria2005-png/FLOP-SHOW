@@ -206,44 +206,54 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
         )}
       </div>
 
-      {/* Brand Wordmark: continuous track translation with coordinated progressive letter-by-letter absorption */}
-      <span
-        className={animated ? 'cinematic-wordmark-track' : undefined}
+      {/* Brand Wordmark Viewport: provides physical light cone clipping during projector emergence */}
+      <div
+        className={animated ? 'cinematic-wordmark-viewport' : undefined}
         style={{
-          fontFamily: "'Outfit', sans-serif",
-          fontWeight: 800,
-          fontSize: fontSizes[size],
-          letterSpacing: '0.08em',
-          lineHeight: 1,
           position: 'relative',
-          zIndex: 4,
           display: 'inline-flex',
           alignItems: 'center',
-          whiteSpace: 'nowrap',
-          overflow: 'visible'
+          overflow: 'visible',
+          zIndex: 4
         }}
       >
-        {animated ? (
-          LETTERS.map((item, idx) => (
-            <span
-              key={idx}
-              className={`cinematic-letter cinematic-letter-${idx}`}
-              style={{
-                color: item.color,
-                display: 'inline-block',
-                position: 'relative',
-                overflow: 'visible'
-              }}
-            >
-              {item.char}
-            </span>
-          ))
-        ) : (
-          <>
-            FLOP<span style={{ color: 'var(--brand-gold, #F5A623)' }}>SHOW</span>
-          </>
-        )}
-      </span>
+        <span
+          className={animated ? 'cinematic-wordmark-track' : undefined}
+          style={{
+            fontFamily: "'Outfit', sans-serif",
+            fontWeight: 800,
+            fontSize: fontSizes[size],
+            letterSpacing: '0.08em',
+            lineHeight: 1,
+            position: 'relative',
+            display: 'inline-flex',
+            alignItems: 'center',
+            whiteSpace: 'nowrap',
+            overflow: 'visible'
+          }}
+        >
+          {animated ? (
+            LETTERS.map((item, idx) => (
+              <span
+                key={idx}
+                className={`cinematic-letter cinematic-letter-${idx}`}
+                style={{
+                  color: item.color,
+                  display: 'inline-block',
+                  position: 'relative',
+                  overflow: 'visible'
+                }}
+              >
+                {item.char}
+              </span>
+            ))
+          ) : (
+            <>
+              FLOP<span style={{ color: 'var(--brand-gold, #F5A623)' }}>SHOW</span>
+            </>
+          )}
+        </span>
+      </div>
 
       {animated && (
         <style>{`
@@ -358,7 +368,40 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             }
           }
 
-          /* 3. CONTINUOUS WORDMARK TRACK:
+          /* 3. WORDMARK VIEWPORT CONICAL BEAM CLIPPER:
+             - Fully unclipped during rest and absorption into logo
+             - During emergence (51.0% to 71.0%), confines the visible wordmark strictly within
+               the expanding V-shaped light beam cone originating from the lens opening */
+          .cinematic-wordmark-viewport {
+            animation: cinematicWordmarkViewport 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            will-change: clip-path;
+          }
+
+          @keyframes cinematicWordmarkViewport {
+            /* 1. Fully open during initial rest, magnetic pull, and letter absorption */
+            0%, 48.0% {
+              clip-path: polygon(-60px -60px, 320px -60px, 320px 80px, -60px 80px);
+            }
+            48.1%, 50.8% {
+              clip-path: polygon(-60px -60px, 320px -60px, 320px 80px, -60px 80px);
+            }
+            /* 2. EMERGENCE: Originates as a tight slit centered on the camera lens opening,
+               then continuously spreads outward into the full V-shaped projector cone */
+            51.0% {
+              clip-path: polygon(-14px 11.75px, -8px 11.75px, -8px 15.75px, -14px 15.75px);
+              animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+            }
+            71.0% {
+              clip-path: polygon(-14px 11.75px, 200px -20px, 200px 48px, -14px 15.75px);
+              animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            /* 3. Fully unclipped as projector beam fades, settling into crisp default state */
+            74.0%, 100% {
+              clip-path: polygon(-60px -60px, 320px -60px, 320px 80px, -60px 80px);
+            }
+          }
+
+          /* 4. CONTINUOUS WORDMARK TRACK:
              - Absorption: uniform continuous pull carrying letters directly toward the exact logo center (-30px)
              - Emergence: ONE single continuous unbroken curve from lens center origin to resting position,
                ZERO intermediate stops, plateaus, or hesitations */
@@ -384,36 +427,36 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
               animation-timing-function: step-end;
             }
             /* 3. Swallowed & hidden inside logo/camera */
-            38.1%, 53.9% {
+            38.1%, 50.9% {
               opacity: 0;
-              transform: translate(var(--emerge-x, -14px), var(--emerge-y, 3.75px)) scale(0.03);
+              transform: translate(var(--emerge-x, -14px), var(--emerge-y, 3.75px)) scale(0.02);
               filter: drop-shadow(0 0 14px #FFE082) brightness(1.5);
             }
             /* 4. EMERGENCE: ONE SINGLE CONTINUOUS UNBROKEN MOTION
-               Starts as a tiny seed at the EXACT lens aperture center, inside the yellow beam.
-               Smoothly and continuously expands and glides forward into its final position.
-               Zero intermediate keyframes, zero pause, zero stutter, zero hesitation. */
-            54.0% {
+               Starts at 51.0% at the EXACT lens aperture center, inside the expanding yellow beam.
+               Expands proportionally and glides forward continuously into its resting position.
+               Zero pause, zero hesitation, zero stutter, zero snap. */
+            51.0% {
               opacity: 1;
-              transform: translate(var(--emerge-x, -14px), var(--emerge-y, 3.75px)) scale(0.03);
-              filter: drop-shadow(0 0 12px #FFE082) brightness(1.35);
-              animation-timing-function: cubic-bezier(0.2, 0.85, 0.32, 1);
+              transform: translate(var(--emerge-x, -14px), var(--emerge-y, 3.75px)) scale(0.02);
+              filter: drop-shadow(0 0 10px #FFE082) brightness(1.35);
+              animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
             }
-            72.5% {
+            71.0% {
               opacity: 1;
               transform: translate(0px, 0px) scale(1.0);
               filter: drop-shadow(0 0 4px rgba(245, 166, 35, 0.25)) brightness(1.03);
               animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
             }
             /* 5. Subtle settling into crisp default state as projector beam fades */
-            77.0%, 100% {
+            76.0%, 100% {
               opacity: 1;
               transform: translate(0px, 0px) scale(1.0);
               filter: none;
             }
           }
 
-          /* 4. PROGRESSIVE PER-LETTER COMPRESSION INTO EXACT LOGO CENTRE (-30px):
+          /* 5. PROGRESSIVE PER-LETTER COMPRESSION INTO EXACT LOGO CENTRE (-30px):
              - Each letter stays 100% full-sized (scale: 1) until it enters the logo attraction zone.
              - As it travels toward the logo center (-30px), ONLY THAT LEADING LETTER progressively compresses horizontally.
              - Letters behind remain completely normal sized until their turn.
@@ -431,8 +474,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             0%, 22.0% { opacity: 1; transform: scaleX(1) scaleY(1); }
             22.8% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
             23.4% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            23.9%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            54.0%, 100% { opacity: 1; transform: scale(1); }
+            23.9%, 50.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            51.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
           /* Letter 1: 'L' (starts at 14.1px -> enters zone at 24.0% -> absorbed at exact centre at 25.8%) */
@@ -441,8 +484,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             0%, 24.0% { opacity: 1; transform: scaleX(1) scaleY(1); }
             24.7% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
             25.3% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            25.8%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            54.0%, 100% { opacity: 1; transform: scale(1); }
+            25.8%, 50.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            51.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
           /* Letter 2: 'O' (starts at 27.2px -> enters zone at 25.9% -> absorbed at exact centre at 27.5%) */
@@ -451,8 +494,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             0%, 25.9% { opacity: 1; transform: scaleX(1) scaleY(1); }
             26.5% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
             27.0% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            27.5%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            54.0%, 100% { opacity: 1; transform: scale(1); }
+            27.5%, 50.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            51.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
           /* Letter 3: 'P' (starts at 44.3px -> enters zone at 27.8% -> absorbed at exact centre at 29.7%) */
@@ -461,8 +504,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             0%, 27.8% { opacity: 1; transform: scaleX(1) scaleY(1); }
             28.5% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
             29.1% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            29.7%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            54.0%, 100% { opacity: 1; transform: scale(1); }
+            29.7%, 50.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            51.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
           /* Letter 4: 'S' (starts at 59.4px -> enters zone at 29.9% -> absorbed at exact centre at 31.7%) */
@@ -471,8 +514,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             0%, 29.9% { opacity: 1; transform: scaleX(1) scaleY(1); }
             30.6% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
             31.2% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            31.7%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            54.0%, 100% { opacity: 1; transform: scale(1); }
+            31.7%, 50.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            51.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
           /* Letter 5: 'H' (starts at 74.0px -> enters zone at 31.8% -> absorbed at exact centre at 33.6%) */
@@ -481,8 +524,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             0%, 31.8% { opacity: 1; transform: scaleX(1) scaleY(1); }
             32.5% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
             33.1% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            33.6%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            54.0%, 100% { opacity: 1; transform: scale(1); }
+            33.6%, 50.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            51.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
           /* Letter 6: 'O' (starts at 90.6px -> enters zone at 33.8% -> absorbed at exact centre at 35.7%) */
@@ -491,8 +534,8 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             0%, 33.8% { opacity: 1; transform: scaleX(1) scaleY(1); }
             34.5% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
             35.1% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            35.7%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            54.0%, 100% { opacity: 1; transform: scale(1); }
+            35.7%, 50.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            51.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
           /* Letter 7: 'W' (starts at 107.7px -> enters zone at 35.9% -> absorbed at exact centre at 38.0%) */
@@ -501,11 +544,11 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             0%, 35.9% { opacity: 1; transform: scaleX(1) scaleY(1); }
             36.7% { opacity: 0.95; transform: scaleX(0.7) scaleY(0.92); }
             37.4% { opacity: 0.8; transform: scaleX(0.35) scaleY(0.8); }
-            38.0%, 53.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
-            54.0%, 100% { opacity: 1; transform: scale(1); }
+            38.0%, 50.9% { opacity: 0; transform: scaleX(0.02) scaleY(0.1); }
+            51.0%, 100% { opacity: 1; transform: scale(1); }
           }
 
-          /* 5. VINTAGE MOVIE CAMERA */
+          /* 6. VINTAGE MOVIE CAMERA */
           .cinematic-camera-logo {
             animation: cinematicCameraLogo 12.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
             transform-origin: center center;
@@ -553,7 +596,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             }
           }
 
-          /* 6. LENS FOCAL FLARE: Origin centered exactly at camera lens opening */
+          /* 7. LENS FOCAL FLARE: Origin centered exactly at camera lens opening */
           .cinematic-lens-flare {
             position: absolute;
             width: 10px;
@@ -573,11 +616,11 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
               opacity: 0;
               transform: scale(0.2);
             }
-            51.0%, 70.0% {
+            50.0%, 71.0% {
               opacity: 1;
               transform: scale(1);
             }
-            73.0%, 76.0% {
+            73.5%, 76.0% {
               opacity: 0;
               transform: scale(0.2);
             }
@@ -587,7 +630,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             }
           }
 
-          /* 7. V-SHAPED PROJECTOR BEAM: Originates precisely from the center of the lens glass */
+          /* 8. V-SHAPED PROJECTOR BEAM: Originates precisely from the center of the lens glass */
           .cinematic-projector-beam {
             position: absolute;
             transform: translateY(-50%);
@@ -611,21 +654,27 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
           }
 
           @keyframes cinematicBeam {
-            0%, 47.0% {
+            0%, 48.0% {
               opacity: 0;
-              transform: translateY(-50%) scaleX(0.05);
+              transform: translateY(-50%) scaleX(0.04);
             }
-            51.0%, 70.0% {
+            50.5% {
               opacity: 0.95;
-              transform: translateY(-50%) scaleX(1);
+              transform: translateY(-50%) scaleX(0.04);
+              animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
             }
-            73.0%, 76.0% {
+            71.0% {
+              opacity: 0.95;
+              transform: translateY(-50%) scaleX(1.0);
+              animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            73.5%, 76.0% {
               opacity: 0;
-              transform: translateY(-50%) scaleX(0.85);
+              transform: translateY(-50%) scaleX(0.9);
             }
             76.1%, 100% {
               opacity: 0;
-              transform: translateY(-50%) scaleX(0.05);
+              transform: translateY(-50%) scaleX(0.04);
             }
           }
 
@@ -635,11 +684,13 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', onClick, animated = fal
             .cinematic-camera-logo,
             .cinematic-projector-beam,
             .cinematic-lens-flare,
+            .cinematic-wordmark-viewport,
             .cinematic-wordmark-track,
             .cinematic-letter,
             .cinematic-magnetic-aura {
               animation: none !important;
               transform: none !important;
+              clip-path: none !important;
               filter: none !important;
               opacity: 1 !important;
             }

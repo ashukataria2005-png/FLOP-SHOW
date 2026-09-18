@@ -29,7 +29,10 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
     toggleMyList,
     activeEpisode,
     catalog,
-    getProgress
+    getProgress,
+    monetizationMode,
+    hasActiveSubscription,
+    openSubscriptionModal
   } = useApp();
 
   const [details, setDetails] = useState<ContentItem>(item);
@@ -78,18 +81,23 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
   ).slice(0, 4);
 
   const isFreeItem = Boolean(currentItem.isFree || currentItem.price === 0);
+  const canWatch = isFreeItem || owned || (monetizationMode === 'SUBSCRIPTION' && hasActiveSubscription);
 
   const handlePrimaryAction = () => {
-    if (owned || isFreeItem) {
+    if (canWatch) {
       startPlaying(currentItem);
+    } else if (monetizationMode === 'SUBSCRIPTION') {
+      openSubscriptionModal();
     } else {
       openPurchaseModal(currentItem);
     }
   };
 
   const handlePlayEpisode = (episode: Episode) => {
-    if (owned || isFreeItem) {
+    if (canWatch) {
       startPlaying(currentItem, episode);
+    } else if (monetizationMode === 'SUBSCRIPTION') {
+      openSubscriptionModal();
     } else {
       openPurchaseModal(currentItem);
     }
@@ -271,9 +279,9 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
             >
               <Play size={18} fill="#0E0E12" />
               <span>
-                {owned || isFreeItem
-                  ? 'Watch now'
-                  : `Buy for ₹${currentItem.price}`}
+                {monetizationMode === 'SUBSCRIPTION'
+                  ? (canWatch ? 'Watch now' : 'Subscribe to Watch')
+                  : (owned || isFreeItem ? 'Watch now' : `Buy for ₹${currentItem.price}`)}
               </span>
             </button>
 

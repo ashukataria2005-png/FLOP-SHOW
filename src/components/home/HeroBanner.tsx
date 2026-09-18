@@ -10,7 +10,7 @@ interface HeroBannerProps {
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({ item, onViewDetails }) => {
   if (!item) return null;
-  const { isOwned, playTrailer } = useApp();
+  const { isOwned, playTrailer, monetizationMode, hasActiveSubscription } = useApp();
   const owned = isOwned(item.id);
 
   const handlePrimaryClick = () => {
@@ -169,7 +169,11 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, onViewDetails }) =
             style={{ minWidth: '140px' }}
           >
             <Play size={18} fill="currentColor" />
-            <span>{owned || item.isFree || item.price === 0 ? 'Watch now' : `Buy for ₹${item.price}`}</span>
+            <span>
+              {monetizationMode === 'SUBSCRIPTION'
+                ? (hasActiveSubscription || owned || item.isFree || item.price === 0 ? 'Watch now' : 'Subscribe to Watch')
+                : (owned || item.isFree || item.price === 0 ? 'Watch now' : `Buy for ₹${item.price}`)}
+            </span>
           </button>
 
           <button

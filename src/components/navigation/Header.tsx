@@ -1,7 +1,7 @@
 import React from 'react';
 import { Logo } from '../common/Logo';
 import { useApp } from '../../context/AppContext';
-import { Wallet, Search, Compass, Bookmark } from 'lucide-react';
+import { Wallet, Search, Compass, Bookmark, Crown } from 'lucide-react';
 
 interface HeaderProps {
   currentTab: string;
@@ -9,7 +9,14 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
-  const { user, walletBalance } = useApp();
+  const {
+    user,
+    walletBalance,
+    monetizationMode,
+    hasActiveSubscription,
+    activeSubscription,
+    openSubscriptionModal
+  } = useApp();
 
   const handleHomeNavigation = () => {
     if (currentTab === 'discover') {
@@ -99,38 +106,71 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
         </button>
       </nav>
 
-      {/* Right Action Icons: Wallet balance & Avatar */}
+      {/* Right Action Icons: Wallet balance / Subscription pill & Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        {/* Wallet Balance Pill */}
-        <button
-          onClick={() => onNavigate('profile', 'wallet')}
-          title="Open Wallet in Profile"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-pill)',
-            backgroundColor: 'rgba(245, 166, 35, 0.12)',
-            border: '1px solid rgba(245, 166, 35, 0.3)',
-            color: 'var(--brand-gold)',
-            fontSize: '14px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            transition: 'all var(--transition-fast)'
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.backgroundColor = 'rgba(245, 166, 35, 0.2)';
-            e.currentTarget.style.borderColor = 'var(--brand-gold)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.backgroundColor = 'rgba(245, 166, 35, 0.12)';
-            e.currentTarget.style.borderColor = 'rgba(245, 166, 35, 0.3)';
-          }}
-        >
-          <Wallet size={15} />
-          <span>₹{walletBalance}</span>
-        </button>
+        {/* Mode A: Wallet Balance Pill */}
+        {monetizationMode === 'PER_CONTENT' && (
+          <button
+            onClick={() => onNavigate('profile', 'wallet')}
+            title="Open Wallet in Profile"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'rgba(245, 166, 35, 0.12)',
+              border: '1px solid rgba(245, 166, 35, 0.3)',
+              color: 'var(--brand-gold)',
+              fontSize: '14px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = 'rgba(245, 166, 35, 0.2)';
+              e.currentTarget.style.borderColor = 'var(--brand-gold)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = 'rgba(245, 166, 35, 0.12)';
+              e.currentTarget.style.borderColor = 'rgba(245, 166, 35, 0.3)';
+            }}
+          >
+            <Wallet size={15} />
+            <span>₹{walletBalance}</span>
+          </button>
+        )}
+
+        {/* Mode B: Subscription Badge / CTA */}
+        {monetizationMode === 'SUBSCRIPTION' && (
+          <button
+            onClick={() => {
+              if (hasActiveSubscription) {
+                onNavigate('profile', 'subscription');
+              } else {
+                openSubscriptionModal();
+              }
+            }}
+            title={hasActiveSubscription ? 'Active Subscription' : 'Subscribe to FLOPSHOW'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: hasActiveSubscription ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 166, 35, 0.15)',
+              border: `1px solid ${hasActiveSubscription ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 166, 35, 0.4)'}`,
+              color: hasActiveSubscription ? '#10B981' : 'var(--brand-gold)',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)'
+            }}
+          >
+            <Crown size={14} />
+            <span>{hasActiveSubscription ? (activeSubscription?.plan ? `${activeSubscription.plan}` : 'VIP Active') : 'Subscribe'}</span>
+          </button>
+        )}
 
         {/* User Avatar Circle */}
         <button

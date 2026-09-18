@@ -61,7 +61,7 @@ interface AppContextType {
   saveWatchProgress: (progress: Omit<WatchProgress, 'updatedAt'>) => void;
 
   // Modals & UI Triggers
-  activeModal: 'purchase' | 'recharge' | 'auth' | null;
+  activeModal: 'purchase' | 'recharge' | 'auth' | 'subscription' | null;
   purchaseTarget: ContentItem | null;
   openPurchaseModal: (item: ContentItem) => void;
   closePurchaseModal: () => void;
@@ -69,6 +69,40 @@ interface AppContextType {
   closeRechargeModal: () => void;
   openAuthModal: () => void;
   closeAuthModal: () => void;
+  openSubscriptionModal: () => void;
+  closeSubscriptionModal: () => void;
+
+  // Monetization Mode & Subscriptions
+  monetizationMode: 'PER_CONTENT' | 'SUBSCRIPTION';
+  subscriptionPlans: Array<{
+    id: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    name: string;
+    durationDays: number;
+    priceRupees: number;
+    description: string;
+  }>;
+  activeSubscription: {
+    id: string;
+    plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    status: 'ACTIVE';
+    amount_paid: number;
+    start_date: string;
+    end_date: string;
+    daysRemaining: number;
+    payment_reference: string | null;
+  } | null;
+  pendingSubscription: {
+    id: string;
+    plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    status: 'PENDING';
+    amount_paid: number;
+    payment_reference: string;
+    submitted_at: string;
+  } | null;
+  hasActiveSubscription: boolean;
+  refreshMonetizationConfig: () => Promise<void>;
+  refreshSubscriptionStatus: () => Promise<void>;
+  submitSubscriptionRequest: (plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', utr: string) => Promise<{ success: boolean; message: string }>;
 
   // Player State
   activePlayerContent: ContentItem | null;
@@ -161,7 +195,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [catalog, setCatalog] = useState<ContentItem[]>([]);
 
   // Modal states
-  const [activeModal, setActiveModal] = useState<'purchase' | 'recharge' | 'auth' | null>(null);
+  const [activeModal, setActiveModal] = useState<'purchase' | 'recharge' | 'auth' | 'subscription' | null>(null);
   const [purchaseTarget, setPurchaseTarget] = useState<ContentItem | null>(null);
 
   // Player state
@@ -171,6 +205,74 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Toast state
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Monetization Mode & Subscription states
+  const [monetizationMode, setMonetizationMode] = useState<'PER_CONTENT' | 'SUBSCRIPTION'>('PER_CONTENT');
+  const [subscriptionPlans, setSubscriptionPlans] = useState<Array<{
+    id: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    name: string;
+    durationDays: number;
+    priceRupees: number;
+    description: string;
+  }>>([
+    { id: 'WEEKLY', name: 'Weekly Plan', durationDays: 7, priceRupees: 49, description: '7 days of uninterrupted streaming across all devices.' },
+    { id: 'MONTHLY', name: 'Monthly Plan', durationDays: 30, priceRupees: 149, description: '30 days full catalog access with HD & 4K playback.' },
+    { id: 'YEARLY', name: 'Yearly Plan', durationDays: 365, priceRupees: 999, description: 'Best value! 365 days of unlimited movies and webseries.' }
+  ]);
+  const [activeSubscription, setActiveSubscription] = useState<any>(null);
+  const [pendingSubscription, setPendingSubscription] = useState<any>(null);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean>(false);
+
+  const refreshMonetizationConfig = async () => {
+    try {
+      const res = await api.monetization.getConfig();
+      if (res?.mode) {
+        setMonetizationMode(res.mode);
+      }
+      if (res?.plans && res.plans.length > 0) {
+        setSubscriptionPlans(res.plans);
+      }
+    } catch {
+      // Offline fallback
+    }
+  };
+
+  const refreshSubscriptionStatus = async () => {
+    if (!isAuthenticated) {
+      setActiveSubscription(null);
+      setPendingSubscription(null);
+      setHasActiveSubscription(false);
+      return;
+    }
+    try {
+      const status = await api.subscriptions.getMyStatus();
+      setHasActiveSubscription(Boolean(status?.hasActiveSubscription));
+      setActiveSubscription(status?.activeSubscription || null);
+      setPendingSubscription(status?.pendingSubscription || null);
+    } catch {
+      // Offline fallback
+    }
+  };
+
+  const submitSubscriptionRequest = async (plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', utr: string) => {
+    try {
+      const res = await api.subscriptions.submitRequest(plan, utr, user.name, user.email);
+      await refreshSubscriptionStatus();
+      showToast(res.message || 'Subscription request submitted! Awaiting administrator verification.', 'success');
+      return { success: true, message: res.message };
+    } catch (err: any) {
+      showToast(err.message || 'Failed to submit subscription request.', 'error');
+      return { success: false, message: err.message || 'Submission failed' };
+    }
+  };
+
+  const openSubscriptionModal = () => {
+    setActiveModal('subscription');
+  };
+
+  const closeSubscriptionModal = () => {
+    setActiveModal(null);
+  };
 
   // Fetch central catalog from backend
   const refreshCatalog = async () => {
@@ -184,6 +286,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     refreshCatalog();
+    refreshMonetizationConfig();
 
     // Sync theme setting from central backend
     api.content.getTheme().then(serverTheme => {
@@ -341,6 +444,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
   }, []);
+
+  // Synchronize subscription status whenever user authentication changes
+  useEffect(() => {
+    refreshSubscriptionStatus();
+  }, [isAuthenticated, user?.id]);
 
   // Proactive background session refresh to prevent random expiry during long editing sessions
   useEffect(() => {
@@ -803,6 +911,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           activeVcdnStatus = (mediaRes as any).vcdnStatus;
         }
       } catch (err: any) {
+        if (err?.code === 'SUBSCRIPTION_REQUIRED' || (monetizationMode === 'SUBSCRIPTION' && (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403))) {
+          openSubscriptionModal();
+          return;
+        }
         if (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403) {
           // skipOwnershipCheck is set when called immediately after a purchase (before React re-renders
           // the purchases state), so we trust the caller that the content is now owned.
@@ -839,6 +951,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           activeVcdnStatus = (mediaRes as any).vcdnStatus;
         }
       } catch (err: any) {
+        if (err?.code === 'SUBSCRIPTION_REQUIRED' || (monetizationMode === 'SUBSCRIPTION' && (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403))) {
+          openSubscriptionModal();
+          return;
+        }
         if (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403) {
           // skipOwnershipCheck is set when called immediately after a purchase (before React re-renders
           // the purchases state), so we trust the caller that the content is now owned.
@@ -977,6 +1093,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         closeRechargeModal,
         openAuthModal,
         closeAuthModal,
+        openSubscriptionModal,
+        closeSubscriptionModal,
+        monetizationMode,
+        subscriptionPlans,
+        activeSubscription,
+        pendingSubscription,
+        hasActiveSubscription,
+        refreshMonetizationConfig,
+        refreshSubscriptionStatus,
+        submitSubscriptionRequest,
         activePlayerContent,
         activeEpisode,
         activeMediaSource,

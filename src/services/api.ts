@@ -1257,5 +1257,172 @@ export const api = {
         body: JSON.stringify(payload)
       });
     }
+  },
+
+  // --------------------------------------------------------------------------
+  // MONETIZATION (DUAL MODE: PER-CONTENT VS SUBSCRIPTION)
+  // --------------------------------------------------------------------------
+  monetization: {
+    async getConfig() {
+      return request<{
+        mode: 'PER_CONTENT' | 'SUBSCRIPTION';
+        plans: Array<{
+          id: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+          name: string;
+          durationDays: number;
+          priceRupees: number;
+          description: string;
+        }>;
+        currencySymbol: string;
+        upiId: string;
+        merchantName: string;
+      }>('/monetization/config');
+    },
+
+    async getAdminConfig() {
+      return request<{
+        success: boolean;
+        config: {
+          mode: 'PER_CONTENT' | 'SUBSCRIPTION';
+          weeklyPrice: number;
+          monthlyPrice: number;
+          yearlyPrice: number;
+          currencySymbol: string;
+          metrics: {
+            totalSubscriptions: number;
+            activeCount: number;
+            pendingCount: number;
+            totalRevenueRupees: number;
+          };
+        };
+      }>('/monetization/admin');
+    },
+
+    async updateAdminConfig(data: {
+      mode?: 'PER_CONTENT' | 'SUBSCRIPTION';
+      weeklyPrice?: number;
+      monthlyPrice?: number;
+      yearlyPrice?: number;
+    }) {
+      return request<{
+        success: boolean;
+        message: string;
+        config: {
+          mode: 'PER_CONTENT' | 'SUBSCRIPTION';
+          weeklyPrice: number;
+          monthlyPrice: number;
+          yearlyPrice: number;
+          currencySymbol: string;
+          metrics: {
+            totalSubscriptions: number;
+            activeCount: number;
+            pendingCount: number;
+            totalRevenueRupees: number;
+          };
+        };
+      }>('/monetization/admin', {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // SUBSCRIPTIONS (USER & ADMIN VERIFICATION)
+  // --------------------------------------------------------------------------
+  subscriptions: {
+    async getPlans() {
+      return request<{
+        plans: Array<{
+          id: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+          name: string;
+          durationDays: number;
+          priceRupees: number;
+          description: string;
+        }>;
+      }>('/subscriptions/plans');
+    },
+
+    async getMyStatus() {
+      return request<{
+        hasActiveSubscription: boolean;
+        activeSubscription: {
+          id: string;
+          plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+          status: 'ACTIVE';
+          amount_paid: number;
+          start_date: string;
+          end_date: string;
+          daysRemaining: number;
+          payment_reference: string | null;
+        } | null;
+        pendingSubscription: {
+          id: string;
+          plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+          status: 'PENDING';
+          amount_paid: number;
+          payment_reference: string;
+          submitted_at: string;
+        } | null;
+        latestSubscription: any;
+      }>('/subscriptions/my-status');
+    },
+
+    async submitRequest(plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', utr: string, userName?: string, userEmail?: string) {
+      return request<{
+        success: boolean;
+        message: string;
+        subscription: any;
+      }>('/subscriptions/submit-request', {
+        method: 'POST',
+        body: JSON.stringify({ plan, utr, userName, userEmail })
+      });
+    },
+
+    async getMyHistory(limit = 50) {
+      return request<{ count: number; subscriptions: any[] }>(`/subscriptions/my-history?limit=${limit}`);
+    },
+
+    // Admin endpoints
+    async adminGetRequests(status?: string, limit = 100) {
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      if (limit) params.append('limit', String(limit));
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return request<{ count: number; requests: any[] }>(`/subscriptions/admin/requests${query}`);
+    },
+
+    async adminApprove(subscriptionId: string, adminNote?: string) {
+      return request<{
+        success: boolean;
+        message: string;
+        subscription: any;
+      }>('/subscriptions/admin/approve', {
+        method: 'POST',
+        body: JSON.stringify({ subscriptionId, adminNote })
+      });
+    },
+
+    async adminReject(subscriptionId: string, adminNote?: string) {
+      return request<{
+        success: boolean;
+        message: string;
+        subscription: any;
+      }>('/subscriptions/admin/reject', {
+        method: 'POST',
+        body: JSON.stringify({ subscriptionId, adminNote })
+      });
+    },
+
+    async adminGrant(userId: string, plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', adminNote?: string) {
+      return request<{
+        success: boolean;
+        message: string;
+        subscription: any;
+      }>('/subscriptions/admin/grant', {
+        method: 'POST',
+        body: JSON.stringify({ userId, plan, adminNote })
+      });
+    }
   }
 };

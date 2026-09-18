@@ -39,13 +39,15 @@ export function errorHandler(
     console.warn(`[CLIENT ERROR ${statusCode}] ${err.message}`);
   }
 
-  // Map common HTTP status codes to clean error codes
-  let code = 'INTERNAL_ERROR';
-  if (statusCode === 400) code = 'BAD_REQUEST';
-  else if (statusCode === 401) code = 'UNAUTHORIZED';
-  else if (statusCode === 403) code = 'FORBIDDEN';
-  else if (statusCode === 404) code = 'NOT_FOUND';
-  else if (statusCode === 409) code = 'CONFLICT';
+  // Map common HTTP status codes to clean error codes, preserving specific domain codes (e.g. SUBSCRIPTION_REQUIRED)
+  let code = err.code || 'INTERNAL_ERROR';
+  if (!err.code) {
+    if (statusCode === 400) code = 'BAD_REQUEST';
+    else if (statusCode === 401) code = 'UNAUTHORIZED';
+    else if (statusCode === 403) code = 'FORBIDDEN';
+    else if (statusCode === 404) code = 'NOT_FOUND';
+    else if (statusCode === 409) code = 'CONFLICT';
+  }
 
   // Do not expose stack traces, db queries, or internal details in public responses
   const message = (statusCode >= 500 && config.isProd)
@@ -53,6 +55,8 @@ export function errorHandler(
     : (err.message || 'An unexpected server error occurred.');
 
   res.status(statusCode).json({
+    code,
+    message,
     error: {
       code,
       message

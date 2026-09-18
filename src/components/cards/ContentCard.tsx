@@ -11,7 +11,7 @@ interface ContentCardProps {
 }
 
 export const ContentCard: React.FC<ContentCardProps> = ({ item, onSelect, width }) => {
-  const { isOwned, getProgress } = useApp();
+  const { isOwned, getProgress, monetizationMode } = useApp();
   const owned = isOwned(item.id);
   const progress = getProgress(item.id);
 
@@ -95,7 +95,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, onSelect, width 
           )}
           {owned && <Badge type="OWNED" />}
           {!owned && (item.isFree || item.price === 0) && <Badge type="FREE" />}
-          {!owned && !item.isFree && item.price > 0 && <Badge type="PRICE" price={item.price} />}
+          {!owned && !item.isFree && item.price > 0 && monetizationMode === 'PER_CONTENT' && <Badge type="PRICE" price={item.price} />}
           {item.isNow && <Badge type="NOW" />}
         </div>
 

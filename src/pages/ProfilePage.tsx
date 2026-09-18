@@ -31,7 +31,10 @@ import {
   Trash2,
   AlertCircle,
   RefreshCw,
-  Sliders
+  Sliders,
+  Crown,
+  Sparkles,
+  Calendar
 } from 'lucide-react';
 
 interface UserPaymentRequest {
@@ -47,7 +50,7 @@ interface UserPaymentRequest {
 
 interface ProfilePageProps {
   onNavigate: (tab: string, param?: string) => void;
-  initialSection?: 'profile' | 'wallet' | 'settings';
+  initialSection?: 'profile' | 'wallet' | 'subscription' | 'settings';
 }
 
 // In-memory cache for instant switching between profile tabs
@@ -65,10 +68,21 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     openAuthModal,
     openRechargeModal,
     updateProfile,
-    isAuthenticated
+    isAuthenticated,
+    monetizationMode,
+    subscriptionPlans,
+    activeSubscription,
+    pendingSubscription,
+    hasActiveSubscription,
+    openSubscriptionModal
   } = useApp();
 
-  const [activeSection, setActiveSection] = useState<'profile' | 'wallet' | 'settings'>(initialSection);
+  const [activeSection, setActiveSection] = useState<'profile' | 'wallet' | 'subscription' | 'settings'>(() => {
+    if (initialSection === 'wallet' && monetizationMode === 'SUBSCRIPTION') {
+      return 'subscription';
+    }
+    return initialSection;
+  });
   const [rechargeRequests, setRechargeRequests] = useState<UserPaymentRequest[]>(() => cachedRechargeRequests);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -244,38 +258,92 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
           <span>Account Profile</span>
         </button>
 
-        <button
-          onClick={() => setActiveSection('wallet')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 18px',
-            borderRadius: '12px',
-            border: activeSection === 'wallet' ? '1px solid rgba(245, 166, 35, 0.4)' : '1px solid transparent',
-            backgroundColor: activeSection === 'wallet' ? 'rgba(245, 166, 35, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-            color: activeSection === 'wallet' ? 'var(--brand-gold, #F5C518)' : 'var(--text-secondary)',
-            fontWeight: activeSection === 'wallet' ? 700 : 500,
-            fontSize: '14px',
-            cursor: 'pointer',
-            transition: 'all var(--transition-fast)'
-          }}
-        >
-          <Wallet size={16} />
-          <span>Wallet & UPI Payments</span>
-          <span
+        {/* Mode A: Wallet & UPI Payments Tab */}
+        {monetizationMode === 'PER_CONTENT' && (
+          <button
+            onClick={() => setActiveSection('wallet')}
             style={{
-              padding: '2px 8px',
-              borderRadius: '9999px',
-              backgroundColor: 'rgba(245, 166, 35, 0.2)',
-              color: 'var(--brand-gold, #F5C518)',
-              fontSize: '12px',
-              fontWeight: 800
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 18px',
+              borderRadius: '12px',
+              border: activeSection === 'wallet' ? '1px solid rgba(245, 166, 35, 0.4)' : '1px solid transparent',
+              backgroundColor: activeSection === 'wallet' ? 'rgba(245, 166, 35, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+              color: activeSection === 'wallet' ? 'var(--brand-gold, #F5C518)' : 'var(--text-secondary)',
+              fontWeight: activeSection === 'wallet' ? 700 : 500,
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)'
             }}
           >
-            ₹{walletBalance.toFixed(0)}
-          </span>
-        </button>
+            <Wallet size={16} />
+            <span>Wallet & UPI Payments</span>
+            <span
+              style={{
+                padding: '2px 8px',
+                borderRadius: '9999px',
+                backgroundColor: 'rgba(245, 166, 35, 0.2)',
+                color: 'var(--brand-gold, #F5C518)',
+                fontSize: '12px',
+                fontWeight: 800
+              }}
+            >
+              ₹{walletBalance.toFixed(0)}
+            </span>
+          </button>
+        )}
+
+        {/* Mode B: Subscription Tab */}
+        {monetizationMode === 'SUBSCRIPTION' && (
+          <button
+            onClick={() => setActiveSection('subscription')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 18px',
+              borderRadius: '12px',
+              border: (activeSection === 'subscription' || activeSection === 'wallet') ? '1px solid rgba(245, 166, 35, 0.4)' : '1px solid transparent',
+              backgroundColor: (activeSection === 'subscription' || activeSection === 'wallet') ? 'rgba(245, 166, 35, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+              color: (activeSection === 'subscription' || activeSection === 'wallet') ? 'var(--brand-gold, #F5C518)' : 'var(--text-secondary)',
+              fontWeight: (activeSection === 'subscription' || activeSection === 'wallet') ? 700 : 500,
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)'
+            }}
+          >
+            <Crown size={16} />
+            <span>My Subscription</span>
+            {hasActiveSubscription ? (
+              <span
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                  color: '#10B981',
+                  fontSize: '11px',
+                  fontWeight: 800
+                }}
+              >
+                ACTIVE
+              </span>
+            ) : pendingSubscription ? (
+              <span
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(245, 166, 35, 0.2)',
+                  color: 'var(--brand-gold)',
+                  fontSize: '11px',
+                  fontWeight: 800
+                }}
+              >
+                PENDING
+              </span>
+            ) : null}
+          </button>
+        )}
 
         <button
           onClick={() => setActiveSection('settings')}
@@ -473,53 +541,105 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
             </div>
           </div>
 
-          {/* Wallet Balance Shortcut Strip */}
-          <div
-            onClick={() => setActiveSection('wallet')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: 'rgba(245, 166, 35, 0.08)',
-              border: '1px solid rgba(245, 166, 35, 0.25)',
-              borderRadius: '16px',
-              padding: '18px 20px',
-              marginBottom: '24px',
-              cursor: 'pointer',
-              transition: 'all var(--transition-fast)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--brand-gold)',
-                  color: '#0E0E12',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <Wallet size={22} />
-              </div>
-              <div>
-                <span style={{ fontSize: '12px', color: 'var(--brand-gold)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  FLOPSHOW Wallet
-                </span>
-                <div style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF' }}>
-                  ₹{walletBalance.toFixed(2)}
+          {/* Mode A: Wallet Balance Shortcut Strip */}
+          {monetizationMode === 'PER_CONTENT' && (
+            <div
+              onClick={() => setActiveSection('wallet')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: 'rgba(245, 166, 35, 0.08)',
+                border: '1px solid rgba(245, 166, 35, 0.25)',
+                borderRadius: '16px',
+                padding: '18px 20px',
+                marginBottom: '24px',
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--brand-gold)',
+                    color: '#0E0E12',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Wallet size={22} />
+                </div>
+                <div>
+                  <span style={{ fontSize: '12px', color: 'var(--brand-gold)', fontWeight: 700, textTransform: 'uppercase' }}>
+                    FLOPSHOW Wallet
+                  </span>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF' }}>
+                    ₹{walletBalance.toFixed(2)}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '13px', color: 'var(--brand-gold)', fontWeight: 600 }}>
-                Manage Wallet & History →
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--brand-gold)', fontWeight: 600 }}>
+                  Manage Wallet & History →
+                </span>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Mode B: Subscription Shortcut Strip */}
+          {monetizationMode === 'SUBSCRIPTION' && (
+            <div
+              onClick={() => setActiveSection('subscription')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: hasActiveSubscription ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 166, 35, 0.08)',
+                border: `1px solid ${hasActiveSubscription ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 166, 35, 0.3)'}`,
+                borderRadius: '16px',
+                padding: '18px 20px',
+                marginBottom: '24px',
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    backgroundColor: hasActiveSubscription ? '#10B981' : 'var(--brand-gold)',
+                    color: '#0E0E12',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Crown size={22} />
+                </div>
+                <div>
+                  <span style={{ fontSize: '12px', color: hasActiveSubscription ? '#10B981' : 'var(--brand-gold)', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Subscription Status
+                  </span>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF' }}>
+                    {hasActiveSubscription ? `${activeSubscription?.plan} Plan Active` : pendingSubscription ? 'Payment Verification Pending' : 'No Active Subscription'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '13px', color: hasActiveSubscription ? '#10B981' : 'var(--brand-gold)', fontWeight: 600 }}>
+                  {hasActiveSubscription ? 'View Plan Details →' : 'View Plans →'}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Navigation Shortcuts List */}
           <div
@@ -569,24 +689,49 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
               <ChevronRight size={18} color="var(--text-muted)" />
             </button>
 
-            <button
-              onClick={() => setActiveSection('wallet')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                padding: '16px 20px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-                color: '#FFFFFF'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <History size={18} color="var(--brand-gold)" />
-                <span style={{ fontSize: '15px', fontWeight: 600 }}>Billing & Transaction History</span>
-              </div>
-              <ChevronRight size={18} color="var(--text-muted)" />
-            </button>
+            {/* Mode A: Billing & Transaction History */}
+            {monetizationMode === 'PER_CONTENT' && (
+              <button
+                onClick={() => setActiveSection('wallet')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  width: '100%',
+                  padding: '16px 20px',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                  color: '#FFFFFF'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <History size={18} color="var(--brand-gold)" />
+                  <span style={{ fontSize: '15px', fontWeight: 600 }}>Billing & Transaction History</span>
+                </div>
+                <ChevronRight size={18} color="var(--text-muted)" />
+              </button>
+            )}
+
+            {/* Mode B: My Subscription & Plans */}
+            {monetizationMode === 'SUBSCRIPTION' && (
+              <button
+                onClick={() => setActiveSection('subscription')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  width: '100%',
+                  padding: '16px 20px',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                  color: '#FFFFFF'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Crown size={18} color="var(--brand-gold)" />
+                  <span style={{ fontSize: '15px', fontWeight: 600 }}>My Subscription & OTT Plans</span>
+                </div>
+                <ChevronRight size={18} color="var(--text-muted)" />
+              </button>
+            )}
 
             <button
               onClick={() => setActiveSection('settings')}
@@ -628,8 +773,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
         </>
       )}
 
-      {/* SECTION 2: WALLET & UPI PAYMENTS */}
-      {activeSection === 'wallet' && (
+      {/* SECTION 2: WALLET & UPI PAYMENTS (Mode A only) */}
+      {activeSection === 'wallet' && monetizationMode === 'PER_CONTENT' && (
         <div>
           {/* Main Balance Card */}
           <div
@@ -978,6 +1123,308 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>No transactions yet.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 2B: SUBSCRIPTION PASS & PLANS (Mode B only) */}
+      {(activeSection === 'subscription' || (activeSection === 'wallet' && monetizationMode === 'SUBSCRIPTION')) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          {/* Main Status Hero Card */}
+          <div
+            style={{
+              background: hasActiveSubscription
+                ? 'linear-gradient(135deg, #2A1F0D 0%, #17141D 50%, #0E0E14 100%)'
+                : 'linear-gradient(135deg, #1C1914 0%, #151318 50%, #0E0E14 100%)',
+              border: hasActiveSubscription
+                ? '1.5px solid rgba(245, 197, 24, 0.5)'
+                : '1.5px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '24px',
+              padding: 'clamp(24px, 4vw, 36px)',
+              position: 'relative',
+              overflow: 'hidden',
+              boxShadow: hasActiveSubscription
+                ? '0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(245, 197, 24, 0.15)'
+                : '0 16px 40px rgba(0, 0, 0, 0.5)'
+            }}
+          >
+            {/* Glow backdrop */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '-60px',
+                right: '-60px',
+                width: '220px',
+                height: '220px',
+                borderRadius: '50%',
+                background: hasActiveSubscription
+                  ? 'radial-gradient(circle, rgba(245, 197, 24, 0.28) 0%, transparent 70%)'
+                  : 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)',
+                pointerEvents: 'none'
+              }}
+            />
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--brand-gold, #F5C518)' }}>
+                <Crown size={20} />
+                <span style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                  FLOPSHOW VIP Pass
+                </span>
+              </div>
+              {hasActiveSubscription ? (
+                <span
+                  style={{
+                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                    color: '#4ADE80',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  <CheckCircle2 size={12} />
+                  ACTIVE
+                </span>
+              ) : pendingSubscription ? (
+                <span
+                  style={{
+                    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+                    color: '#FACC15',
+                    border: '1px solid rgba(234, 179, 8, 0.3)',
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  <Clock size={12} />
+                  APPROVAL PENDING
+                </span>
+              ) : (
+                <span
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    color: 'var(--text-secondary)',
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 700
+                  }}
+                >
+                  NO ACTIVE PLAN
+                </span>
+              )}
+            </div>
+
+            {hasActiveSubscription && activeSubscription ? (
+              <div>
+                <h1 style={{ fontSize: 'clamp(26px, 4vw, 36px)', fontWeight: 900, color: '#FFFFFF', marginBottom: '8px' }}>
+                  {activeSubscription.plan.toUpperCase()} PASS
+                </h1>
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                  Unlimited streaming of all movies and web series unlocked.
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#D1D5DB', fontSize: '13px' }}>
+                    <Calendar size={16} color="var(--brand-gold)" />
+                    <span>Valid until: <strong>{new Date(activeSubscription.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#D1D5DB', fontSize: '13px' }}>
+                    <Clock size={16} color="var(--brand-gold)" />
+                    <span>Days remaining: <strong>{activeSubscription.daysRemaining} days</strong></span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => openSubscriptionModal()}
+                  className="btn btn-primary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontWeight: 700 }}
+                >
+                  <Sparkles size={16} />
+                  <span>Renew or Extend Pass</span>
+                </button>
+              </div>
+            ) : pendingSubscription ? (
+              <div>
+                <h1 style={{ fontSize: 'clamp(22px, 3.5vw, 30px)', fontWeight: 900, color: '#FACC15', marginBottom: '8px' }}>
+                  Payment Verification Underway
+                </h1>
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '18px', maxWidth: '600px' }}>
+                  Your request for the <strong>{pendingSubscription.plan.toUpperCase()}</strong> plan (₹{pendingSubscription.amount_paid}) with UTR reference <code style={{ color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{pendingSubscription.payment_reference}</code> has been submitted. Our administrators are verifying your transaction. Access will automatically activate once approved.
+                </p>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#FACC15', backgroundColor: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.25)', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600 }}>
+                  <Clock size={15} />
+                  <span>Typically verified within 10 to 30 minutes</span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <h1 style={{ fontSize: 'clamp(24px, 4vw, 34px)', fontWeight: 900, color: '#FFFFFF', marginBottom: '8px' }}>
+                  Subscribe for Unlimited OTT Streaming
+                </h1>
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px', maxWidth: '600px' }}>
+                  Switch to an all-inclusive VIP pass to stream every blockbuster, exclusive original, and full web series season with zero per-content charges.
+                </p>
+                <button
+                  onClick={() => openSubscriptionModal()}
+                  className="btn btn-primary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontWeight: 700, fontSize: '15px' }}
+                >
+                  <Crown size={18} />
+                  <span>Choose Your Plan</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Available Plans Section */}
+          <div>
+            <div style={{ marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', marginBottom: '4px' }}>
+                Subscription Plans
+              </h2>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                Select a plan, pay via any UPI app, and submit your UTR reference for instant verification.
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: '20px'
+              }}
+            >
+              {subscriptionPlans.map((plan) => {
+                const isCurrentActive = activeSubscription?.plan === plan.id;
+                const isPendingForThis = pendingSubscription?.plan === plan.id;
+                const isPopular = plan.id === 'MONTHLY';
+
+                return (
+                  <div
+                    key={plan.id}
+                    style={{
+                      backgroundColor: 'var(--bg-surface)',
+                      borderRadius: '20px',
+                      border: isPopular
+                        ? '2px solid var(--brand-gold, #F5C518)'
+                        : isCurrentActive
+                        ? '1.5px solid rgba(34, 197, 94, 0.4)'
+                        : '1px solid rgba(255, 255, 255, 0.08)',
+                      padding: '24px',
+                      position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      boxShadow: isPopular ? '0 12px 30px rgba(245, 197, 24, 0.1)' : 'none'
+                    }}
+                  >
+                    {isPopular && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '-12px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          backgroundColor: 'var(--brand-gold, #F5C518)',
+                          color: '#000000',
+                          fontSize: '11px',
+                          fontWeight: 900,
+                          padding: '3px 12px',
+                          borderRadius: '12px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.08em'
+                        }}
+                      >
+                        Most Popular
+                      </div>
+                    )}
+
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                          {plan.name}
+                        </span>
+                        {isCurrentActive && (
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#4ADE80', backgroundColor: 'rgba(34, 197, 94, 0.15)', padding: '2px 8px', borderRadius: '10px' }}>
+                            Current Plan
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '16px' }}>
+                        <span style={{ fontSize: '32px', fontWeight: 900, color: '#FFFFFF' }}>
+                          ₹{plan.priceRupees}
+                        </span>
+                        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                          / {plan.durationDays === 7 ? 'week' : plan.durationDays === 30 ? 'month' : 'year'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#D1D5DB' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>Full HD & 4K Streaming</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#D1D5DB' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>Unlimited movies & web series</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#D1D5DB' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>Ad-free cinema experience</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#D1D5DB' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>Zero per-content charges</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => openSubscriptionModal()}
+                      className={isPopular ? 'btn btn-primary btn-block' : 'btn btn-secondary btn-block'}
+                      disabled={isPendingForThis}
+                      style={{
+                        fontWeight: 700,
+                        opacity: isPendingForThis ? 0.7 : 1,
+                        cursor: isPendingForThis ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {isPendingForThis
+                        ? 'Verification In Progress'
+                        : isCurrentActive
+                        ? 'Extend This Pass'
+                        : `Get ${plan.name}`}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Secure Guarantee Note */}
+          <div
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              padding: '16px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px'
+            }}
+          >
+            <ShieldCheck size={24} color="var(--brand-gold, #F5C518)" style={{ flexShrink: 0 }} />
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+              All subscription transactions are protected by FLOPSHOW's secure manual verification. After paying via UPI QR or VPA, simply paste your 12-digit UTR reference. Our team activates your VIP pass upon receipt.
+            </p>
           </div>
         </div>
       )}

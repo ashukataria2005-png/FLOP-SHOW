@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import { mediaRepository, MediaRecord } from '../repositories/mediaRepository.js';
 import { contentRepository } from '../repositories/contentRepository.js';
 import { purchaseRepository } from '../repositories/purchaseRepository.js';
+import { monetizationService } from './monetizationService.js';
+import { subscriptionService } from './subscriptionService.js';
 import { getAdapter } from '../db/adapter.js';
 import { parseYouTubeUrl, isValidMediaUrl } from '../utils/mediaUrl.js';
 
@@ -263,11 +265,23 @@ export const mediaService = {
     const isAdmin = userRole === 'ADMIN';
     const isOwned = isAdmin || (userId ? await purchaseRepository.isOwned(userId, content.id) : false);
 
-    if (!isFree && !isOwned) {
-      const err = new Error('Purchase required to watch this movie.');
-      (err as any).statusCode = 403;
-      (err as any).code = 'PURCHASE_REQUIRED';
-      throw err;
+    const monetizationMode = await monetizationService.getMonetizationMode();
+
+    if (monetizationMode === 'SUBSCRIPTION') {
+      const hasActiveSub = userId ? await subscriptionService.hasActiveSubscription(userId) : false;
+      if (!isFree && !isAdmin && !hasActiveSub && !isOwned) {
+        const err = new Error('Active subscription required to watch this movie.');
+        (err as any).statusCode = 403;
+        (err as any).code = 'SUBSCRIPTION_REQUIRED';
+        throw err;
+      }
+    } else {
+      if (!isFree && !isOwned) {
+        const err = new Error('Purchase required to watch this movie.');
+        (err as any).statusCode = 403;
+        (err as any).code = 'PURCHASE_REQUIRED';
+        throw err;
+      }
     }
 
     const mainMedia = await mediaRepository.getActiveMediaForContent(content.id, 'MAIN');
@@ -371,11 +385,23 @@ export const mediaService = {
     const isAdmin = userRole === 'ADMIN';
     const isOwned = isAdmin || (userId ? await purchaseRepository.isOwned(userId, episode.content_id) : false);
 
-    if (!isFree && !isOwned) {
-      const err = new Error('Purchase required to watch this series episode.');
-      (err as any).statusCode = 403;
-      (err as any).code = 'PURCHASE_REQUIRED';
-      throw err;
+    const monetizationMode = await monetizationService.getMonetizationMode();
+
+    if (monetizationMode === 'SUBSCRIPTION') {
+      const hasActiveSub = userId ? await subscriptionService.hasActiveSubscription(userId) : false;
+      if (!isFree && !isAdmin && !hasActiveSub && !isOwned) {
+        const err = new Error('Active subscription required to watch this series episode.');
+        (err as any).statusCode = 403;
+        (err as any).code = 'SUBSCRIPTION_REQUIRED';
+        throw err;
+      }
+    } else {
+      if (!isFree && !isOwned) {
+        const err = new Error('Purchase required to watch this series episode.');
+        (err as any).statusCode = 403;
+        (err as any).code = 'PURCHASE_REQUIRED';
+        throw err;
+      }
     }
 
     const mainMedia = await mediaRepository.getActiveMediaForEpisode(episode.id, 'MAIN');

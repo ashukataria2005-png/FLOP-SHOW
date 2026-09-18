@@ -25,8 +25,10 @@ import { AdminUpiSettingsPage } from './pages/admin/AdminUpiSettingsPage';
 import { AdminFinancePage } from './pages/admin/AdminFinancePage';
 import { AdminFreeContentPage } from './pages/admin/AdminFreeContentPage';
 import { AdminResetPage } from './pages/admin/AdminResetPage';
+import { AdminMonetizationPage } from './pages/admin/AdminMonetizationPage';
 import { PurchaseModal } from './components/purchase/PurchaseModal';
 import { RechargeModal } from './components/wallet/RechargeModal';
+import { SubscriptionModal } from './components/subscription/SubscriptionModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { MediaPlayer } from './components/player/MediaPlayer';
 import { ContentItem } from './types/content';
@@ -78,6 +80,9 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   }
   if (cleanPath === '/admin/upi-settings') {
     return { tab: 'admin-upi-settings' };
+  }
+  if (cleanPath === '/admin/monetization') {
+    return { tab: 'admin-monetization' };
   }
   if (cleanPath === '/admin/finance') {
     return { tab: 'admin-finance' };
@@ -146,6 +151,8 @@ export function tabToPath(tab: string, param?: string): string {
       return '/admin/payments';
     case 'admin-upi-settings':
       return '/admin/upi-settings';
+    case 'admin-monetization':
+      return '/admin/monetization';
     case 'admin-finance':
       return '/admin/finance';
     case 'admin-transactions':
@@ -302,6 +309,7 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-users' && <AdminUsersPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-payments' && <AdminPaymentsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-upi-settings' && <AdminUpiSettingsPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-monetization' && <AdminMonetizationPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-finance' && <AdminFinancePage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-transactions' && <AdminTransactionsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-genres' && <AdminGenresPage onNavigateTab={handleNavigate} />}
@@ -309,7 +317,7 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-reset' && <AdminResetPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings', 'admin-reset'].includes(currentTab) && (
+          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-monetization', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings', 'admin-reset'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>
@@ -417,6 +425,7 @@ const AppContent: React.FC = () => {
       {/* Overlays & Modals */}
       <PurchaseModal />
       <RechargeModal />
+      <SubscriptionModal />
       <AuthModal />
 
       {/* Real Media Player (HTML5, local uploads, direct URLs, YouTube trailers) */}

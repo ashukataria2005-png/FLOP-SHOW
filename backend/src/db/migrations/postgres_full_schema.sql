@@ -337,15 +337,47 @@ INSERT INTO app_settings (key, value, updated_at)
 VALUES
   ('payment_upi_id', 'flopshow@upi', NOW()::TEXT),
   ('payment_upi_enabled', 'true', NOW()::TEXT),
-  ('payment_upi_merchant_name', 'FLOPSHOW', NOW()::TEXT)
+  ('payment_upi_merchant_name', 'FLOPSHOW', NOW()::TEXT),
+  ('monetization_mode', 'PER_CONTENT', NOW()::TEXT),
+  ('subscription_price_weekly', '49', NOW()::TEXT),
+  ('subscription_price_monthly', '149', NOW()::TEXT),
+  ('subscription_price_yearly', '999', NOW()::TEXT)
 ON CONFLICT (key) DO NOTHING;
 
 -- ==============================================================================
--- 16. MIGRATION TRACKING TABLE
+-- 16. SUBSCRIPTIONS
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  plan TEXT NOT NULL CHECK(plan IN ('WEEKLY', 'MONTHLY', 'YEARLY')),
+  status TEXT NOT NULL CHECK(status IN ('PENDING', 'ACTIVE', 'EXPIRED', 'CANCELLED', 'REJECTED')) DEFAULT 'PENDING',
+  amount_paid INTEGER NOT NULL DEFAULT 0,
+  payment_method TEXT NOT NULL DEFAULT 'MANUAL_UPI' CHECK(payment_method IN ('MANUAL_UPI', 'GATEWAY', 'ADMIN_GRANT')),
+  payment_reference TEXT,
+  admin_id TEXT,
+  admin_note TEXT,
+  submitted_at TEXT NOT NULL,
+  activated_at TEXT,
+  start_date TEXT,
+  end_date TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user_status ON subscriptions(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_end_date ON subscriptions(end_date);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_payment_ref ON subscriptions(payment_reference);
+
+-- ==============================================================================
+-- 17. MIGRATION TRACKING TABLE
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   applied_at TEXT NOT NULL
 );
+
 

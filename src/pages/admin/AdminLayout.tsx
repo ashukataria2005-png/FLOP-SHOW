@@ -72,6 +72,14 @@ const navGroups: NavGroup[] = [
     ]
   },
   {
+    id: 'group-monetization',
+    title: 'SUBSCRIPTION / MONETIZATION',
+    icon: Crown,
+    items: [
+      { id: 'admin-monetization', label: 'Subscription / Monetization', icon: Crown }
+    ]
+  },
+  {
     id: 'group-payments',
     title: 'PAYMENTS',
     icon: QrCode,

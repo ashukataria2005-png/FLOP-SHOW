@@ -459,6 +459,129 @@ div:has(> table) {
 }
 
 /* ==========================================================================
+   ADMIN DASHBOARD 2-COLUMN MOBILE RESPONSIVENESS & MODE SWITCH
+   ========================================================================== */
+.admin-today-cards-grid,
+.admin-summary-cards-grid,
+.admin-monetization-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.today-card-combined {
+  display: block;
+  grid-column: span 2;
+}
+
+.today-card-split {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Mode switch buttons fit 50/50 side-by-side without overflowing */
+  .admin-dashboard-mode-switch {
+    width: 100% !important;
+    display: flex !important;
+    gap: 8px !important;
+    margin-top: 8px !important;
+  }
+  .admin-dashboard-mode-btn {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    justify-content: center !important;
+    padding: 10px 8px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Today's Performance & Summary cards: EXACTLY 2 cards per row on mobile */
+  .admin-today-cards-grid,
+  .admin-summary-cards-grid,
+  .admin-monetization-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Hide combined wide card and reveal the two separate equal-width cards */
+  .today-card-combined {
+    display: none !important;
+  }
+  .today-card-split {
+    display: flex !important;
+  }
+
+  /* Stat Cards styling on mobile: equal width, equal height, wrapped text */
+  .admin-stat-card {
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 14px 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    border-radius: 14px !important;
+  }
+
+  .admin-stat-card .stat-header {
+    margin-bottom: 6px !important;
+  }
+
+  .admin-stat-card .stat-title {
+    font-size: 10.5px !important;
+    line-height: 1.2 !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+  }
+
+  .admin-stat-card .stat-value {
+    font-size: clamp(18px, 4.5vw, 24px) !important;
+    line-height: 1.15 !important;
+    margin: 4px 0 !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+  }
+
+  .admin-stat-card .stat-desc {
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+    margin-bottom: 8px !important;
+    word-break: break-word !important;
+  }
+
+  .admin-stat-card .stat-action {
+    font-size: 11px !important;
+    gap: 3px !important;
+  }
+
+  .admin-stat-card .stat-icon {
+    width: 28px !important;
+    height: 28px !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-stat-card {
+    padding: 12px 10px !important;
+    border-radius: 12px !important;
+  }
+  .admin-today-cards-grid,
+  .admin-summary-cards-grid,
+  .admin-monetization-grid {
+    gap: 8px !important;
+  }
+}
+
+/* ==========================================================================
    CINEMATIC SPOTLIGHT COMPONENT
    Proportionally scaling responsive aspect-ratio banner.
    Desktop: 21:9 cinematic aspect ratio.

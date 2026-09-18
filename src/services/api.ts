@@ -729,6 +729,14 @@ export const api = {
       return request<{ count: number; users: any[] }>('/admin/users');
     },
 
+    async deleteUsers(userIds: string[]) {
+      return request<{ success: boolean; deletedCount: number; message: string }>('/admin/users', {
+        method: 'DELETE',
+        body: JSON.stringify({ userIds })
+      });
+    },
+
+
     async updateUserStatus(userId: string, status: 'ACTIVE' | 'SUSPENDED') {
       return request<{ success: boolean; message: string }>(`/admin/users/${userId}/status`, {
         method: 'PATCH',

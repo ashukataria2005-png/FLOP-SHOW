@@ -1025,4 +1025,54 @@ export const adminService = {
       userId,
     ]);
   },
+
+  async deleteUsers(currentAdminUserId: string | undefined, userIds: string[]): Promise<{ deletedCount: number; message: string }> {
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      const err = new Error('No users selected for deletion.');
+      (err as any).statusCode = 400;
+      throw err;
+    }
+
+    const db = getAdapter();
+
+    const placeholders = userIds.map(() => '?').join(',');
+    const { rows: targetUsers } = await db.query(
+      `SELECT id, email, role FROM users WHERE id IN (${placeholders})`,
+      userIds
+    );
+
+    // Prevent deleting any ADMIN accounts or current logged-in admin
+    const adminTargets = (targetUsers as any[]).filter(
+      u => u.role === 'ADMIN' || (currentAdminUserId && u.id === currentAdminUserId)
+    );
+
+    if (adminTargets.length > 0) {
+      const err = new Error('Admin accounts cannot be deleted.');
+      (err as any).statusCode = 403;
+      throw err;
+    }
+
+    const validTargetIds = (targetUsers as any[]).map(u => u.id);
+    if (validTargetIds.length === 0) {
+      return { deletedCount: 0, message: 'No valid non-admin users found to delete.' };
+    }
+
+    for (const uid of validTargetIds) {
+      await db.run('DELETE FROM subscriptions WHERE user_id = ?', [uid]);
+      await db.run('DELETE FROM upi_payment_requests WHERE user_id = ?', [uid]);
+      await db.run('DELETE FROM watch_history WHERE user_id = ?', [uid]);
+      await db.run('DELETE FROM my_list WHERE user_id = ?', [uid]);
+      await db.run('DELETE FROM watch_progress WHERE user_id = ?', [uid]);
+      await db.run('DELETE FROM wallet_transactions WHERE user_id = ?', [uid]);
+      await db.run('DELETE FROM purchases WHERE user_id = ?', [uid]);
+      await db.run('DELETE FROM wallets WHERE user_id = ?', [uid]);
+      await db.run('DELETE FROM users WHERE id = ?', [uid]);
+    }
+
+    return {
+      deletedCount: validTargetIds.length,
+      message: `Successfully deleted ${validTargetIds.length} user(s).`
+    };
+  },
 };
+

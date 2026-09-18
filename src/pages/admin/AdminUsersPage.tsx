@@ -24,7 +24,8 @@ import {
   ArrowUpRight,
   Film,
   Tv,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 
 interface AdminUsersPageProps {
@@ -53,6 +54,34 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
   const [isResetting, setIsResetting] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
+
+  // User Selection & Bulk Delete State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleToggleSelectUser = (userId: string, isAdmin: boolean) => {
+    if (isAdmin) return;
+    setSelectedIds(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleConfirmDelete = async () => {
+    if (selectedIds.length === 0) return;
+    setIsDeleting(true);
+    try {
+      const res = await api.admin.deleteUsers(selectedIds);
+      showToast(res.message || `Deleted ${selectedIds.length} user(s).`, 'success');
+      setSelectedIds([]);
+      setShowDeleteConfirm(false);
+      await fetchUsers();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete selected users.', 'error');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -172,6 +201,30 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {selectedIds.length > 0 && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#EF4444',
+                color: '#FFFFFF',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                fontWeight: 700,
+                fontSize: '13px',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 2px 10px rgba(239, 68, 68, 0.35)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Trash2 size={15} />
+              <span>Delete Selected ({selectedIds.length})</span>
+            </button>
+          )}
+
           <div
             style={{
               padding: '8px 16px',
@@ -252,6 +305,9 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+                  <th style={{ width: '48px', padding: '16px 12px 16px 20px', textAlign: 'center' }}>
+                    {/* Manual selection column */}
+                  </th>
                   <th style={{ padding: '16px 20px', fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>User Profile</th>
                   <th style={{ padding: '16px 20px', fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Role</th>
                   <th style={{ padding: '16px 20px', fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Status</th>
@@ -264,14 +320,34 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
               <tbody>
                 {filteredUsers.map(user => {
                   const isAdmin = user.role === 'ADMIN';
+                  const isSelected = selectedIds.includes(user.id);
                   return (
                     <tr
                       key={user.id}
                       style={{
                         borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                        backgroundColor: isSelected ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
                         transition: 'background 0.15s ease'
                       }}
                     >
+                      {/* Checkbox Column */}
+                      <td style={{ padding: '16px 12px 16px 20px', textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={isAdmin}
+                          onChange={() => handleToggleSelectUser(user.id, isAdmin)}
+                          style={{
+                            width: '18px',
+                            height: '18px',
+                            accentColor: '#EF4444',
+                            cursor: isAdmin ? 'not-allowed' : 'pointer',
+                            opacity: isAdmin ? 0.3 : 1
+                          }}
+                          title={isAdmin ? 'Admin accounts cannot be deleted' : 'Select user'}
+                        />
+                      </td>
+
                       {/* User Profile */}
                       <td style={{ padding: '16px 20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -1232,6 +1308,108 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
                   )}
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* DELETE CONFIRMATION MODAL */}
+      {showDeleteConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 1100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => !isDeleting && setShowDeleteConfirm(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '460px',
+              backgroundColor: '#161622',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '16px',
+              padding: '28px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+              position: 'relative'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '12px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#EF4444'
+                }}
+              >
+                <AlertCircle size={24} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                  Delete {selectedIds.length} selected user{selectedIds.length > 1 ? 's' : ''}?
+                </h3>
+                <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0' }}>
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '14px', color: '#D1D5DB', lineHeight: 1.5, marginBottom: '24px' }}>
+              Are you sure you want to permanently delete {selectedIds.length === 1 ? 'this user' : `these ${selectedIds.length} users`}? All associated wallet balances, purchases, and subscriptions will also be removed.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#D1D5DB',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  backgroundColor: '#EF4444',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 10px rgba(239, 68, 68, 0.4)'
+                }}
+              >
+                {isDeleting && <Loader2 size={16} className="animate-spin" />}
+                <span>{isDeleting ? 'Deleting...' : 'Confirm Delete'}</span>
+              </button>
             </div>
           </div>
         </div>

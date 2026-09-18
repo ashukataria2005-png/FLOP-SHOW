@@ -51,6 +51,26 @@ adminRouter.get('/users', async (_req, res, next) => {
   }
 });
 
+adminRouter.delete('/users', async (req, res, next) => {
+  try {
+    const { userIds } = req.body;
+    const currentAdminId = (req as any).user?.id;
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'No users selected for deletion.' } });
+      return;
+    }
+    const result = await adminService.deleteUsers(currentAdminId, userIds);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    if (err.statusCode) {
+      res.status(err.statusCode).json({ error: { code: 'FORBIDDEN', message: err.message } });
+      return;
+    }
+    next(err);
+  }
+});
+
+
 adminRouter.get('/transactions', async (req, res, next) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;

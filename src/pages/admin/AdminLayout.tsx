@@ -63,6 +63,7 @@ interface NavGroup {
 }
 
 const navGroups: NavGroup[] = [
+  // 1. Dashboard
   {
     id: 'group-dashboard',
     title: 'DASHBOARD',
@@ -71,23 +72,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard }
     ]
   },
-  {
-    id: 'group-monetization',
-    title: 'SUBSCRIPTION / MONETIZATION',
-    icon: Crown,
-    items: [
-      { id: 'admin-monetization', label: 'Subscription / Monetization', icon: Crown }
-    ]
-  },
-  {
-    id: 'group-payments',
-    title: 'PAYMENTS',
-    icon: QrCode,
-    items: [
-      { id: 'admin-upi-settings', label: 'UPI Settings', icon: QrCode },
-      { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck }
-    ]
-  },
+  // 2. Content Catalog
   {
     id: 'group-content',
     title: 'CONTENT / CATALOG',
@@ -99,6 +84,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-genres', label: 'Genres & Categories', icon: Tag }
     ]
   },
+  // 3. Home Page
   {
     id: 'group-homepage',
     title: 'HOME PAGE',
@@ -109,6 +95,35 @@ const navGroups: NavGroup[] = [
       { id: 'admin-spotlight', label: 'Cinematic Spotlight', icon: Sparkles }
     ]
   },
+  // 4. Payments
+  {
+    id: 'group-payments',
+    title: 'PAYMENTS',
+    icon: QrCode,
+    items: [
+      { id: 'admin-upi-settings', label: 'UPI Settings', icon: QrCode },
+      { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck }
+    ]
+  },
+  // 5. Monetization
+  {
+    id: 'group-monetization',
+    title: 'SUBSCRIPTION / MONETIZATION',
+    icon: Crown,
+    items: [
+      { id: 'admin-monetization', label: 'Subscription / Monetization', icon: Crown }
+    ]
+  },
+  // 6. Ads
+  {
+    id: 'group-ads',
+    title: 'ADS',
+    icon: Megaphone,
+    items: [
+      { id: 'admin-ads', label: 'Advertisement / Ads', icon: Megaphone }
+    ]
+  },
+  // 7. Users
   {
     id: 'group-users',
     title: 'USERS',
@@ -117,6 +132,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-users', label: 'User Management', icon: Users }
     ]
   },
+  // 8. Transactions
   {
     id: 'group-finance',
     title: 'TRANSACTIONS / FINANCE',
@@ -126,14 +142,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-transactions', label: 'All Transactions', icon: CreditCard }
     ]
   },
-  {
-    id: 'group-ads',
-    title: 'ADS',
-    icon: Megaphone,
-    items: [
-      { id: 'admin-ads', label: 'Advertisement / Ads', icon: Megaphone }
-    ]
-  },
+  // 9. Settings
   {
     id: 'group-settings',
     title: 'SETTINGS',
@@ -143,6 +152,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-design', label: 'App Design & Themes', icon: Palette }
     ]
   },
+  // 10. Reset
   {
     id: 'group-reset',
     title: 'SYSTEM / RESET',

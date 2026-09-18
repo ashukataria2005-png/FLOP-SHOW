@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Loader2
 } from 'lucide-react';
+import { generateUpiQrDataUrl } from '../../utils/upiQr';
 
 export const SubscriptionModal: React.FC = () => {
   const {
@@ -39,6 +40,10 @@ export const SubscriptionModal: React.FC = () => {
     upiEnabled: true,
   });
 
+  // Dynamic UPI QR code state
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [qrLoading, setQrLoading] = useState<boolean>(false);
+
   useEffect(() => {
     if (activeModal === 'subscription') {
       api.payments.getConfig()
@@ -55,6 +60,21 @@ export const SubscriptionModal: React.FC = () => {
   if (activeModal !== 'subscription') return null;
 
   const selectedPlan = subscriptionPlans.find(p => p.id === selectedPlanId) || subscriptionPlans[1] || subscriptionPlans[0];
+
+  // Dynamically generate UPI QR code when reaching 'pay' step with selected plan amount
+  useEffect(() => {
+    if (step === 'pay' && upiConfig.upiId && selectedPlan && selectedPlan.priceRupees > 0) {
+      setQrLoading(true);
+      generateUpiQrDataUrl(upiConfig.upiId, selectedPlan.priceRupees, upiConfig.merchantName || 'FLOPSHOW')
+        .then(url => {
+          setQrCodeUrl(url);
+          setQrLoading(false);
+        })
+        .catch(() => {
+          setQrLoading(false);
+        });
+    }
+  }, [step, upiConfig.upiId, upiConfig.merchantName, selectedPlan?.priceRupees]);
 
   const handleCopyUpi = () => {
     if (navigator.clipboard) {
@@ -380,20 +400,55 @@ export const SubscriptionModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* UPI Payment Instructions */}
+              {/* Dynamic QR Display */}
+              <div
+                style={{
+                  backgroundColor: '#0A0A0F',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '16px',
+                  padding: '18px',
+                  textAlign: 'center',
+                  marginBottom: '18px'
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)', marginBottom: '12px' }}>
+                  Scan Dynamic UPI QR Code
+                </div>
+
+                {qrLoading ? (
+                  <div style={{ height: '190px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#9CA3AF' }}>
+                    <Loader2 size={24} className="animate-spin" color="var(--brand-gold, #F5C518)" />
+                    <span style={{ fontSize: '13px' }}>Generating dynamic UPI QR...</span>
+                  </div>
+                ) : qrCodeUrl ? (
+                  <div style={{ display: 'inline-block', padding: '10px', backgroundColor: '#FFFFFF', borderRadius: '12px', boxShadow: '0 8px 30px rgba(0, 0, 0, 0.8)' }}>
+                    <img
+                      src={qrCodeUrl}
+                      alt={`UPI QR Code for ₹${selectedPlan.priceRupees}`}
+                      style={{ width: '180px', height: '180px', display: 'block' }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#EF4444', fontSize: '13px' }}>
+                    Could not generate QR code. Please use the UPI ID below.
+                  </div>
+                )}
+
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '12px', marginBottom: 0 }}>
+                  Scan with <strong>GPay</strong>, <strong>PhonePe</strong>, <strong>Paytm</strong>, or any UPI app. Exact amount ₹{selectedPlan.priceRupees} is encoded.
+                </p>
+              </div>
+
+              {/* UPI ID (Secondary / Manual Option) */}
               <div
                 style={{
                   backgroundColor: 'rgba(0, 0, 0, 0.3)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '16px',
-                  padding: '16px',
+                  borderRadius: '14px',
+                  padding: '14px',
                   marginBottom: '20px'
                 }}
               >
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--brand-gold)', marginBottom: '8px' }}>
-                  Pay via any UPI App (GPay, PhonePe, Paytm, BHIM)
-                </div>
-
                 <div
                   style={{
                     display: 'flex',
@@ -403,12 +458,12 @@ export const SubscriptionModal: React.FC = () => {
                     borderRadius: '10px',
                     backgroundColor: '#181824',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    marginBottom: '12px'
+                    marginBottom: '10px'
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>UPI ID</div>
-                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#FFFFFF', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>UPI ID (Manual Option)</div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF', fontFamily: 'monospace' }}>
                       {upiConfig.upiId}
                     </div>
                   </div>
@@ -424,9 +479,9 @@ export const SubscriptionModal: React.FC = () => {
                 </div>
 
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  1. Send exact amount <strong>₹{selectedPlan.priceRupees}</strong> to the UPI ID above.<br />
-                  2. Copy the <strong>12-digit UTR / UPI Transaction Reference Number</strong> from your payment receipt.<br />
-                  3. Paste it below and submit for administrator verification.
+                  1. Scan the dynamic QR above or transfer <strong>₹{selectedPlan.priceRupees}</strong> to the UPI ID.<br />
+                  2. Copy the <strong>12-digit UTR / UPI Reference Number</strong> from your payment confirmation.<br />
+                  3. Enter it below and submit for administrator verification.
                 </div>
               </div>
 

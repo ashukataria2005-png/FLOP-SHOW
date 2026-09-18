@@ -383,16 +383,23 @@ input, textarea, select {
 }
 
 /* Responsive Table Wrapper */
-.table-responsive {
+.table-responsive,
+div:has(> table) {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
 }
 
-/* Admin Responsive Utilities */
+/* ==========================================================================
+   ADMIN PANEL RESPONSIVE UTILITIES & VIEWPORT ADAPTATIONS
+   Desktop layout is preserved intact; mobile adapts gracefully.
+   ========================================================================== */
 @media (max-width: 768px) {
   .admin-header-bar {
     padding: 0 12px !important;
+    height: 60px !important;
   }
   .admin-header-breadcrumb {
     display: none !important;
@@ -405,51 +412,143 @@ input, textarea, select {
   }
   .admin-main-container {
     padding: 16px 12px 60px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+  /* Remove excessive nested padding from admin page containers on mobile */
+  .admin-main-container > div {
+    padding: 8px 0 24px !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  /* Ensure all flex children can shrink and do not cause horizontal page overflow */
+  .admin-main-container,
+  .admin-main-container div,
+  .admin-main-container section,
+  .admin-main-container form {
+    min-width: 0;
+    box-sizing: border-box;
+  }
+  /* Reflow fixed/dense headers and action bars */
+  .admin-main-container h1 {
+    font-size: clamp(20px, 4.5vw, 26px) !important;
+  }
+  /* Form inputs, buttons and controls fit mobile screen */
+  .admin-main-container input,
+  .admin-main-container select,
+  .admin-main-container textarea {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-header-bar {
+    padding: 0 8px !important;
+  }
+  .admin-main-container {
+    padding: 12px 8px 60px !important;
+  }
+  /* Compact action buttons in header */
+  .admin-header-bar button {
+    padding: 7px 10px !important;
+    font-size: 12px !important;
   }
 }
 
 /* ==========================================================================
    CINEMATIC SPOTLIGHT COMPONENT
-   Full-width responsive immersive banner
+   Proportionally scaling responsive aspect-ratio banner.
+   Desktop: 21:9 cinematic aspect ratio.
+   Mobile/Tablet: 16:9 proportional aspect ratio — FULL artwork visible.
    ========================================================================== */
 .cinematic-spotlight-container {
+  width: 100%;
+  aspect-ratio: 21 / 9;
+  min-height: 320px;
+  max-height: 440px;
+  border-radius: 24px;
+  margin: 40px 0 32px;
+  padding: clamp(28px, 5vw, 52px);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), inset 0 0 100px rgba(0, 0, 0, 0.4);
   transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.cinematic-spotlight-container img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 25%;
+  z-index: 0;
+}
+
+@media (max-width: 1024px) {
+  .cinematic-spotlight-container {
+    aspect-ratio: 16 / 9;
+    min-height: 240px !important;
+    max-height: 380px !important;
+    padding: 24px 20px !important;
+    margin: 32px 0 24px !important;
+    border-radius: 20px !important;
+  }
 }
 
 @media (max-width: 768px) {
   .cinematic-spotlight-container {
-    margin: 24px 0 20px !important;
-    min-height: 480px !important;
-    max-height: none !important;
-    border-radius: 18px !important;
-    padding: 24px 18px !important;
+    aspect-ratio: 16 / 9;
+    min-height: 190px !important;
+    max-height: 300px !important;
+    margin: 22px 0 18px !important;
+    border-radius: 16px !important;
+    padding: 18px 16px !important;
   }
 
   .cinematic-spotlight-container h2 {
-    font-size: 26px !important;
+    font-size: clamp(18px, 4vw, 24px) !important;
     line-height: 1.2 !important;
   }
 
   .cinematic-spotlight-container p {
     font-size: 13px !important;
+    display: -webkit-box !important;
     -webkit-line-clamp: 2 !important;
-  }
-
-  .cinematic-spotlight-container .btn {
-    flex: 1 1 auto;
-    justify-content: center;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
   }
 }
 
 @media (max-width: 480px) {
   .cinematic-spotlight-container {
+    aspect-ratio: 16 / 9;
+    min-height: 160px !important;
+    max-height: 220px !important;
     border-radius: 14px !important;
-    padding: 20px 14px !important;
-    min-height: 460px !important;
+    padding: 14px 12px !important;
+    margin: 16px 0 14px !important;
   }
 
   .cinematic-spotlight-container h2 {
-    font-size: 22px !important;
+    font-size: 17px !important;
+    line-height: 1.2 !important;
+  }
+
+  .cinematic-spotlight-container p {
+    font-size: 11.5px !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 1 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
   }
 }
 

@@ -1242,7 +1242,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                   </div>
                 </div>
                 <button
-                  onClick={() => openSubscriptionModal()}
+                  onClick={() => openSubscriptionModal('MONTHLY', 'choose')}
                   className="btn btn-primary"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontWeight: 700 }}
                 >
@@ -1272,7 +1272,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                   Switch to an all-inclusive VIP pass to stream every blockbuster, exclusive original, and full web series season with zero per-content charges.
                 </p>
                 <button
-                  onClick={() => openSubscriptionModal()}
+                  onClick={() => openSubscriptionModal('MONTHLY', 'choose')}
                   className="btn btn-primary"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontWeight: 700, fontSize: '15px' }}
                 >
@@ -1388,7 +1388,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                     </div>
 
                     <button
-                      onClick={() => openSubscriptionModal()}
+                      onClick={() => openSubscriptionModal(plan.id, 'pay')}
                       className={isPopular ? 'btn btn-primary btn-block' : 'btn btn-secondary btn-block'}
                       disabled={isPendingForThis}
                       style={{

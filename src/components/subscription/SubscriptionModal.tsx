@@ -22,14 +22,18 @@ export const SubscriptionModal: React.FC = () => {
     activeSubscription,
     pendingSubscription,
     submitSubscriptionRequest,
-    openAuthModal,
     isAuthenticated,
-    showToast
+    showToast,
+    subscriptionTargetPlan,
+    subscriptionTargetStep,
+    user
   } = useApp();
 
-  const [selectedPlanId, setSelectedPlanId] = useState<'WEEKLY' | 'MONTHLY' | 'YEARLY'>('MONTHLY');
-  const [step, setStep] = useState<'choose' | 'pay'>('choose');
+  const [selectedPlanId, setSelectedPlanId] = useState<'WEEKLY' | 'MONTHLY' | 'YEARLY'>(subscriptionTargetPlan || 'MONTHLY');
+  const [step, setStep] = useState<'choose' | 'pay'>(subscriptionTargetStep || 'choose');
   const [utr, setUtr] = useState('');
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -44,51 +48,80 @@ export const SubscriptionModal: React.FC = () => {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [qrLoading, setQrLoading] = useState<boolean>(false);
 
+  // Safe fallback plans guaranteeing non-null selectedPlan and numbers
+  const fallbackPlans = [
+    { id: 'WEEKLY' as const, name: 'Weekly Plan', durationDays: 7, priceRupees: 49, description: '7 days of uninterrupted streaming across all devices.' },
+    { id: 'MONTHLY' as const, name: 'Monthly Plan', durationDays: 30, priceRupees: 149, description: '30 days full catalog access with HD & 4K playback.' },
+    { id: 'YEARLY' as const, name: 'Yearly Plan', durationDays: 365, priceRupees: 999, description: 'Best value! 365 days of unlimited movies and webseries.' }
+  ];
+
+  const plans = (subscriptionPlans && Array.isArray(subscriptionPlans) && subscriptionPlans.length > 0)
+    ? subscriptionPlans
+    : fallbackPlans;
+
+  const selectedPlan = plans.find(p => p.id === selectedPlanId)
+    || plans.find(p => p.id === 'MONTHLY')
+    || plans[0]
+    || fallbackPlans[1];
+
   useEffect(() => {
     if (activeModal === 'subscription') {
       api.payments.getConfig()
         .then(cfg => {
-          if (cfg) setUpiConfig(cfg);
+          if (cfg?.upiId) setUpiConfig(cfg);
         })
         .catch(() => {});
-      setStep('choose');
+      if (subscriptionTargetPlan) {
+        setSelectedPlanId(subscriptionTargetPlan);
+      }
+      setStep(subscriptionTargetStep || 'choose');
       setUtr('');
       setErrorMessage(null);
     }
-  }, [activeModal]);
-
-  if (activeModal !== 'subscription') return null;
-
-  const selectedPlan = subscriptionPlans.find(p => p.id === selectedPlanId) || subscriptionPlans[1] || subscriptionPlans[0];
+  }, [activeModal, subscriptionTargetPlan, subscriptionTargetStep]);
 
   // Dynamically generate UPI QR code when reaching 'pay' step with selected plan amount
   useEffect(() => {
-    if (step === 'pay' && upiConfig.upiId && selectedPlan && selectedPlan.priceRupees > 0) {
+    let isCancelled = false;
+    if (step === 'pay' && selectedPlan) {
+      const upi = upiConfig?.upiId || 'flopshow@upi';
+      const merchant = upiConfig?.merchantName || 'FLOPSHOW';
+      const price = Number(selectedPlan.priceRupees) || 149;
+
       setQrLoading(true);
-      generateUpiQrDataUrl(upiConfig.upiId, selectedPlan.priceRupees, upiConfig.merchantName || 'FLOPSHOW')
+      generateUpiQrDataUrl(upi, price, merchant)
         .then(url => {
-          setQrCodeUrl(url);
-          setQrLoading(false);
+          if (!isCancelled) {
+            setQrCodeUrl(url);
+            setQrLoading(false);
+          }
         })
         .catch(() => {
-          setQrLoading(false);
+          if (!isCancelled) {
+            setQrLoading(false);
+          }
         });
     }
-  }, [step, upiConfig.upiId, upiConfig.merchantName, selectedPlan?.priceRupees]);
+    return () => {
+      isCancelled = true;
+    };
+  }, [step, upiConfig?.upiId, upiConfig?.merchantName, selectedPlan?.priceRupees, selectedPlanId]);
+
+  if (activeModal !== 'subscription') return null;
 
   const handleCopyUpi = () => {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(upiConfig.upiId);
+      navigator.clipboard.writeText(upiConfig.upiId || 'flopshow@upi');
       showToast('UPI ID copied to clipboard!', 'success');
     }
   };
 
+  const handleSelectPlan = (planId: 'WEEKLY' | 'MONTHLY' | 'YEARLY') => {
+    setSelectedPlanId(planId);
+    setStep('pay');
+  };
+
   const handleProceedToPayment = () => {
-    if (!isAuthenticated) {
-      closeSubscriptionModal();
-      openAuthModal();
-      return;
-    }
     setStep('pay');
   };
 
@@ -98,10 +131,17 @@ export const SubscriptionModal: React.FC = () => {
       setErrorMessage('Please enter the 6-35 character UPI Transaction ID / UTR.');
       return;
     }
+    if (!isAuthenticated && (!guestEmail.trim() || !guestEmail.includes('@'))) {
+      setErrorMessage('Please enter a valid email address for subscription verification.');
+      return;
+    }
 
     setSubmitting(true);
     setErrorMessage(null);
-    const res = await submitSubscriptionRequest(selectedPlan.id, utr.trim());
+    const finalName = isAuthenticated ? user.name : (guestName.trim() || 'FLOPSHOW Subscriber');
+    const finalEmail = isAuthenticated ? user.email : guestEmail.trim();
+
+    const res = await submitSubscriptionRequest(selectedPlan.id, utr.trim(), finalName, finalEmail);
     setSubmitting(false);
 
     if (res.success) {
@@ -242,14 +282,14 @@ export const SubscriptionModal: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {subscriptionPlans.map(plan => {
+                  {plans.map(plan => {
                     const isSelected = selectedPlanId === plan.id;
                     const isPopular = plan.id === 'MONTHLY';
 
                     return (
                       <div
                         key={plan.id}
-                        onClick={() => setSelectedPlanId(plan.id)}
+                        onClick={() => handleSelectPlan(plan.id)}
                         style={{
                           position: 'relative',
                           padding: '16px 20px',
@@ -365,9 +405,7 @@ export const SubscriptionModal: React.FC = () => {
               >
                 <Crown size={18} />
                 <span>
-                  {isAuthenticated
-                    ? `Continue with ${selectedPlan.name} • ₹${selectedPlan.priceRupees}`
-                    : 'Sign In to Subscribe'}
+                  Continue with {selectedPlan.name} • ₹{selectedPlan.priceRupees}
                 </span>
               </button>
             </div>
@@ -484,6 +522,55 @@ export const SubscriptionModal: React.FC = () => {
                   3. Enter it below and submit for administrator verification.
                 </div>
               </div>
+
+              {/* Guest Details if not signed in */}
+              {!isAuthenticated && (
+                <div style={{ marginBottom: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      Your Name
+                    </label>
+                    <input
+                      type="text"
+                      value={guestName}
+                      onChange={e => setGuestName(e.target.value)}
+                      placeholder="e.g. Rahul Sharma"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: '14px',
+                        backgroundColor: '#161622',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '8px',
+                        color: '#FFFFFF',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      Your Email <span style={{ color: '#F87171' }}>*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={guestEmail}
+                      onChange={e => setGuestEmail(e.target.value)}
+                      placeholder="e.g. rahul@gmail.com"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: '14px',
+                        backgroundColor: '#161622',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '8px',
+                        color: '#FFFFFF',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* UTR Input */}
               <div style={{ marginBottom: '20px' }}>

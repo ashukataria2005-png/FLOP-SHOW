@@ -69,8 +69,10 @@ interface AppContextType {
   closeRechargeModal: () => void;
   openAuthModal: () => void;
   closeAuthModal: () => void;
-  openSubscriptionModal: () => void;
+  openSubscriptionModal: (planId?: 'WEEKLY' | 'MONTHLY' | 'YEARLY', initialStep?: 'choose' | 'pay') => void;
   closeSubscriptionModal: () => void;
+  subscriptionTargetPlan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+  subscriptionTargetStep: 'choose' | 'pay';
 
   // Monetization Mode & Subscriptions
   monetizationMode: 'PER_CONTENT' | 'SUBSCRIPTION';
@@ -102,7 +104,7 @@ interface AppContextType {
   hasActiveSubscription: boolean;
   refreshMonetizationConfig: () => Promise<void>;
   refreshSubscriptionStatus: () => Promise<void>;
-  submitSubscriptionRequest: (plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', utr: string) => Promise<{ success: boolean; message: string }>;
+  submitSubscriptionRequest: (plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', utr: string, userName?: string, userEmail?: string) => Promise<{ success: boolean; message: string }>;
 
   // Player State
   activePlayerContent: ContentItem | null;
@@ -208,20 +210,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Monetization Mode & Subscription states
   const [monetizationMode, setMonetizationMode] = useState<'PER_CONTENT' | 'SUBSCRIPTION'>('PER_CONTENT');
+  const DEFAULT_SUBSCRIPTION_PLANS: Array<{
+    id: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    name: string;
+    durationDays: number;
+    priceRupees: number;
+    description: string;
+  }> = [
+    { id: 'WEEKLY', name: 'Weekly Plan', durationDays: 7, priceRupees: 49, description: '7 days of uninterrupted streaming across all devices.' },
+    { id: 'MONTHLY', name: 'Monthly Plan', durationDays: 30, priceRupees: 149, description: '30 days full catalog access with HD & 4K playback.' },
+    { id: 'YEARLY', name: 'Yearly Plan', durationDays: 365, priceRupees: 999, description: 'Best value! 365 days of unlimited movies and webseries.' }
+  ];
+
   const [subscriptionPlans, setSubscriptionPlans] = useState<Array<{
     id: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
     name: string;
     durationDays: number;
     priceRupees: number;
     description: string;
-  }>>([
-    { id: 'WEEKLY', name: 'Weekly Plan', durationDays: 7, priceRupees: 49, description: '7 days of uninterrupted streaming across all devices.' },
-    { id: 'MONTHLY', name: 'Monthly Plan', durationDays: 30, priceRupees: 149, description: '30 days full catalog access with HD & 4K playback.' },
-    { id: 'YEARLY', name: 'Yearly Plan', durationDays: 365, priceRupees: 999, description: 'Best value! 365 days of unlimited movies and webseries.' }
-  ]);
+  }>>(DEFAULT_SUBSCRIPTION_PLANS);
   const [activeSubscription, setActiveSubscription] = useState<any>(null);
   const [pendingSubscription, setPendingSubscription] = useState<any>(null);
   const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean>(false);
+  const [subscriptionTargetPlan, setSubscriptionTargetPlan] = useState<'WEEKLY' | 'MONTHLY' | 'YEARLY'>('MONTHLY');
+  const [subscriptionTargetStep, setSubscriptionTargetStep] = useState<'choose' | 'pay'>('choose');
 
   const refreshMonetizationConfig = async () => {
     try {
@@ -229,11 +241,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (res?.mode) {
         setMonetizationMode(res.mode);
       }
-      if (res?.plans && res.plans.length > 0) {
-        setSubscriptionPlans(res.plans);
+      if (res?.plans && Array.isArray(res.plans) && res.plans.length > 0) {
+        const normalized = res.plans.map((p: any) => {
+          const rawId = String(p.id || p.plan || 'MONTHLY').toUpperCase();
+          const id = (rawId === 'WEEKLY' || rawId === 'YEARLY' ? rawId : 'MONTHLY') as 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+          const defaultRef = DEFAULT_SUBSCRIPTION_PLANS.find(d => d.id === id) || DEFAULT_SUBSCRIPTION_PLANS[1];
+          const rawPrice = p.priceRupees ?? p.price_inr ?? p.price;
+          const numPrice = Number(rawPrice);
+          const rawDays = p.durationDays ?? p.duration_days;
+          const numDays = Number(rawDays);
+          return {
+            id,
+            name: p.name || defaultRef.name,
+            durationDays: !isNaN(numDays) && numDays > 0 ? numDays : defaultRef.durationDays,
+            priceRupees: !isNaN(numPrice) && numPrice >= 0 ? numPrice : defaultRef.priceRupees,
+            description: p.description || defaultRef.description
+          };
+        });
+        setSubscriptionPlans(normalized);
       }
     } catch {
-      // Offline fallback
+      // Offline fallback: keep current defaults
     }
   };
 
@@ -254,9 +282,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const submitSubscriptionRequest = async (plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', utr: string) => {
+  const submitSubscriptionRequest = async (plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', utr: string, userName?: string, userEmail?: string) => {
     try {
-      const res = await api.subscriptions.submitRequest(plan, utr, user.name, user.email);
+      const finalName = userName || user.name || 'FLOPSHOW Subscriber';
+      const finalEmail = userEmail || user.email || 'subscriber@flopshow.in';
+      const res = await api.subscriptions.submitRequest(plan, utr, finalName, finalEmail);
       await refreshSubscriptionStatus();
       showToast(res.message || 'Subscription request submitted! Awaiting administrator verification.', 'success');
       return { success: true, message: res.message };
@@ -266,7 +296,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const openSubscriptionModal = () => {
+  const openSubscriptionModal = (planId?: 'WEEKLY' | 'MONTHLY' | 'YEARLY', initialStep: 'choose' | 'pay' = 'choose') => {
+    if (planId) {
+      setSubscriptionTargetPlan(planId);
+    }
+    setSubscriptionTargetStep(initialStep);
     setActiveModal('subscription');
   };
 
@@ -1095,6 +1129,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         closeAuthModal,
         openSubscriptionModal,
         closeSubscriptionModal,
+        subscriptionTargetPlan,
+        subscriptionTargetStep,
         monetizationMode,
         subscriptionPlans,
         activeSubscription,

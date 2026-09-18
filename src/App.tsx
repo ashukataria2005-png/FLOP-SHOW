@@ -32,7 +32,7 @@ import { SubscriptionModal } from './components/subscription/SubscriptionModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { MediaPlayer } from './components/player/MediaPlayer';
 import { ContentItem } from './types/content';
-import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Info, Crown } from 'lucide-react';
 
 /**
  * Map browser pathname to app tab state
@@ -484,11 +484,86 @@ const AppContent: React.FC = () => {
   );
 };
 
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('AppErrorBoundary caught an uncaught render error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          style={{
+            minHeight: '100vh',
+            backgroundColor: '#07070A',
+            color: '#FFFFFF',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            textAlign: 'center',
+            fontFamily: "'Outfit', sans-serif"
+          }}
+        >
+          <div
+            style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(245, 166, 35, 0.15)',
+              border: '1px solid rgba(245, 166, 35, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '20px',
+              color: 'var(--brand-gold, #F5C518)'
+            }}
+          >
+            <Crown size={28} />
+          </div>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px' }}>
+            FLOPSHOW Temporary Error
+          </h2>
+          <p style={{ fontSize: '14px', color: '#9CA3AF', maxWidth: '440px', lineHeight: 1.5, marginBottom: '24px' }}>
+            {this.state.error?.message || 'An unexpected rendering error occurred. You can safely reload the platform.'}
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              window.location.reload();
+            }}
+            className="btn btn-primary"
+            style={{ padding: '12px 24px', fontWeight: 700, fontSize: '14px' }}
+          >
+            Reload FLOPSHOW
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const App: React.FC = () => {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <AppErrorBoundary>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </AppErrorBoundary>
   );
 };
 

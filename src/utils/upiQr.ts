@@ -7,21 +7,29 @@ import QRCode from 'qrcode';
  */
 export async function generateUpiQrDataUrl(
   upiId: string,
-  amount: number,
+  amount: number | string,
   merchantName = 'FLOPSHOW'
 ): Promise<string> {
-  const cleanUpi = upiId.trim();
-  const encodedName = encodeURIComponent(merchantName.trim() || 'FLOPSHOW');
-  const amountStr = amount.toFixed(2);
+  const cleanUpi = (upiId || 'flopshow@upi').trim();
+  const cleanMerchant = (merchantName || 'FLOPSHOW').trim();
+  const numAmount = Number(amount);
+  const validAmount = !isNaN(numAmount) && numAmount > 0 ? numAmount : 149;
+  const amountStr = validAmount.toFixed(2);
+  const encodedName = encodeURIComponent(cleanMerchant);
   const upiUri = `upi://pay?pa=${cleanUpi}&pn=${encodedName}&am=${amountStr}&cu=INR`;
 
-  return QRCode.toDataURL(upiUri, {
-    width: 280,
-    margin: 2,
-    errorCorrectionLevel: 'M',
-    color: {
-      dark: '#0E0E14',
-      light: '#FFFFFF',
-    },
-  });
+  try {
+    return await QRCode.toDataURL(upiUri, {
+      width: 280,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#0E0E14',
+        light: '#FFFFFF',
+      },
+    });
+  } catch (err) {
+    console.error('generateUpiQrDataUrl QR generation error:', err);
+    return '';
+  }
 }

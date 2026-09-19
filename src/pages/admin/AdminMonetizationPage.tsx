@@ -34,6 +34,10 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
   const [threeMonthsPrice, setThreeMonthsPrice] = useState<number>(189);
   const [yearlyPrice, setYearlyPrice] = useState<number>(449);
 
+  // Default Content Prices (in Rupees)
+  const [defaultMoviePrice, setDefaultMoviePrice] = useState<number>(30);
+  const [defaultSeriesPrice, setDefaultSeriesPrice] = useState<number>(35);
+
   // Metrics
   const [metrics, setMetrics] = useState({
     totalSubscriptions: 0,
@@ -65,6 +69,8 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
         setMonthlyPrice(res.config.monthlyPrice || 89);
         setThreeMonthsPrice(res.config.threeMonthsPrice || 189);
         setYearlyPrice(res.config.yearlyPrice || 449);
+        setDefaultMoviePrice(res.config.defaultMoviePrice || 30);
+        setDefaultSeriesPrice(res.config.defaultSeriesPrice || 35);
         if (res.config.metrics) {
           setMetrics(res.config.metrics);
         }
@@ -110,6 +116,8 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
         monthlyPrice: Number(monthlyPrice),
         threeMonthsPrice: Number(threeMonthsPrice),
         yearlyPrice: Number(yearlyPrice),
+        defaultMoviePrice: Number(defaultMoviePrice),
+        defaultSeriesPrice: Number(defaultSeriesPrice),
       });
 
       if (res?.config) {
@@ -117,6 +125,8 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
         setMonthlyPrice(res.config.monthlyPrice);
         setThreeMonthsPrice(res.config.threeMonthsPrice);
         setYearlyPrice(res.config.yearlyPrice);
+        if (res.config.defaultMoviePrice !== undefined) setDefaultMoviePrice(res.config.defaultMoviePrice);
+        if (res.config.defaultSeriesPrice !== undefined) setDefaultSeriesPrice(res.config.defaultSeriesPrice);
         if (res.config.metrics) setMetrics(res.config.metrics);
       }
 
@@ -387,9 +397,9 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
               </div>
 
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                • Existing wallet & UPI recharge system remains fully active.<br />
-                • Movies and series display individual prices (₹10 / ₹20).<br />
-                • Users purchase content for permanent library ownership.
+                • Movies and series use central default prices (₹30 / ₹35) or custom overrides.<br />
+                • Direct UPI QR &amp; UTR verification provides seamless 1-Month ownership.<br />
+                • Users purchase content with instant ownership in their personal library.
               </div>
             </div>
 
@@ -433,9 +443,110 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
             </div>
           </div>
 
+          {/* Default Movie & Series Pricing */}
+          <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 16px' }}>
+            2. Default Movie &amp; Series Pricing
+          </h2>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+            Set baseline prices for movies and series across the platform. These prices apply automatically to all titles unless an individual custom price override is specified in Content Management.
+          </p>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '20px',
+              marginBottom: '32px'
+            }}
+          >
+            {/* Default Movie Price */}
+            <div
+              style={{
+                backgroundColor: '#1B1B28',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '18px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <Film size={16} color="var(--brand-gold)" />
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF' }}>Default Movie Price</span>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                Standard 30-Day Movie Unlock
+              </div>
+
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
+                Price in INR (₹)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--brand-gold)', fontWeight: 700 }}>₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={defaultMoviePrice}
+                  onChange={e => setDefaultMoviePrice(Number(e.target.value))}
+                  required
+                  className="input-field"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px 10px 28px',
+                    borderRadius: '10px',
+                    backgroundColor: '#12121A',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#FFFFFF',
+                    fontWeight: 700
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Default Series Price */}
+            <div
+              style={{
+                backgroundColor: '#1B1B28',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '18px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <Film size={16} color="var(--brand-gold)" />
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF' }}>Default Series Price</span>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                Standard 30-Day Web Series Unlock
+              </div>
+
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
+                Price in INR (₹)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--brand-gold)', fontWeight: 700 }}>₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={defaultSeriesPrice}
+                  onChange={e => setDefaultSeriesPrice(Number(e.target.value))}
+                  required
+                  className="input-field"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px 10px 28px',
+                    borderRadius: '10px',
+                    backgroundColor: '#12121A',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#FFFFFF',
+                    fontWeight: 700
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Subscription Plans Pricing */}
           <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 16px' }}>
-            2. Configure Subscription Plan Prices
+            3. Configure Subscription Plan Prices
           </h2>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
             Set the dynamic pricing for all 3 VIP subscription plans (Monthly ₹89, 3 Months ₹189, 12 Months ₹449). Prices are persistently saved in the database and loaded by clients in real time.

@@ -142,7 +142,7 @@ export const AdminQuickAddPage: React.FC<AdminQuickAddPageProps> = ({ onNavigate
     try {
       const res = await api.admin.getMetadataDetails(candidate.providerId, candidate.type);
       setPreviewDetails(res.details);
-      setCustomPriceRupees(res.details.suggestedPriceRupees || (candidate.type === 'MOVIE' ? 10 : 20));
+      setCustomPriceRupees(res.details.suggestedPriceRupees || (candidate.type === 'MOVIE' ? 30 : 35));
       setAllowOverwrite(false);
       // Smooth scroll down to preview
       window.scrollTo({ top: 320, behavior: 'smooth' });
@@ -1063,7 +1063,7 @@ export const AdminQuickAddPage: React.FC<AdminQuickAddPageProps> = ({ onNavigate
                           />
                         </div>
                         <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                          Default: ₹{previewDetails.type === 'MOVIE' ? '10 (Movie)' : '20 (Series)'}
+                          Default: ₹{previewDetails.type === 'MOVIE' ? '30 (Movie)' : '35 (Series)'}
                         </span>
                       </div>
                     </div>

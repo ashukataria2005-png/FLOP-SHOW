@@ -10,6 +10,8 @@ export interface MonetizationPublicConfig {
   currencySymbol: string;
   upiId: string;
   merchantName: string;
+  defaultMoviePrice: number;
+  defaultSeriesPrice: number;
 }
 
 export interface MonetizationAdminConfig {
@@ -18,6 +20,8 @@ export interface MonetizationAdminConfig {
   monthlyPrice: number;
   threeMonthsPrice: number;
   yearlyPrice: number;
+  defaultMoviePrice: number;
+  defaultSeriesPrice: number;
   currencySymbol: string;
   metrics: {
     totalSubscriptions: number;
@@ -59,12 +63,17 @@ export const monetizationService = {
     const plans = await subscriptionService.getPlans();
     const settings = await adminService.getSettings();
 
+    const defaultMoviePrice = parseInt(settings.per_movie_price || '30', 10);
+    const defaultSeriesPrice = parseInt(settings.per_series_price || '35', 10);
+
     return {
       mode,
       plans,
       currencySymbol: settings.currency_symbol || '₹',
       upiId: settings.payment_upi_id || 'flopshow@upi',
       merchantName: settings.payment_upi_merchant_name || 'FLOPSHOW',
+      defaultMoviePrice: isNaN(defaultMoviePrice) ? 30 : defaultMoviePrice,
+      defaultSeriesPrice: isNaN(defaultSeriesPrice) ? 35 : defaultSeriesPrice,
     };
   },
 
@@ -79,6 +88,9 @@ export const monetizationService = {
     const monthly = plans.find(p => p.id === 'MONTHLY')?.priceRupees || 89;
     const threeMonths = plans.find(p => p.id === '3_MONTHS')?.priceRupees || 189;
     const yearly = plans.find(p => p.id === 'YEARLY')?.priceRupees || 449;
+
+    const defaultMoviePrice = parseInt(settings.per_movie_price || '30', 10);
+    const defaultSeriesPrice = parseInt(settings.per_series_price || '35', 10);
 
     // Fetch subscription metrics from DB
     const db = getAdapter();
@@ -100,6 +112,8 @@ export const monetizationService = {
       monthlyPrice: monthly,
       threeMonthsPrice: threeMonths,
       yearlyPrice: yearly,
+      defaultMoviePrice: isNaN(defaultMoviePrice) ? 30 : defaultMoviePrice,
+      defaultSeriesPrice: isNaN(defaultSeriesPrice) ? 35 : defaultSeriesPrice,
       currencySymbol: settings.currency_symbol || '₹',
       metrics: {
         totalSubscriptions: parseInt(stats.total || '0', 10),
@@ -119,6 +133,8 @@ export const monetizationService = {
     monthlyPrice?: number;
     threeMonthsPrice?: number;
     yearlyPrice?: number;
+    defaultMoviePrice?: number;
+    defaultSeriesPrice?: number;
   }): Promise<MonetizationAdminConfig> {
     const updates: Record<string, string> = {};
 
@@ -148,6 +164,18 @@ export const monetizationService = {
       const num = Math.round(Number(data.yearlyPrice));
       if (isNaN(num) || num < 0) throw new Error('Yearly plan price must be a valid non-negative number.');
       updates.subscription_price_yearly = String(num);
+    }
+
+    if (data.defaultMoviePrice !== undefined) {
+      const num = Math.round(Number(data.defaultMoviePrice));
+      if (isNaN(num) || num < 0) throw new Error('Default movie price must be a valid non-negative number.');
+      updates.per_movie_price = String(num);
+    }
+
+    if (data.defaultSeriesPrice !== undefined) {
+      const num = Math.round(Number(data.defaultSeriesPrice));
+      if (isNaN(num) || num < 0) throw new Error('Default series price must be a valid non-negative number.');
+      updates.per_series_price = String(num);
     }
 
     if (Object.keys(updates).length > 0) {

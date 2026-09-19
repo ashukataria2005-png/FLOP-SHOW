@@ -65,12 +65,12 @@ export const AdminFreeContentPage: React.FC<AdminFreeContentPageProps> = ({ onNa
   const handleToggleFree = async (item: ContentItem) => {
     const isCurrentlyFree = Boolean(item.isFree || item.price === 0);
     const newPriceRupees = isCurrentlyFree
-      ? (item.type === 'series' ? 20 : 10) // default paid price when switching from Free to Paid
+      ? ((item.customPrice && item.customPrice > 0) ? item.customPrice : (item.type === 'series' ? 35 : 30))
       : 0; // ₹0 for 100% Free
 
     try {
       setUpdatingId(item.id);
-      await api.admin.updatePrice(item.id, newPriceRupees);
+      await api.admin.updatePrice(item.id, newPriceRupees, newPriceRupees === 0 ? null : (item.customPrice || null));
       await refreshCatalog();
 
       if (newPriceRupees === 0) {
@@ -95,7 +95,7 @@ export const AdminFreeContentPage: React.FC<AdminFreeContentPageProps> = ({ onNa
 
     try {
       setUpdatingId(item.id);
-      await api.admin.updatePrice(item.id, parsed);
+      await api.admin.updatePrice(item.id, parsed, parsed > 0 ? parsed : null);
       await refreshCatalog();
 
       if (parsed === 0) {
@@ -224,7 +224,7 @@ export const AdminFreeContentPage: React.FC<AdminFreeContentPageProps> = ({ onNa
             {paidCount}
           </div>
           <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '4px' }}>
-            Requires Wallet Balance (₹10 / ₹20)
+            Requires Purchase / Active Ownership (₹30 / ₹35)
           </div>
         </div>
       </div>
@@ -539,9 +539,8 @@ export const AdminFreeContentPage: React.FC<AdminFreeContentPageProps> = ({ onNa
                                 cursor: 'pointer'
                               }}
                             >
-                              <option value="10">₹10</option>
-                              <option value="20">₹20</option>
-                              <option value="30">₹30</option>
+                              <option value="30">₹30 (Movie)</option>
+                              <option value="35">₹35 (Series)</option>
                               <option value="50">₹50</option>
                               <option value="100">₹100</option>
                             </select>

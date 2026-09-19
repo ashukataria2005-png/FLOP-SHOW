@@ -62,9 +62,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     user,
     walletBalance,
     transactions,
-    purchases,
-    myList,
-    watchProgress,
     logout,
     openAuthModal,
     openRechargeModal,
@@ -252,6 +249,33 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
       // Ignore
     }
   };
+
+  const currentPlanName = (() => {
+    if (hasActiveSubscription && activeSubscription) {
+      const planId = (activeSubscription as any).plan_id || (activeSubscription as any).planId;
+      if (planId === 'MONTHLY') return 'VIP Monthly';
+      if (planId === '3_MONTHS') return 'VIP 3 Months';
+      if (planId === 'YEARLY') return 'VIP Yearly (12 Months)';
+      if (planId === 'WEEKLY') return 'VIP Weekly';
+      return 'VIP Subscription';
+    }
+    if (userWatchPasses.activePasses.length > 0) {
+      const p = userWatchPasses.activePasses[0];
+      const planType = p.plan_type || p.planType;
+      if (planType === '24H') return 'Watch Pass (24H)';
+      if (planType === '3D') return 'Watch Pass (3 Days)';
+      if (planType === '7D') return 'Watch Pass (7 Days)';
+      if (planType === '15D') return 'Watch Pass (15 Days)';
+      return 'Watch Pass';
+    }
+    if (pendingSubscription) {
+      return 'Subscription (Pending Approval)';
+    }
+    if (userWatchPasses.pendingPasses.length > 0) {
+      return 'Watch Pass (Pending Approval)';
+    }
+    return 'Free / Standard Plan';
+  })();
 
   return (
     <div style={{ padding: '24px 20px', maxWidth: '840px', margin: '0 auto' }}>
@@ -502,9 +526,16 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                   )}
                 </div>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '2px' }}>{user.email}</p>
-                <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px' }}>
-                  Member since {user.joinedDate}
-                </p>
+                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Plan:</span>
+                  <span style={{
+                    fontSize: '13px',
+                    fontWeight: 800,
+                    color: hasActiveSubscription || userWatchPasses.activePasses.length > 0 ? '#10B981' : 'var(--brand-gold, #F5C518)'
+                  }}>
+                    {currentPlanName}
+                  </span>
+                </div>
               </div>
 
               {isAuthenticated && (
@@ -585,38 +616,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                 </div>
               </form>
             )}
-
-            {/* Quick Stats Banner */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '12px',
-                backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                borderRadius: '16px',
-                padding: '14px 10px',
-                textAlign: 'center'
-              }}
-            >
-              <div>
-                <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--brand-gold)' }}>
-                  {purchases.length}
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Owned Titles</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF' }}>
-                  {myList.length}
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>In My List</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF' }}>
-                  {watchProgress.length}
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Watched</div>
-              </div>
-            </div>
           </div>
 
           {/* Mode A: Wallet Balance Shortcut Strip */}
@@ -914,7 +913,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
             </div>
 
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '8px', maxWidth: '440px' }}>
-              Use your wallet balance to unlock movies (₹10) and web series (₹20) with instant one-click checkout.
+              Use your wallet balance for instant one-click checkout across the FLOPSHOW catalog.
             </p>
 
             {/* Action Button */}

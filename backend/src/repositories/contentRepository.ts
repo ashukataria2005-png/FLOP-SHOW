@@ -11,6 +11,9 @@ export interface ContentRecord {
   trailer_url: string | null;
   video_url: string | null;
   price: number;
+  custom_price?: number | null;
+  priceRupees?: number;
+  customPriceRupees?: number | null;
   language: string;
   release_year: number;
   duration: string | null;
@@ -35,6 +38,64 @@ export interface ContentRecord {
   vcdn_thumbnail_url?: string | null;
   media_provider?: string | null;
   genres?: string[]; // array of genre names
+}
+
+export async function getDefaultPrices(): Promise<{ defaultMoviePrice: number; defaultSeriesPrice: number }> {
+  try {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      "SELECT key, value FROM app_settings WHERE key IN ('per_movie_price', 'per_series_price');"
+    );
+    let defaultMoviePrice = 30;
+    let defaultSeriesPrice = 35;
+    for (const r of rows as { key: string; value: string }[]) {
+      if (r.key === 'per_movie_price') defaultMoviePrice = parseInt(r.value, 10) || 30;
+      if (r.key === 'per_series_price') defaultSeriesPrice = parseInt(r.value, 10) || 35;
+    }
+    return { defaultMoviePrice, defaultSeriesPrice };
+  } catch {
+    return { defaultMoviePrice: 30, defaultSeriesPrice: 35 };
+  }
+}
+
+export function resolveContentPricing(
+  r: ContentRecord,
+  defaults: { defaultMoviePrice: number; defaultSeriesPrice: number }
+): ContentRecord & { priceRupees: number; customPriceRupees: number | null } {
+  // Free content (price === 0)
+  if (r.price === 0) {
+    return {
+      ...r,
+      price: 0,
+      priceRupees: 0,
+      custom_price: null,
+      customPriceRupees: null
+    };
+  }
+
+  // Individual/Custom Override Price (> 0)
+  if (r.custom_price !== null && r.custom_price !== undefined && Number(r.custom_price) > 0) {
+    const cpPaise = Number(r.custom_price);
+    const cpRupees = Math.round(cpPaise / 100);
+    return {
+      ...r,
+      price: cpPaise,
+      priceRupees: cpRupees,
+      custom_price: cpPaise,
+      customPriceRupees: cpRupees
+    };
+  }
+
+  // Fallback to central system defaults
+  const defaultRupees = r.type === 'SERIES' ? defaults.defaultSeriesPrice : defaults.defaultMoviePrice;
+  const defaultPaise = defaultRupees * 100;
+  return {
+    ...r,
+    price: defaultPaise,
+    priceRupees: defaultRupees,
+    custom_price: null,
+    customPriceRupees: null
+  };
 }
 
 export interface GenreRecord {
@@ -73,6 +134,9 @@ export interface EpisodeRecord {
 }
 
 export const contentRepository = {
+  getDefaultPrices,
+  resolveContentPricing,
+
   async list(
     filters: {
       status?: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'ALL';
@@ -183,10 +247,11 @@ export const contentRepository = {
       genresByContentId.get(gr.content_id)!.push(gr.name);
     }
 
-    return records.map(r => ({
+    const defaultPrices = await getDefaultPrices();
+    return records.map(r => resolveContentPricing({
       ...r,
       genres: genresByContentId.get(r.id) || []
-    }));
+    }, defaultPrices));
   },
 
   async findByIdOrSlug(idOrSlug: string): Promise<ContentRecord | null> {
@@ -200,10 +265,11 @@ export const contentRepository = {
     );
     if (!rows[0]) return null;
     const row = rows[0] as ContentRecord;
-    return {
+    const defaultPrices = await getDefaultPrices();
+    return resolveContentPricing({
       ...row,
       genres: await contentRepository.getGenresForContent(row.id),
-    };
+    }, defaultPrices);
   },
 
   async search(
@@ -252,10 +318,11 @@ export const contentRepository = {
     const allParams = [...joinParams, ...whereParams];
     const { rows } = await db.query(sql, allParams);
     const records = rows as ContentRecord[];
-    return Promise.all(records.map(async r => ({
+    const defaultPrices = await getDefaultPrices();
+    return Promise.all(records.map(async r => resolveContentPricing({
       ...r,
       genres: await contentRepository.getGenresForContent(r.id),
-    })));
+    }, defaultPrices)));
   },
 
   async getGenresForContent(contentId: string): Promise<string[]> {
@@ -307,13 +374,13 @@ export const contentRepository = {
     await db.run(
       `INSERT INTO content (
          id, type, title, slug, description, poster, backdrop,
-         trailer_url, video_url, price, language, release_year,
+         trailer_url, video_url, price, custom_price, language, release_year,
          duration, age_rating, status, featured, category_label,
          tagline, about, rating, director, cast_json,
          vcdn_video_id, vcdn_status, vcdn_playback_url,
          vcdn_embed_url, vcdn_thumbnail_url, media_provider,
          created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         item.id,
         item.type,
@@ -325,6 +392,7 @@ export const contentRepository = {
         item.trailer_url || null,
         item.video_url || null,
         item.price,
+        item.custom_price ?? null,
         item.language || 'Hindi',
         item.release_year,
         item.duration || null,
@@ -371,7 +439,7 @@ export const contentRepository = {
 
     const allowedKeys: (keyof ContentRecord)[] = [
       'title', 'slug', 'description', 'poster', 'backdrop',
-      'trailer_url', 'video_url', 'price', 'language', 'release_year',
+      'trailer_url', 'video_url', 'price', 'custom_price', 'language', 'release_year',
       'duration', 'age_rating', 'status', 'featured', 'category_label',
       'tagline', 'about', 'rating', 'director', 'cast_json',
       'vcdn_video_id', 'vcdn_status', 'vcdn_playback_url',
@@ -404,12 +472,19 @@ export const contentRepository = {
     );
   },
 
-  async updatePrice(id: string, pricePaise: number): Promise<void> {
+  async updatePrice(id: string, pricePaise: number, customPricePaise?: number | null): Promise<void> {
     const db = getAdapter();
-    await db.run(
-      `UPDATE content SET price = ?, updated_at = ? WHERE id = ?;`,
-      [pricePaise, new Date().toISOString(), id]
-    );
+    if (customPricePaise !== undefined) {
+      await db.run(
+        `UPDATE content SET price = ?, custom_price = ?, updated_at = ? WHERE id = ?;`,
+        [pricePaise, customPricePaise, new Date().toISOString(), id]
+      );
+    } else {
+      await db.run(
+        `UPDATE content SET price = ?, updated_at = ? WHERE id = ?;`,
+        [pricePaise, new Date().toISOString(), id]
+      );
+    }
   },
 
   async createGenre(id: string, name: string, slug: string): Promise<void> {
@@ -701,10 +776,11 @@ export const contentRepository = {
       );
       if (rows[0]) {
         const row = rows[0] as ContentRecord;
-        return {
+        const defaultPrices = await getDefaultPrices();
+        return resolveContentPricing({
           ...row,
           genres: await contentRepository.getGenresForContent(row.id),
-        };
+        }, defaultPrices);
       }
     } catch {
       // Return null on missing tables or columns

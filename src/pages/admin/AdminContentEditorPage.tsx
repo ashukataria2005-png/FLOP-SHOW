@@ -55,7 +55,10 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
   const [rating, setRating] = useState<number>(8.5);
 
   // Pricing, Status & Ranking
-  const [price, setPrice] = useState<number>(20);
+  const [pricingType, setPricingType] = useState<'DEFAULT' | 'CUSTOM'>('DEFAULT');
+  const [customPrice, setCustomPrice] = useState<number>(30);
+  const [defaultMoviePrice, setDefaultMoviePrice] = useState<number>(30);
+  const [defaultSeriesPrice, setDefaultSeriesPrice] = useState<number>(35);
   const [isFree, setIsFree] = useState<boolean>(false);
   const [status, setStatus] = useState<'PUBLISHED' | 'DRAFT' | 'ARCHIVED'>('PUBLISHED');
   const [isFeatured, setIsFeatured] = useState<boolean>(false);
@@ -107,6 +110,14 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
   // Preview Player State
   const [previewSource, setPreviewSource] = useState<MediaPlayerSource | null>(null);
 
+  // Load platform default monetization prices
+  useEffect(() => {
+    api.monetization.getConfig().then(cfg => {
+      if (cfg?.defaultMoviePrice) setDefaultMoviePrice(cfg.defaultMoviePrice);
+      if (cfg?.defaultSeriesPrice) setDefaultSeriesPrice(cfg.defaultSeriesPrice);
+    }).catch(() => {});
+  }, []);
+
   // Load existing content details
   useEffect(() => {
     if (!isNew && contentId) {
@@ -131,7 +142,14 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
       setDirector(data.director || '');
       setCastInput((data.cast || []).join(', '));
       setRating(data.rating || 8.0);
-      setPrice(data.price || 0);
+      if (data.customPrice !== undefined && data.customPrice !== null && data.customPrice > 0) {
+        setPricingType('CUSTOM');
+        setCustomPrice(data.customPrice);
+      } else {
+        setPricingType('DEFAULT');
+        const dPrice = data.type === 'series' ? 35 : 30;
+        setCustomPrice(dPrice);
+      }
       setIsFree(data.price === 0);
       setStatus((data as any).status || 'PUBLISHED');
       setIsFeatured(Boolean(data.isFeatured));
@@ -437,7 +455,18 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
       return;
     }
 
-    const finalPrice = isFree ? 0 : Number(price) || 0;
+    const resolvedCustomPriceRupees = isFree
+      ? null
+      : pricingType === 'CUSTOM'
+      ? (Number(customPrice) || 0)
+      : null;
+
+    const finalPrice = isFree
+      ? 0
+      : pricingType === 'CUSTOM'
+      ? (Number(customPrice) || 0)
+      : (type === 'series' ? defaultSeriesPrice : defaultMoviePrice);
+
     const genres = genresInput.split(',').map(g => g.trim()).filter(Boolean);
     const cast = castInput.split(',').map(c => c.trim()).filter(Boolean);
 
@@ -451,6 +480,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
       runtime: type === 'movie' ? runtime : undefined,
       language,
       priceRupees: finalPrice,
+      customPriceRupees: resolvedCustomPriceRupees,
       rating: Number(rating) || 8.0,
       status,
       isFeatured,
@@ -1103,7 +1133,7 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                 Pay-Per-View Pricing
               </h3>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -1117,25 +1147,78 @@ export const AdminContentEditorPage: React.FC<AdminContentEditorPageProps> = ({
                 </label>
 
                 {!isFree && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#9CA3AF' }}>Price in INR (₹):</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="1000"
-                      value={price}
-                      onChange={e => setPrice(Number(e.target.value))}
-                      style={{
-                        width: '100px',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        color: 'var(--brand-gold, #F5C518)',
-                        fontSize: '16px',
-                        fontWeight: 800
-                      }}
-                    />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <div
+                        onClick={() => {
+                          setPricingType('DEFAULT');
+                        }}
+                        style={{
+                          flex: 1,
+                          minWidth: '180px',
+                          padding: '12px 14px',
+                          borderRadius: '10px',
+                          border: pricingType === 'DEFAULT' ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                          backgroundColor: pricingType === 'DEFAULT' ? 'rgba(245, 197, 24, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: pricingType === 'DEFAULT' ? 'var(--brand-gold, #F5C518)' : '#FFFFFF' }}>
+                          Use Default Price (₹{type === 'series' ? defaultSeriesPrice : defaultMoviePrice})
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                          Standard platform price for {type === 'series' ? 'series' : 'movies'}
+                        </div>
+                      </div>
+
+                      <div
+                        onClick={() => {
+                          setPricingType('CUSTOM');
+                        }}
+                        style={{
+                          flex: 1,
+                          minWidth: '180px',
+                          padding: '12px 14px',
+                          borderRadius: '10px',
+                          border: pricingType === 'CUSTOM' ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                          backgroundColor: pricingType === 'CUSTOM' ? 'rgba(245, 197, 24, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: pricingType === 'CUSTOM' ? 'var(--brand-gold, #F5C518)' : '#FFFFFF' }}>
+                          Individual / Custom Price
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                          Override default with custom price
+                        </div>
+                      </div>
+                    </div>
+
+                    {pricingType === 'CUSTOM' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#9CA3AF' }}>Custom Price in INR (₹):</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="1000"
+                          value={customPrice}
+                          onChange={e => {
+                            const val = Number(e.target.value);
+                            setCustomPrice(val);
+                          }}
+                          style={{
+                            width: '110px',
+                            padding: '10px 14px',
+                            borderRadius: '8px',
+                            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            color: 'var(--brand-gold, #F5C518)',
+                            fontSize: '16px',
+                            fontWeight: 800
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

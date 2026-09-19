@@ -492,10 +492,14 @@ export const adminService = {
     director?: string;
     cast?: string[];
     genreIds?: string[];
+    customPriceRupees?: number | null;
   }): Promise<string> {
     const slug = data.slug || data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const id = slug;
     const pricePaise = Math.round(data.priceRupees * 100);
+    const customPricePaise = data.customPriceRupees !== undefined && data.customPriceRupees !== null && data.customPriceRupees > 0
+      ? Math.round(data.customPriceRupees * 100)
+      : null;
 
     const record: Omit<ContentRecord, 'created_at' | 'updated_at'> = {
       id,
@@ -507,7 +511,8 @@ export const adminService = {
       backdrop: data.backdrop || (data as any).backdropUrl || 'https://images.unsplash.com/photo-1519681393784-d120267933ba',
       trailer_url: data.trailerUrl || null,
       video_url: data.videoUrl || null,
-      price: pricePaise,
+      price: customPricePaise ?? pricePaise,
+      custom_price: customPricePaise,
       language: data.language || 'Hindi',
       release_year: data.releaseYear,
       duration: data.duration || null,
@@ -587,6 +592,16 @@ export const adminService = {
       updates.price = Math.round(updates.priceRupees * 100);
     }
 
+    if (anyUpdates.customPriceRupees !== undefined) {
+      updates.custom_price = (anyUpdates.customPriceRupees === null || anyUpdates.customPriceRupees === '' || Number(anyUpdates.customPriceRupees) <= 0)
+        ? null
+        : Math.round(Number(anyUpdates.customPriceRupees) * 100);
+    } else if (anyUpdates.custom_price !== undefined) {
+      updates.custom_price = (anyUpdates.custom_price === null || anyUpdates.custom_price === '' || Number(anyUpdates.custom_price) <= 0)
+        ? null
+        : Math.round(Number(anyUpdates.custom_price));
+    }
+
     await contentRepository.updateContent(existing.id, updates);
 
     if (updates.trending_position !== undefined) {
@@ -628,7 +643,7 @@ export const adminService = {
     await contentRepository.updateStatus(existing.id, status);
   },
 
-  async updatePrice(id: string, priceRupees: number): Promise<void> {
+  async updatePrice(id: string, priceRupees: number, customPriceRupees?: number | null): Promise<void> {
     const existing = await contentRepository.findByIdOrSlug(id);
     if (!existing) {
       const err = new Error('Content not found.');
@@ -640,7 +655,23 @@ export const adminService = {
       (err as any).statusCode = 400;
       throw err;
     }
-    await contentRepository.updatePrice(existing.id, Math.round(priceRupees * 100));
+    const defaults = await contentRepository.getDefaultPrices();
+    const defaultPrice = existing.type === 'SERIES' ? defaults.defaultSeriesPrice : defaults.defaultMoviePrice;
+
+    let customPricePaise: number | null;
+    if (customPriceRupees !== undefined) {
+      customPricePaise = (customPriceRupees === null || customPriceRupees <= 0)
+        ? null
+        : Math.round(customPriceRupees * 100);
+    } else {
+      // Caller updated price without specifying customPriceRupees
+      if (priceRupees === 0 || priceRupees === defaultPrice) {
+        customPricePaise = null;
+      } else {
+        customPricePaise = Math.round(priceRupees * 100);
+      }
+    }
+    await contentRepository.updatePrice(existing.id, Math.round(priceRupees * 100), customPricePaise);
   },
 
   async createGenre(name: string, slug?: string): Promise<string> {
@@ -810,6 +841,8 @@ export const adminService = {
     for (const r of rows as { key: string; value: string }[]) {
       result[r.key] = r.value;
     }
+    if (!result.per_movie_price) result.per_movie_price = '30';
+    if (!result.per_series_price) result.per_series_price = '35';
     return result;
   },
 

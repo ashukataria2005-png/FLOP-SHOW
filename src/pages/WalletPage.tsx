@@ -119,7 +119,7 @@ export const WalletPage: React.FC = () => {
         </div>
 
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '8px', maxWidth: '440px' }}>
-          Use your wallet balance to unlock movies (₹10) and full webseries (₹20) with instant one-click checkout.
+          Use your wallet balance for instant one-click checkout across the FLOPSHOW catalog.
         </p>
 
         {/* Action Button */}

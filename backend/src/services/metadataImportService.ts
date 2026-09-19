@@ -728,8 +728,9 @@ export const metadataImportService = {
       );
     }
 
-    // Default FLOPSHOW price in paise: ₹10 (1000 paise) for Movie, ₹20 (2000 paise) for Series
-    const defaultPriceRupees = type === 'MOVIE' ? 10 : 20;
+    // Default FLOPSHOW price: ₹30 for Movie, ₹35 for Series (configurable in admin settings)
+    const defaultPrices = await contentRepository.getDefaultPrices();
+    const defaultPriceRupees = type === 'MOVIE' ? defaultPrices.movieRupees : defaultPrices.seriesRupees;
     const finalPriceRupees = payload.priceRupees !== undefined ? Number(payload.priceRupees) : defaultPriceRupees;
     const pricePaise = Math.round(finalPriceRupees * 100);
 

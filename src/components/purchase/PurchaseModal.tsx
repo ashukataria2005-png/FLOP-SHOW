@@ -4,11 +4,9 @@ import { api } from '../../services/api';
 import {
   X,
   CheckCircle,
-  Wallet,
   ArrowRight,
   Film,
   Tv,
-  QrCode,
   Copy,
   Check,
   Clock,
@@ -22,8 +20,6 @@ export const PurchaseModal: React.FC = () => {
     activeModal,
     purchaseTarget,
     closePurchaseModal,
-    walletBalance,
-    buyContent,
     syncPurchases,
     openAuthModal,
     startPlaying,
@@ -36,10 +32,7 @@ export const PurchaseModal: React.FC = () => {
   const [submittedPending, setSubmittedPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [liveBalance, setLiveBalance] = useState<number>(walletBalance);
 
-  // Pay method: 'UPI' (direct QR + UTR) or 'WALLET'
-  const [payMethod, setPayMethod] = useState<'UPI' | 'WALLET'>('UPI');
   const [utr, setUtr] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -54,34 +47,9 @@ export const PurchaseModal: React.FC = () => {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [qrLoading, setQrLoading] = useState<boolean>(false);
 
-  // Fetch balance and config whenever modal opens
+  // Fetch UPI config whenever modal opens
   useEffect(() => {
     if (activeModal === 'purchase' && purchaseTarget) {
-      const defaultPrice = purchaseTarget.type === 'series' ? 35 : 30;
-      const targetPrice = (typeof purchaseTarget.price === 'number' && purchaseTarget.price >= 10)
-        ? purchaseTarget.price
-        : defaultPrice;
-
-      if (isAuthenticated) {
-        setLiveBalance(walletBalance);
-        api.wallet.getBalance()
-          .then(res => {
-            if (typeof res.balanceRupees === 'number') {
-              setLiveBalance(res.balanceRupees);
-              if (res.balanceRupees >= targetPrice) {
-                setPayMethod('WALLET');
-              } else {
-                setPayMethod('UPI');
-              }
-            }
-          })
-          .catch(() => {
-            setLiveBalance(walletBalance);
-          });
-      } else {
-        setPayMethod('UPI');
-      }
-
       api.payments.getConfig()
         .then(cfg => {
           if (cfg?.upiId) setUpiConfig(cfg);
@@ -93,21 +61,23 @@ export const PurchaseModal: React.FC = () => {
       setErrorMessage(null);
       setUtr('');
     }
-  }, [activeModal, purchaseTarget?.id, isAuthenticated]);
+  }, [activeModal, purchaseTarget?.id]);
+
+  // Determine uniform title price: custom override if present, else type default (₹30 movie, ₹35 series)
+  const defaultPrice = purchaseTarget?.type === 'series' ? 35 : 30;
+  const price = (typeof purchaseTarget?.price === 'number' && purchaseTarget.price > 0)
+    ? purchaseTarget.price
+    : defaultPrice;
 
   // Generate dynamic QR code for title price
   useEffect(() => {
     let isCancelled = false;
-    if (activeModal === 'purchase' && purchaseTarget && payMethod === 'UPI') {
+    if (activeModal === 'purchase' && purchaseTarget) {
       const upi = upiConfig?.upiId || 'flopshow@upi';
       const merchant = upiConfig?.merchantName || 'FLOPSHOW';
-      const defaultPrice = purchaseTarget.type === 'series' ? 35 : 30;
-      const priceToCharge = (typeof purchaseTarget.price === 'number' && purchaseTarget.price >= 10)
-        ? purchaseTarget.price
-        : defaultPrice;
 
       setQrLoading(true);
-      generateUpiQrDataUrl(upi, priceToCharge, merchant)
+      generateUpiQrDataUrl(upi, price, merchant)
         .then(url => {
           if (!isCancelled) {
             setQrCodeUrl(url);
@@ -123,15 +93,9 @@ export const PurchaseModal: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [activeModal, purchaseTarget?.price, purchaseTarget?.type, payMethod, upiConfig?.upiId, upiConfig?.merchantName]);
+  }, [activeModal, purchaseTarget?.id, price, upiConfig?.upiId, upiConfig?.merchantName]);
 
   if (activeModal !== 'purchase' || !purchaseTarget) return null;
-
-  const hybridPrice = purchaseTarget.type === 'series' ? 35 : 30;
-  const price = (typeof purchaseTarget.price === 'number' && purchaseTarget.price >= 10)
-    ? purchaseTarget.price
-    : hybridPrice;
-  const hasSufficientBalance = liveBalance >= price;
 
   const handleCopyUpi = () => {
     if (navigator.clipboard) {
@@ -142,33 +106,7 @@ export const PurchaseModal: React.FC = () => {
     }
   };
 
-  // 1. Pay with wallet
-  const handleConfirmWallet = async () => {
-    if (isSubmitting || !purchaseTarget) return;
-
-    if (!isAuthenticated) {
-      handleClose();
-      openAuthModal();
-      return;
-    }
-
-    setErrorMessage(null);
-    setIsSubmitting(true);
-    try {
-      const result = await buyContent(purchaseTarget);
-      if (result.success) {
-        setPurchasedSuccess(true);
-      } else {
-        setErrorMessage(result.message);
-      }
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Purchase transaction failed.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // 2. Pay directly with UPI QR & UTR
+  // Pay directly with UPI QR & UTR submission
   const handleSubmitUpiUtr = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAuthenticated) {
@@ -193,7 +131,7 @@ export const PurchaseModal: React.FC = () => {
         await syncPurchases();
         setPurchasedSuccess(true);
       } else {
-        // Manual verification mode: pending review
+        // Manual verification mode: pending admin review
         setSubmittedPending(true);
       }
     } catch (err: any) {
@@ -313,7 +251,7 @@ export const PurchaseModal: React.FC = () => {
               </button>
             </div>
           ) : (
-            /* Purchase Screen with UPI QR + UTR / Wallet */
+            /* Purchase Screen with direct UPI QR + UTR */
             <div>
               {/* Content Pill Summary */}
               <div
@@ -366,66 +304,6 @@ export const PurchaseModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Payment Method Switcher Tabs */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '8px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                  padding: '4px',
-                  borderRadius: '10px',
-                  marginBottom: '18px'
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setPayMethod('UPI')}
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    fontSize: '13px',
-                    fontWeight: payMethod === 'UPI' ? 800 : 500,
-                    backgroundColor: payMethod === 'UPI' ? 'var(--brand-gold, #F5C518)' : 'transparent',
-                    color: payMethod === 'UPI' ? '#000000' : '#9CA3AF',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <QrCode size={15} />
-                  <span>UPI QR &amp; UTR (₹{price})</span>
-                </button>
-
-                {hasSufficientBalance && (
-                  <button
-                    type="button"
-                    onClick={() => setPayMethod('WALLET')}
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      fontSize: '13px',
-                      fontWeight: payMethod === 'WALLET' ? 800 : 500,
-                      backgroundColor: payMethod === 'WALLET' ? 'var(--brand-gold, #F5C518)' : 'transparent',
-                      color: payMethod === 'WALLET' ? '#000000' : '#9CA3AF',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Wallet size={15} />
-                    <span>Wallet (Bal: ₹{liveBalance})</span>
-                  </button>
-                )}
-              </div>
-
               {errorMessage && (
                 <div
                   style={{
@@ -441,158 +319,110 @@ export const PurchaseModal: React.FC = () => {
                 </div>
               )}
 
-              {/* TAB 1: UPI QR CODE & UTR SUBMISSION */}
-              {payMethod === 'UPI' && (
-                <form onSubmit={handleSubmitUpiUtr}>
+              {/* UPI QR CODE & UTR SUBMISSION */}
+              <form onSubmit={handleSubmitUpiUtr}>
+                <div
+                  style={{
+                    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '14px',
+                    padding: '16px',
+                    textAlign: 'center',
+                    marginBottom: '16px'
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '8px' }}>
+                    Scan QR code with Google Pay, PhonePe, Paytm, or BHIM
+                  </div>
+
                   <div
                     style={{
-                      backgroundColor: 'rgba(0, 0, 0, 0.35)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '14px',
-                      padding: '16px',
-                      textAlign: 'center',
-                      marginBottom: '16px'
+                      width: '180px',
+                      height: '180px',
+                      margin: '0 auto 12px',
+                      backgroundColor: '#FFFFFF',
+                      padding: '10px',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
                     }}
                   >
-                    <div style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '8px' }}>
-                      Scan QR code with Google Pay, PhonePe, Paytm, or BHIM
-                    </div>
+                    {qrLoading ? (
+                      <Loader2 size={32} className="animate-spin" color="#000000" />
+                    ) : qrCodeUrl ? (
+                      <img src={qrCodeUrl} alt="UPI QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#666' }}>Generating QR...</span>
+                    )}
+                  </div>
 
-                    <div
+                  {/* Amount & UPI ID Copy */}
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '13px', color: '#9CA3AF' }}>UPI ID:</span>
+                    <code style={{ fontSize: '13px', color: 'var(--brand-gold, #F5C518)', fontWeight: 800 }}>
+                      {upiConfig.upiId}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={handleCopyUpi}
                       style={{
-                        width: '180px',
-                        height: '180px',
-                        margin: '0 auto 12px',
-                        backgroundColor: '#FFFFFF',
-                        padding: '10px',
-                        borderRadius: '12px',
+                        background: 'none',
+                        border: 'none',
+                        color: copied ? '#10B981' : 'var(--brand-gold)',
+                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
+                        gap: '4px',
+                        fontSize: '12px',
+                        padding: '4px'
                       }}
                     >
-                      {qrLoading ? (
-                        <Loader2 size={32} className="animate-spin" color="#000000" />
-                      ) : qrCodeUrl ? (
-                        <img src={qrCodeUrl} alt="UPI QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                      ) : (
-                        <span style={{ fontSize: '12px', color: '#666' }}>Generating QR...</span>
-                      )}
-                    </div>
-
-                    {/* Amount & UPI ID Copy */}
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '13px', color: '#9CA3AF' }}>UPI ID:</span>
-                      <code style={{ fontSize: '13px', color: 'var(--brand-gold, #F5C518)', fontWeight: 800 }}>
-                        {upiConfig.upiId}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={handleCopyUpi}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: copied ? '#10B981' : 'var(--brand-gold)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '12px',
-                          padding: '4px'
-                        }}
-                      >
-                        {copied ? <Check size={14} /> : <Copy size={14} />}
-                        <span>{copied ? 'Copied' : 'Copy'}</span>
-                      </button>
-                    </div>
-
-                    <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 800, color: '#FFFFFF' }}>
-                      Amount to Pay: <span style={{ color: 'var(--brand-gold, #F5C518)' }}>₹{price}</span>
-                    </div>
-                  </div>
-
-                  {/* UTR Input */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#D1D5DB', marginBottom: '6px' }}>
-                      Enter 12-Digit UPI UTR / Transaction ID
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 425619882314"
-                      value={utr}
-                      onChange={e => setUtr(e.target.value)}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '12px 14px',
-                        borderRadius: '10px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        fontSize: '14px',
-                        color: '#FFFFFF',
-                        fontFamily: 'monospace'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button type="button" onClick={handleClose} className="btn btn-secondary" style={{ flex: 1 }}>
-                      Cancel
-                    </button>
-                    <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 2 }}>
-                      {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
-                      <span>{isSubmitting ? 'Verifying...' : `Submit UTR & Unlock (₹${price})`}</span>
+                      {copied ? <Check size={14} /> : <Copy size={14} />}
+                      <span>{copied ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
-                </form>
-              )}
 
-              {/* TAB 2: PAY WITH WALLET */}
-              {payMethod === 'WALLET' && (
-                <div>
-                  <div
-                    style={{
-                      backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: '12px',
-                      padding: '16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                      marginBottom: '20px'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Content Price:</span>
-                      <span style={{ fontWeight: 700, color: 'var(--brand-gold)' }}>₹{price}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Current Wallet Balance:</span>
-                      <span style={{ fontWeight: 600, color: '#FFFFFF' }}>₹{liveBalance}</span>
-                    </div>
-
-                    <div style={{ height: '1px', backgroundColor: 'rgba(255, 255, 255, 0.08)' }} />
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
-                      <span style={{ color: '#FFFFFF', fontWeight: 600 }}>Balance After Purchase:</span>
-                      <span style={{ fontWeight: 800, color: '#10B981' }}>
-                        ₹{liveBalance - price}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={handleClose} disabled={isSubmitting} className="btn btn-secondary" style={{ flex: 1 }}>
-                      Cancel
-                    </button>
-                    <button onClick={handleConfirmWallet} disabled={isSubmitting} className="btn btn-primary" style={{ flex: 2 }}>
-                      {isSubmitting ? 'Processing...' : `Confirm Purchase (₹${price})`}
-                    </button>
+                  <div style={{ marginTop: '8px', fontSize: '14px', fontWeight: 800, color: '#FFFFFF' }}>
+                    Amount to Pay: <span style={{ color: 'var(--brand-gold, #F5C518)' }}>₹{price}</span>
                   </div>
                 </div>
-              )}
+
+                {/* UTR Input */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#D1D5DB', marginBottom: '6px' }}>
+                    Enter 12-Digit UPI UTR / Transaction ID
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 425619882314"
+                    value={utr}
+                    onChange={e => setUtr(e.target.value)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      fontSize: '14px',
+                      color: '#FFFFFF',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="button" onClick={handleClose} className="btn btn-secondary" style={{ flex: 1 }}>
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 2 }}>
+                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                    <span>{isSubmitting ? 'Verifying...' : `Submit UTR & Unlock (₹${price})`}</span>
+                  </button>
+                </div>
+              </form>
             </div>
           )}
         </div>

@@ -468,7 +468,38 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 9 };
+    // Apply incremental 014_content_custom_pricing for PostgreSQL if not already applied
+    const customPricingMigrationVersion = '014_content_custom_pricing';
+    if (!appliedSet.has(customPricingMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 014_content_custom_pricing...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          ALTER TABLE content ADD COLUMN IF NOT EXISTS custom_price INTEGER DEFAULT NULL;
+
+          UPDATE content SET price = 3000 WHERE type = 'MOVIE' AND price = 1000 AND custom_price IS NULL;
+          UPDATE content SET price = 3500 WHERE type = 'SERIES' AND price = 2000 AND custom_price IS NULL;
+
+          INSERT INTO app_settings (key, value, updated_at)
+          VALUES
+            ('per_movie_price', '30', NOW()::TEXT),
+            ('per_series_price', '35', NOW()::TEXT)
+          ON CONFLICT (key) DO NOTHING;
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${customPricingMigrationVersion}', '014_content_custom_pricing.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('014_content_custom_pricing.sql');
+        console.log('✓ [PostgreSQL] Migration 014_content_custom_pricing applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 10 };
   } finally {
     client.release();
     await pool.end();

@@ -220,6 +220,9 @@ export function adaptDbContentToFrontend(item: any): ContentItem {
   }));
 
   const priceRupees = item.price ? Math.round(item.price / 100) : (item.priceRupees ?? 0);
+  const customPriceRupees = item.custom_price !== undefined && item.custom_price !== null
+    ? Math.round(Number(item.custom_price) / 100)
+    : (item.customPriceRupees !== undefined ? item.customPriceRupees : (item.customPrice !== undefined ? item.customPrice : null));
 
   return {
     id: item.id,
@@ -237,6 +240,7 @@ export function adaptDbContentToFrontend(item: any): ContentItem {
     language: item.language || 'Hindi',
     genres: item.genres || [],
     price: priceRupees,
+    customPrice: customPriceRupees,
     isFree: priceRupees === 0,
     isFeatured: Boolean(item.featured ?? item.isFeatured),
     isHero: Boolean(item.is_hero ?? item.isHero),
@@ -918,10 +922,10 @@ export const api = {
       });
     },
 
-    async updatePrice(contentId: string, priceRupees: number) {
+    async updatePrice(contentId: string, priceRupees: number, customPriceRupees?: number | null) {
       return request<{ success: boolean }>(`/admin/content/${contentId}/price`, {
         method: 'PATCH',
-        body: JSON.stringify({ priceRupees })
+        body: JSON.stringify({ priceRupees, customPriceRupees })
       });
     },
 
@@ -1323,6 +1327,8 @@ export const api = {
         currencySymbol: string;
         upiId: string;
         merchantName: string;
+        defaultMoviePrice: number;
+        defaultSeriesPrice: number;
       }>('/monetization/config');
     },
 
@@ -1335,6 +1341,8 @@ export const api = {
           monthlyPrice: number;
           threeMonthsPrice: number;
           yearlyPrice: number;
+          defaultMoviePrice: number;
+          defaultSeriesPrice: number;
           currencySymbol: string;
           metrics: {
             totalSubscriptions: number;
@@ -1352,6 +1360,8 @@ export const api = {
       monthlyPrice?: number;
       threeMonthsPrice?: number;
       yearlyPrice?: number;
+      defaultMoviePrice?: number;
+      defaultSeriesPrice?: number;
     }) {
       return request<{
         success: boolean;
@@ -1362,6 +1372,8 @@ export const api = {
           monthlyPrice: number;
           threeMonthsPrice: number;
           yearlyPrice: number;
+          defaultMoviePrice: number;
+          defaultSeriesPrice: number;
           currencySymbol: string;
           metrics: {
             totalSubscriptions: number;

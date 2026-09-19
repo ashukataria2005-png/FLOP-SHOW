@@ -34,7 +34,8 @@ export interface ContentItem {
   seasonsCount?: number; // e.g. 2 (series)
   language: string; // e.g. "Hindi"
   genres: string[]; // e.g. ["Drama", "Thriller"]
-  price: number; // in INR e.g. 10 or 20, 0 = free
+  price: number; // in INR e.g. 30 or 35, 0 = free
+  customPrice?: number | null; // custom individual price override in INR, null if using default
   isNow?: boolean; // displays "NOW" badge
   isFree?: boolean; // displays "FREE" badge
   isFeatured?: boolean; // featured spotlight

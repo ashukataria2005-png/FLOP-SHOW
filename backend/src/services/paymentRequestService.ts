@@ -104,22 +104,26 @@ export const paymentRequestService = {
 
     // Resolve contentId if provided to guarantee valid primary key content.id
     let finalContentId: string | null = null;
-    let targetContent: ContentRecord | null = null;
+    let targetContent: (ContentRecord & { priceRupees?: number; customPriceRupees?: number | null }) | null = null;
     if (data.contentId && typeof data.contentId === 'string' && data.contentId.trim()) {
       targetContent = await contentRepository.findByIdOrSlug(data.contentId.trim());
-      if (targetContent) {
-        finalContentId = targetContent.id;
+      if (!targetContent) {
+        const err = new Error('Content not found for purchase.');
+        (err as any).statusCode = 404;
+        throw err;
       }
+      finalContentId = targetContent.id;
     }
 
     let numRupees = Math.round(Number(data.amountRupees));
-    // If purchasing content and amount was 0 or invalid, apply hybrid title price (₹35 for series, ₹30 for movie)
-    if (targetContent && (isNaN(numRupees) || numRupees < 10)) {
-      numRupees = targetContent.type === 'SERIES' ? 35 : 30;
+    // If purchasing content, resolve against content price (custom price or default movie/series price)
+    if (targetContent) {
+      const resolvedPrice = targetContent.priceRupees ?? (targetContent.price > 0 ? Math.round(targetContent.price / 100) : (targetContent.type === 'SERIES' ? 35 : 30));
+      numRupees = resolvedPrice;
     }
 
-    if (isNaN(numRupees) || numRupees < 10) {
-      const err = new Error('Minimum recharge amount is ₹10.');
+    if (isNaN(numRupees) || numRupees < 1) {
+      const err = new Error(targetContent ? 'Invalid content purchase price.' : 'Minimum recharge amount is ₹10.');
       (err as any).statusCode = 400;
       throw err;
     }

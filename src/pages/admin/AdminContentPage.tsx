@@ -159,10 +159,11 @@ export const AdminContentPage: React.FC<AdminContentPageProps> = ({
   // Handle 1-click Quick Free / Paid Toggle
   const handleToggleFree = async (item: ContentItem) => {
     const isCurrentlyFree = item.price === 0 || item.isFree;
-    const newPrice = isCurrentlyFree ? (item.type === 'movie' ? 10 : 20) : 0;
+    const restoredPrice = (item.customPrice && item.customPrice > 0) ? item.customPrice : (item.type === 'movie' ? 30 : 35);
+    const newPrice = isCurrentlyFree ? restoredPrice : 0;
 
     try {
-      await api.admin.updatePrice(item.id, newPrice);
+      await api.admin.updatePrice(item.id, newPrice, newPrice === 0 ? null : (item.customPrice || null));
       setContentList(prev =>
         prev.map(c => (c.id === item.id ? { ...c, price: newPrice, isFree: newPrice === 0 } : c))
       );

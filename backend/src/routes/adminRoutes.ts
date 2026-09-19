@@ -337,14 +337,17 @@ adminRouter.patch('/content/:id/status', async (req, res, next) => {
 
 adminRouter.patch('/content/:id/price', async (req, res, next) => {
   try {
-    const { priceRupees } = req.body;
+    const { priceRupees, customPriceRupees } = req.body;
     if (priceRupees === undefined || isNaN(Number(priceRupees))) {
       res.status(400).json({
         error: { code: 'BAD_REQUEST', message: 'Valid priceRupees number is required.' },
       });
       return;
     }
-    await adminService.updatePrice(req.params.id, Number(priceRupees));
+    const resolvedCustom = customPriceRupees !== undefined
+      ? (customPriceRupees === null || customPriceRupees === '' ? null : Number(customPriceRupees))
+      : undefined;
+    await adminService.updatePrice(req.params.id, Number(priceRupees), resolvedCustom);
     res.json({ success: true, message: `Price of ${req.params.id} updated to ₹${priceRupees}.` });
   } catch (err) {
     next(err);

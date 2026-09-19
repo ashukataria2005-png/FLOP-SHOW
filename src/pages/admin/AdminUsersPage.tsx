@@ -554,6 +554,19 @@ export const AdminUsersPage: React.FC<AdminUsersPageProps> = () => {
                   <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0' }}>
                     {userDetails?.email || 'Loading details...'}
                   </p>
+                  {userDetails && (
+                    <div style={{ marginTop: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      <span style={{ fontWeight: 600 }}>Plan: </span>
+                      <span style={{
+                        color: userDetails.subscription?.status === 'ACTIVE' ? '#10B981' : 'var(--brand-gold, #F5C518)',
+                        fontWeight: 700
+                      }}>
+                        {userDetails.subscription?.status === 'ACTIVE'
+                          ? (userDetails.subscription?.plan_id === 'MONTHLY' ? 'VIP Monthly' : userDetails.subscription?.plan_id === 'YEARLY' ? 'VIP Yearly' : 'VIP Subscription')
+                          : 'Free / Standard Plan'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -51,7 +51,7 @@ export const purchaseService = {
     const now = new Date().toISOString();
 
     if (content.price > 0) {
-      realPricePaise = content.type === 'SERIES' ? 3500 : 3000;
+      realPricePaise = content.price;
       // 1 Month / 30 Days validity for new purchases
       expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     }

@@ -317,8 +317,40 @@ input, textarea, select {
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  transform: none !important;
   box-shadow: none !important;
+}
+
+/* Browse Movie/Series to Own interactive button */
+.btn-browse-own {
+  width: 100%;
+  padding: 13px 18px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(245, 166, 35, 0.16) 0%, rgba(30, 41, 59, 0.8) 100%);
+  border: 1.5px solid rgba(245, 166, 35, 0.5);
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  box-sizing: border-box;
+}
+
+.btn-browse-own:hover {
+  background: linear-gradient(135deg, var(--brand-gold, #F5A623) 0%, #D97706 100%);
+  border-color: var(--brand-gold, #F5A623);
+  color: #0E0E12;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(245, 166, 35, 0.35);
+}
+
+.btn-browse-own:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(245, 166, 35, 0.2);
 }
 
 /* Modal Overlay & Card */

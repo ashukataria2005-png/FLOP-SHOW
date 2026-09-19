@@ -81,8 +81,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const [switchingMode, setSwitchingMode] = useState(false);
   const [subConfig, setSubConfig] = useState<{
     mode: 'PER_CONTENT' | 'SUBSCRIPTION';
-    weeklyPrice: number;
+    weeklyPrice?: number;
     monthlyPrice: number;
+    threeMonthsPrice?: number;
     yearlyPrice: number;
     currencySymbol: string;
     metrics: {

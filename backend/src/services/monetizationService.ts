@@ -14,8 +14,9 @@ export interface MonetizationPublicConfig {
 
 export interface MonetizationAdminConfig {
   mode: MonetizationMode;
-  weeklyPrice: number;
+  weeklyPrice?: number;
   monthlyPrice: number;
+  threeMonthsPrice: number;
   yearlyPrice: number;
   currencySymbol: string;
   metrics: {
@@ -75,9 +76,9 @@ export const monetizationService = {
     const settings = await adminService.getSettings();
     const plans = await subscriptionService.getPlans();
 
-    const weekly = plans.find(p => p.id === 'WEEKLY')?.priceRupees || 49;
-    const monthly = plans.find(p => p.id === 'MONTHLY')?.priceRupees || 149;
-    const yearly = plans.find(p => p.id === 'YEARLY')?.priceRupees || 999;
+    const monthly = plans.find(p => p.id === 'MONTHLY')?.priceRupees || 89;
+    const threeMonths = plans.find(p => p.id === '3_MONTHS')?.priceRupees || 189;
+    const yearly = plans.find(p => p.id === 'YEARLY')?.priceRupees || 449;
 
     // Fetch subscription metrics from DB
     const db = getAdapter();
@@ -96,8 +97,8 @@ export const monetizationService = {
 
     return {
       mode,
-      weeklyPrice: weekly,
       monthlyPrice: monthly,
+      threeMonthsPrice: threeMonths,
       yearlyPrice: yearly,
       currencySymbol: settings.currency_symbol || '₹',
       metrics: {
@@ -116,6 +117,7 @@ export const monetizationService = {
     mode?: MonetizationMode;
     weeklyPrice?: number;
     monthlyPrice?: number;
+    threeMonthsPrice?: number;
     yearlyPrice?: number;
   }): Promise<MonetizationAdminConfig> {
     const updates: Record<string, string> = {};
@@ -134,6 +136,12 @@ export const monetizationService = {
       const num = Math.round(Number(data.monthlyPrice));
       if (isNaN(num) || num < 0) throw new Error('Monthly plan price must be a valid non-negative number.');
       updates.subscription_price_monthly = String(num);
+    }
+
+    if (data.threeMonthsPrice !== undefined) {
+      const num = Math.round(Number(data.threeMonthsPrice));
+      if (isNaN(num) || num < 0) throw new Error('3-Months plan price must be a valid non-negative number.');
+      updates.subscription_price_3_months = String(num);
     }
 
     if (data.yearlyPrice !== undefined) {

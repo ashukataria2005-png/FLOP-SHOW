@@ -1,6 +1,6 @@
 import { getAdapter, DbAdapter } from '../db/adapter.js';
 
-export type SubscriptionPlan = 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+export type SubscriptionPlan = 'WEEKLY' | 'MONTHLY' | '3_MONTHS' | 'YEARLY';
 export type SubscriptionStatus = 'PENDING' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'REJECTED';
 export type PaymentMethod = 'MANUAL_UPI' | 'GATEWAY' | 'ADMIN_GRANT';
 

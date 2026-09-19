@@ -30,9 +30,9 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
   const [mode, setMode] = useState<'PER_CONTENT' | 'SUBSCRIPTION'>('PER_CONTENT');
 
   // Plan Prices (in Rupees)
-  const [weeklyPrice, setWeeklyPrice] = useState<number>(49);
-  const [monthlyPrice, setMonthlyPrice] = useState<number>(149);
-  const [yearlyPrice, setYearlyPrice] = useState<number>(999);
+  const [monthlyPrice, setMonthlyPrice] = useState<number>(89);
+  const [threeMonthsPrice, setThreeMonthsPrice] = useState<number>(189);
+  const [yearlyPrice, setYearlyPrice] = useState<number>(449);
 
   // Metrics
   const [metrics, setMetrics] = useState({
@@ -51,7 +51,7 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
   // Grant Subscription Modal State
   const [showGrantModal, setShowGrantModal] = useState(false);
   const [grantUserId, setGrantUserId] = useState('');
-  const [grantPlan, setGrantPlan] = useState<'WEEKLY' | 'MONTHLY' | 'YEARLY'>('MONTHLY');
+  const [grantPlan, setGrantPlan] = useState<'MONTHLY' | '3_MONTHS' | 'YEARLY'>('MONTHLY');
   const [grantNote, setGrantNote] = useState('');
   const [granting, setGranting] = useState(false);
 
@@ -62,9 +62,9 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
       const res = await api.monetization.getAdminConfig();
       if (res?.config) {
         setMode(res.config.mode);
-        setWeeklyPrice(res.config.weeklyPrice);
-        setMonthlyPrice(res.config.monthlyPrice);
-        setYearlyPrice(res.config.yearlyPrice);
+        setMonthlyPrice(res.config.monthlyPrice || 89);
+        setThreeMonthsPrice(res.config.threeMonthsPrice || 189);
+        setYearlyPrice(res.config.yearlyPrice || 449);
         if (res.config.metrics) {
           setMetrics(res.config.metrics);
         }
@@ -107,15 +107,15 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
       setSaving(true);
       const res = await api.monetization.updateAdminConfig({
         mode,
-        weeklyPrice: Number(weeklyPrice),
         monthlyPrice: Number(monthlyPrice),
+        threeMonthsPrice: Number(threeMonthsPrice),
         yearlyPrice: Number(yearlyPrice),
       });
 
       if (res?.config) {
         setMode(res.config.mode);
-        setWeeklyPrice(res.config.weeklyPrice);
         setMonthlyPrice(res.config.monthlyPrice);
+        setThreeMonthsPrice(res.config.threeMonthsPrice);
         setYearlyPrice(res.config.yearlyPrice);
         if (res.config.metrics) setMetrics(res.config.metrics);
       }
@@ -426,7 +426,7 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
               </div>
 
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                • OTT platform behavior with Weekly, Monthly, and Yearly plans.<br />
+                • OTT platform behavior with Monthly, 3-Month, and 12-Month plans.<br />
                 • Completely hides wallet, recharge, and individual price tags from user UI.<br />
                 • Active subscription grants full catalog playback access.
               </div>
@@ -438,7 +438,7 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
             2. Configure Subscription Plan Prices
           </h2>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-            Set the dynamic pricing for all 3 subscription plans. Prices are persistently saved in the database and loaded by clients in real time.
+            Set the dynamic pricing for all 3 VIP subscription plans (Monthly ₹89, 3 Months ₹189, 12 Months ₹449). Prices are persistently saved in the database and loaded by clients in real time.
           </p>
 
           <div
@@ -449,48 +449,6 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
               marginBottom: '28px'
             }}
           >
-            {/* Weekly Plan */}
-            <div
-              style={{
-                backgroundColor: '#1B1B28',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '16px',
-                padding: '18px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <Calendar size={16} color="var(--brand-gold)" />
-                <span style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF' }}>Weekly Plan</span>
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-                7 Days Full Access
-              </div>
-
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
-                Price in INR (₹)
-              </label>
-              <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--brand-gold)', fontWeight: 700 }}>₹</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={weeklyPrice}
-                  onChange={e => setWeeklyPrice(Number(e.target.value))}
-                  required
-                  className="input-field"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px 10px 28px',
-                    borderRadius: '10px',
-                    backgroundColor: '#12121A',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: '#FFFFFF',
-                    fontWeight: 700
-                  }}
-                />
-              </div>
-            </div>
-
             {/* Monthly Plan */}
             <div
               style={{
@@ -533,6 +491,48 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
               </div>
             </div>
 
+            {/* 3 Months Plan */}
+            <div
+              style={{
+                backgroundColor: '#1B1B28',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                padding: '18px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <Calendar size={16} color="var(--brand-gold)" />
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF' }}>3 Months Plan</span>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                90 Days Full Access (Quarterly Value)
+              </div>
+
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
+                Price in INR (₹)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--brand-gold)', fontWeight: 700 }}>₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={threeMonthsPrice}
+                  onChange={e => setThreeMonthsPrice(Number(e.target.value))}
+                  required
+                  className="input-field"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px 10px 28px',
+                    borderRadius: '10px',
+                    backgroundColor: '#12121A',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#FFFFFF',
+                    fontWeight: 700
+                  }}
+                />
+              </div>
+            </div>
+
             {/* Yearly Plan */}
             <div
               style={{
@@ -544,10 +544,10 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <Crown size={16} color="var(--brand-gold)" />
-                <span style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF' }}>Yearly Plan</span>
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF' }}>12 Months / Full Year</span>
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-                365 Days Unlimited Access
+                365 Days Unlimited Access (Best Value)
               </div>
 
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
@@ -873,9 +873,9 @@ export const AdminMonetizationPage: React.FC<AdminMonetizationPageProps> = () =>
                     color: '#FFFFFF'
                   }}
                 >
-                  <option value="WEEKLY">Weekly Plan (7 Days)</option>
-                  <option value="MONTHLY">Monthly Plan (30 Days)</option>
-                  <option value="YEARLY">Yearly Plan (365 Days)</option>
+                  <option value="MONTHLY">Monthly Plan (30 Days — ₹89)</option>
+                  <option value="3_MONTHS">3 Months Plan (90 Days — ₹189)</option>
+                  <option value="YEARLY">12 Months / Full Year (365 Days — ₹449)</option>
                 </select>
               </div>
 

@@ -23,19 +23,22 @@ export interface PlanConfig {
 const PLAN_DURATIONS: Record<SubscriptionPlan, number> = {
   WEEKLY: 7,
   MONTHLY: 30,
+  '3_MONTHS': 90,
   YEARLY: 365,
 };
 
 const PLAN_NAMES: Record<SubscriptionPlan, string> = {
   WEEKLY: 'Weekly Plan',
   MONTHLY: 'Monthly Plan',
-  YEARLY: 'Yearly Plan',
+  '3_MONTHS': '3 Months Plan',
+  YEARLY: '12 Months / Full Year',
 };
 
 const PLAN_DESCRIPTIONS: Record<SubscriptionPlan, string> = {
   WEEKLY: '7 days of uninterrupted streaming across all devices.',
-  MONTHLY: '30 days full catalog access with HD & 4K playback.',
-  YEARLY: 'Best value! 365 days of unlimited movies and webseries.',
+  MONTHLY: '30 days full catalog access with HD & 1080p playback.',
+  '3_MONTHS': '90 days full catalog access with HD & 1080p playback. Great quarterly value!',
+  YEARLY: 'Best value! 365 days of unlimited movies and webseries across all devices.',
 };
 
 export const subscriptionService = {
@@ -45,31 +48,31 @@ export const subscriptionService = {
    */
   async getPlans(): Promise<PlanConfig[]> {
     const settings = await adminService.getSettings();
-    const weeklyPrice = parseInt(settings.subscription_price_weekly || '49', 10);
-    const monthlyPrice = parseInt(settings.subscription_price_monthly || '149', 10);
-    const yearlyPrice = parseInt(settings.subscription_price_yearly || '999', 10);
+    const monthlyPrice = parseInt(settings.subscription_price_monthly || '89', 10);
+    const threeMonthsPrice = parseInt(settings.subscription_price_3_months || '189', 10);
+    const yearlyPrice = parseInt(settings.subscription_price_yearly || '449', 10);
 
     return [
-      {
-        id: 'WEEKLY',
-        plan: 'WEEKLY',
-        name: PLAN_NAMES.WEEKLY,
-        durationDays: PLAN_DURATIONS.WEEKLY,
-        duration_days: PLAN_DURATIONS.WEEKLY,
-        priceRupees: isNaN(weeklyPrice) ? 49 : weeklyPrice,
-        price_inr: isNaN(weeklyPrice) ? 49 : weeklyPrice,
-        description: PLAN_DESCRIPTIONS.WEEKLY,
-        is_popular: false,
-      },
       {
         id: 'MONTHLY',
         plan: 'MONTHLY',
         name: PLAN_NAMES.MONTHLY,
         durationDays: PLAN_DURATIONS.MONTHLY,
         duration_days: PLAN_DURATIONS.MONTHLY,
-        priceRupees: isNaN(monthlyPrice) ? 149 : monthlyPrice,
-        price_inr: isNaN(monthlyPrice) ? 149 : monthlyPrice,
+        priceRupees: isNaN(monthlyPrice) ? 89 : monthlyPrice,
+        price_inr: isNaN(monthlyPrice) ? 89 : monthlyPrice,
         description: PLAN_DESCRIPTIONS.MONTHLY,
+        is_popular: false,
+      },
+      {
+        id: '3_MONTHS',
+        plan: '3_MONTHS',
+        name: PLAN_NAMES['3_MONTHS'],
+        durationDays: PLAN_DURATIONS['3_MONTHS'],
+        duration_days: PLAN_DURATIONS['3_MONTHS'],
+        priceRupees: isNaN(threeMonthsPrice) ? 189 : threeMonthsPrice,
+        price_inr: isNaN(threeMonthsPrice) ? 189 : threeMonthsPrice,
+        description: PLAN_DESCRIPTIONS['3_MONTHS'],
         is_popular: true,
       },
       {
@@ -78,8 +81,8 @@ export const subscriptionService = {
         name: PLAN_NAMES.YEARLY,
         durationDays: PLAN_DURATIONS.YEARLY,
         duration_days: PLAN_DURATIONS.YEARLY,
-        priceRupees: isNaN(yearlyPrice) ? 999 : yearlyPrice,
-        price_inr: isNaN(yearlyPrice) ? 999 : yearlyPrice,
+        priceRupees: isNaN(yearlyPrice) ? 449 : yearlyPrice,
+        price_inr: isNaN(yearlyPrice) ? 449 : yearlyPrice,
         description: PLAN_DESCRIPTIONS.YEARLY,
         is_popular: false,
       },
@@ -115,8 +118,8 @@ export const subscriptionService = {
       userEmail?: string;
     }
   ): Promise<SubscriptionRecord> {
-    if (!['WEEKLY', 'MONTHLY', 'YEARLY'].includes(data.plan)) {
-      const err = new Error('Invalid subscription plan. Choose WEEKLY, MONTHLY, or YEARLY.');
+    if (!['MONTHLY', '3_MONTHS', 'YEARLY'].includes(data.plan)) {
+      const err = new Error('Invalid subscription plan. Choose MONTHLY, 3_MONTHS, or YEARLY.');
       (err as any).statusCode = 400;
       throw err;
     }

@@ -29,7 +29,7 @@ export const SubscriptionModal: React.FC = () => {
     user
   } = useApp();
 
-  const [selectedPlanId, setSelectedPlanId] = useState<'WEEKLY' | 'MONTHLY' | 'YEARLY'>(subscriptionTargetPlan || 'MONTHLY');
+  const [selectedPlanId, setSelectedPlanId] = useState<'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY'>(subscriptionTargetPlan || 'MONTHLY');
   const [step, setStep] = useState<'choose' | 'pay'>(subscriptionTargetStep || 'choose');
   const [utr, setUtr] = useState('');
   const [guestName, setGuestName] = useState('');
@@ -50,9 +50,9 @@ export const SubscriptionModal: React.FC = () => {
 
   // Safe fallback plans guaranteeing non-null selectedPlan and numbers
   const fallbackPlans = [
-    { id: 'WEEKLY' as const, name: 'Weekly Plan', durationDays: 7, priceRupees: 49, description: '7 days of uninterrupted streaming across all devices.' },
-    { id: 'MONTHLY' as const, name: 'Monthly Plan', durationDays: 30, priceRupees: 149, description: '30 days full catalog access with HD & 4K playback.' },
-    { id: 'YEARLY' as const, name: 'Yearly Plan', durationDays: 365, priceRupees: 999, description: 'Best value! 365 days of unlimited movies and webseries.' }
+    { id: 'MONTHLY' as const, name: 'Monthly Plan', durationDays: 30, priceRupees: 89, description: '30 days full catalog access with HD & 1080p playback.' },
+    { id: '3_MONTHS' as const, name: '3 Months Plan', durationDays: 90, priceRupees: 189, description: '90 days full catalog access with HD & 1080p playback. Great quarterly value!' },
+    { id: 'YEARLY' as const, name: '12 Months / Full Year', durationDays: 365, priceRupees: 449, description: 'Best value! 365 days of unlimited movies and webseries across all devices.' }
   ];
 
   const plans = (subscriptionPlans && Array.isArray(subscriptionPlans) && subscriptionPlans.length > 0)
@@ -62,7 +62,7 @@ export const SubscriptionModal: React.FC = () => {
   const selectedPlan = plans.find(p => p.id === selectedPlanId)
     || plans.find(p => p.id === 'MONTHLY')
     || plans[0]
-    || fallbackPlans[1];
+    || fallbackPlans[0];
 
   useEffect(() => {
     if (activeModal === 'subscription') {
@@ -116,7 +116,7 @@ export const SubscriptionModal: React.FC = () => {
     }
   };
 
-  const handleSelectPlan = (planId: 'WEEKLY' | 'MONTHLY' | 'YEARLY') => {
+  const handleSelectPlan = (planId: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY') => {
     setSelectedPlanId(planId);
     setStep('pay');
   };
@@ -284,7 +284,7 @@ export const SubscriptionModal: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {plans.map(plan => {
                     const isSelected = selectedPlanId === plan.id;
-                    const isPopular = plan.id === 'MONTHLY';
+                    const badgeText = plan.id === '3_MONTHS' ? 'BEST VALUE' : plan.id === 'YEARLY' ? 'FULL YEAR' : null;
 
                     return (
                       <div
@@ -304,7 +304,7 @@ export const SubscriptionModal: React.FC = () => {
                           boxShadow: isSelected ? '0 4px 20px rgba(245, 166, 35, 0.15)' : 'none'
                         }}
                       >
-                        {isPopular && (
+                        {badgeText && (
                           <span
                             style={{
                               position: 'absolute',
@@ -319,7 +319,7 @@ export const SubscriptionModal: React.FC = () => {
                               letterSpacing: '0.04em'
                             }}
                           >
-                            MOST POPULAR
+                            {badgeText}
                           </span>
                         )}
 
@@ -350,7 +350,7 @@ export const SubscriptionModal: React.FC = () => {
                             ₹{plan.priceRupees}
                           </div>
                           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                            /{plan.durationDays === 7 ? 'week' : plan.durationDays === 365 ? 'year' : 'month'}
+                            /{plan.durationDays === 7 ? 'week' : plan.durationDays === 365 ? 'year' : plan.durationDays === 90 ? '3 months' : 'month'}
                           </div>
                         </div>
                       </div>

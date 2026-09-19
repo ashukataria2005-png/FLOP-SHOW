@@ -70,18 +70,18 @@ interface AppContextType {
   closeRechargeModal: () => void;
   openAuthModal: () => void;
   closeAuthModal: () => void;
-  openSubscriptionModal: (planId?: 'WEEKLY' | 'MONTHLY' | 'YEARLY', initialStep?: 'choose' | 'pay') => void;
+  openSubscriptionModal: (planId?: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', initialStep?: 'choose' | 'pay') => void;
   closeSubscriptionModal: () => void;
   openWatchPassModal: (item?: ContentItem | null, defaultPlan?: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D') => void;
   closeWatchPassModal: () => void;
   watchPassInitialPlan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D';
-  subscriptionTargetPlan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+  subscriptionTargetPlan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
   subscriptionTargetStep: 'choose' | 'pay';
 
   // Monetization Mode & Subscriptions
   monetizationMode: 'PER_CONTENT' | 'SUBSCRIPTION';
   subscriptionPlans: Array<{
-    id: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    id: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
     name: string;
     durationDays: number;
     priceRupees: number;
@@ -89,7 +89,7 @@ interface AppContextType {
   }>;
   activeSubscription: {
     id: string;
-    plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
     status: 'ACTIVE';
     amount_paid: number;
     start_date: string;
@@ -99,7 +99,7 @@ interface AppContextType {
   } | null;
   pendingSubscription: {
     id: string;
-    plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
     status: 'PENDING';
     amount_paid: number;
     payment_reference: string;
@@ -108,7 +108,7 @@ interface AppContextType {
   hasActiveSubscription: boolean;
   refreshMonetizationConfig: () => Promise<void>;
   refreshSubscriptionStatus: () => Promise<void>;
-  submitSubscriptionRequest: (plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', utr: string, userName?: string, userEmail?: string) => Promise<{ success: boolean; message: string }>;
+  submitSubscriptionRequest: (plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', utr: string, userName?: string, userEmail?: string) => Promise<{ success: boolean; message: string }>;
 
   // Player State
   activePlayerContent: ContentItem | null;
@@ -228,19 +228,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Monetization Mode & Subscription states
   const [monetizationMode, setMonetizationMode] = useState<'PER_CONTENT' | 'SUBSCRIPTION'>('PER_CONTENT');
   const DEFAULT_SUBSCRIPTION_PLANS: Array<{
-    id: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    id: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
     name: string;
     durationDays: number;
     priceRupees: number;
     description: string;
   }> = [
-    { id: 'WEEKLY', name: 'Weekly Plan', durationDays: 7, priceRupees: 49, description: '7 days of uninterrupted streaming across all devices.' },
-    { id: 'MONTHLY', name: 'Monthly Plan', durationDays: 30, priceRupees: 149, description: '30 days full catalog access with HD & 4K playback.' },
-    { id: 'YEARLY', name: 'Yearly Plan', durationDays: 365, priceRupees: 999, description: 'Best value! 365 days of unlimited movies and webseries.' }
+    { id: 'MONTHLY', name: 'Monthly Plan', durationDays: 30, priceRupees: 89, description: '30 days full catalog access with HD & 1080p playback.' },
+    { id: '3_MONTHS', name: '3 Months Plan', durationDays: 90, priceRupees: 189, description: '90 days full catalog access with HD & 1080p playback. Great quarterly value!' },
+    { id: 'YEARLY', name: '12 Months / Full Year', durationDays: 365, priceRupees: 449, description: 'Best value! 365 days of unlimited movies and webseries across all devices.' }
   ];
 
   const [subscriptionPlans, setSubscriptionPlans] = useState<Array<{
-    id: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+    id: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
     name: string;
     durationDays: number;
     priceRupees: number;
@@ -249,7 +249,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [activeSubscription, setActiveSubscription] = useState<any>(null);
   const [pendingSubscription, setPendingSubscription] = useState<any>(null);
   const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean>(false);
-  const [subscriptionTargetPlan, setSubscriptionTargetPlan] = useState<'WEEKLY' | 'MONTHLY' | 'YEARLY'>('MONTHLY');
+  const [subscriptionTargetPlan, setSubscriptionTargetPlan] = useState<'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY'>('MONTHLY');
   const [subscriptionTargetStep, setSubscriptionTargetStep] = useState<'choose' | 'pay'>('choose');
 
   const refreshMonetizationConfig = async () => {
@@ -261,8 +261,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (res?.plans && Array.isArray(res.plans) && res.plans.length > 0) {
         const normalized = res.plans.map((p: any) => {
           const rawId = String(p.id || p.plan || 'MONTHLY').toUpperCase();
-          const id = (rawId === 'WEEKLY' || rawId === 'YEARLY' ? rawId : 'MONTHLY') as 'WEEKLY' | 'MONTHLY' | 'YEARLY';
-          const defaultRef = DEFAULT_SUBSCRIPTION_PLANS.find(d => d.id === id) || DEFAULT_SUBSCRIPTION_PLANS[1];
+          const id = (rawId === '3_MONTHS' || rawId === 'YEARLY' || rawId === 'WEEKLY' ? rawId : 'MONTHLY') as 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
+          const defaultRef = DEFAULT_SUBSCRIPTION_PLANS.find(d => d.id === id) || DEFAULT_SUBSCRIPTION_PLANS[0];
           const rawPrice = p.priceRupees ?? p.price_inr ?? p.price;
           const numPrice = Number(rawPrice);
           const rawDays = p.durationDays ?? p.duration_days;
@@ -299,7 +299,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const submitSubscriptionRequest = async (plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', utr: string, userName?: string, userEmail?: string) => {
+  const submitSubscriptionRequest = async (plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', utr: string, userName?: string, userEmail?: string) => {
     try {
       const finalName = userName || user.name || 'FLOPSHOW Subscriber';
       const finalEmail = userEmail || user.email || 'subscriber@flopshow.in';
@@ -313,7 +313,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const openSubscriptionModal = (planId?: 'WEEKLY' | 'MONTHLY' | 'YEARLY', initialStep: 'choose' | 'pay' = 'choose') => {
+  const openSubscriptionModal = (planId?: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', initialStep: 'choose' | 'pay' = 'choose') => {
     if (planId) {
       setSubscriptionTargetPlan(planId);
     }

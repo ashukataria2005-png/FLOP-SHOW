@@ -17,11 +17,42 @@ export interface WatchPassPlanConfig {
   priceRupees: number;
   maxResolution: '720p' | '1080p';
   downloadAllowed: boolean;
+  maxDevices: number;
+  allowedDevicesLabel: string;
+  allowedDeviceTypes: string[];
   description: string;
   popular?: boolean;
   highlight?: string;
   benefits: string[];
 }
+
+export const WATCH_PASS_DEVICE_LIMITS: Record<WatchPassPlan, { maxDevices: number; allowedDevicesLabel: string; allowedDeviceTypes: string[] }> = {
+  PASS_24H: {
+    maxDevices: 1,
+    allowedDevicesLabel: '1 Device',
+    allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'],
+  },
+  PASS_3D: {
+    maxDevices: 1,
+    allowedDevicesLabel: '1 Device',
+    allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'],
+  },
+  PASS_7D: {
+    maxDevices: 2,
+    allowedDevicesLabel: '2 Devices (1 Tablet + 1 TV)',
+    allowedDeviceTypes: ['Tablet', 'TV'],
+  },
+  PASS_15D: {
+    maxDevices: 3,
+    allowedDevicesLabel: '3 Devices (2 Tablets + 1 TV)',
+    allowedDeviceTypes: ['Tablet', 'Tablet', 'TV'],
+  },
+  PASS_30D: {
+    maxDevices: 4,
+    allowedDevicesLabel: '4 Devices',
+    allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'],
+  },
+};
 
 const DURATION_DAYS_MAP: Record<string, number> = {
   PASS_24H: 1,
@@ -39,10 +70,10 @@ const PLAN_NAME_MAP: Record<string, string> = {
 };
 
 const PLAN_DESC_MAP: Record<string, string> = {
-  PASS_24H: 'Unlimited streaming across the entire catalog for 24 hours in HD 720p.',
-  PASS_3D: 'Full 3 days of uninterrupted catalog-wide access with priority playback experience.',
-  PASS_7D: 'Full week of unrestricted streaming in 1080p Full HD with offline downloads available.',
-  PASS_15D: 'Half-month premium pass. Enjoy 1080p Full HD, downloads, and seamless cross-device watching.',
+  PASS_24H: '24 Hours Access • 720p HD • 1 Device',
+  PASS_3D: '3 Days Access • 720p HD • 1 Device',
+  PASS_7D: '7 Days Access • 1080p Full HD • 2 Devices',
+  PASS_15D: '15 Days Access • 1080p Full HD • 3 Devices',
 };
 
 export const watchPassService = {
@@ -67,14 +98,17 @@ export const watchPassService = {
         priceRupees: isNaN(p24) ? 19 : p24,
         maxResolution: '720p',
         downloadAllowed: false,
+        maxDevices: WATCH_PASS_DEVICE_LIMITS.PASS_24H.maxDevices,
+        allowedDevicesLabel: WATCH_PASS_DEVICE_LIMITS.PASS_24H.allowedDevicesLabel,
+        allowedDeviceTypes: WATCH_PASS_DEVICE_LIMITS.PASS_24H.allowedDeviceTypes,
         description: PLAN_DESC_MAP.PASS_24H,
         highlight: 'Quick Access',
         benefits: [
-          'Unlimited movies & web series',
-          '24-Hour full catalog access',
-          '720p HD streaming',
-          'Streaming only (No downloads)',
-          'Instant activation after verification',
+          '24 Hours Access',
+          'HD 720p',
+          '1 Device',
+          'Unlimited eligible catalog streaming',
+          'No Download',
         ],
       },
       {
@@ -86,14 +120,16 @@ export const watchPassService = {
         priceRupees: isNaN(p3d) ? 29 : p3d,
         maxResolution: '720p',
         downloadAllowed: false,
+        maxDevices: WATCH_PASS_DEVICE_LIMITS.PASS_3D.maxDevices,
+        allowedDevicesLabel: WATCH_PASS_DEVICE_LIMITS.PASS_3D.allowedDevicesLabel,
+        allowedDeviceTypes: WATCH_PASS_DEVICE_LIMITS.PASS_3D.allowedDeviceTypes,
         description: PLAN_DESC_MAP.PASS_3D,
         highlight: 'Weekend Favorite',
         benefits: [
-          'Unlimited movies & web series',
-          '3-Day continuous catalog access',
-          '720p HD streaming',
-          'Priority playback experience',
-          'Streaming only (No downloads)',
+          '3 Days Access',
+          'HD 720p',
+          '1 Device',
+          'No Download',
         ],
       },
       {
@@ -105,14 +141,17 @@ export const watchPassService = {
         priceRupees: isNaN(p7d) ? 44 : p7d,
         maxResolution: '1080p',
         downloadAllowed: true,
+        maxDevices: WATCH_PASS_DEVICE_LIMITS.PASS_7D.maxDevices,
+        allowedDevicesLabel: WATCH_PASS_DEVICE_LIMITS.PASS_7D.allowedDevicesLabel,
+        allowedDeviceTypes: WATCH_PASS_DEVICE_LIMITS.PASS_7D.allowedDeviceTypes,
         popular: true,
         highlight: 'Recommended',
         benefits: [
-          'Unlimited movies & web series',
-          '7-Day full catalog access',
-          'Full HD 1080p cinema streaming',
-          'Download Available for offline watch',
-          'Continue Watching cross-device sync',
+          '7 Days Access',
+          'Full HD 1080p',
+          'Download Available',
+          '2 Devices',
+          '1 Tablet + 1 TV',
         ],
       },
       {
@@ -124,14 +163,16 @@ export const watchPassService = {
         priceRupees: isNaN(p15d) ? 69 : p15d,
         maxResolution: '1080p',
         downloadAllowed: true,
+        maxDevices: WATCH_PASS_DEVICE_LIMITS.PASS_15D.maxDevices,
+        allowedDevicesLabel: WATCH_PASS_DEVICE_LIMITS.PASS_15D.allowedDevicesLabel,
+        allowedDeviceTypes: WATCH_PASS_DEVICE_LIMITS.PASS_15D.allowedDeviceTypes,
         highlight: 'Best Value',
         benefits: [
-          'Unlimited movies & web series',
-          '15-Day extended catalog access',
-          'Full HD 1080p cinema streaming',
-          'Download Available for offline watch',
-          'Continue Watching cross-device sync',
-          'Lowest per-day rate',
+          '15 Days Access',
+          'Full HD 1080p',
+          'Download Available',
+          '3 Devices',
+          '2 Tablets + 1 TV',
         ],
       },
     ];
@@ -319,13 +360,16 @@ export const watchPassService = {
   },
 
   /**
-   * Get active pass capabilities (quality cap, download entitlement, time remaining).
+   * Get active pass capabilities (quality cap, download entitlement, time remaining, device limits).
    */
   async getActivePassCapabilities(userId: string): Promise<{
     hasActivePass: boolean;
     plan?: WatchPassPlan;
     maxResolution: '720p' | '1080p';
     downloadAllowed: boolean;
+    maxDevices: number;
+    allowedDevicesLabel: string;
+    allowedDeviceTypes: string[];
     remainingHours: number;
     remainingDays: number;
     expiresAt?: string;
@@ -336,6 +380,9 @@ export const watchPassService = {
         hasActivePass: false,
         maxResolution: '1080p',
         downloadAllowed: false,
+        maxDevices: 1,
+        allowedDevicesLabel: '1 Device',
+        allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'],
         remainingHours: 0,
         remainingDays: 0,
       };
@@ -348,11 +395,16 @@ export const watchPassService = {
     const remainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
     const is1080p = active.plan === 'PASS_7D' || active.plan === 'PASS_15D' || active.plan === 'PASS_30D';
+    const limits = WATCH_PASS_DEVICE_LIMITS[active.plan] || { maxDevices: 1, allowedDevicesLabel: '1 Device', allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'] };
+
     return {
       hasActivePass: true,
       plan: active.plan,
       maxResolution: is1080p ? '1080p' : '720p',
       downloadAllowed: is1080p,
+      maxDevices: limits.maxDevices,
+      allowedDevicesLabel: limits.allowedDevicesLabel,
+      allowedDeviceTypes: limits.allowedDeviceTypes,
       remainingHours,
       remainingDays,
       expiresAt: active.expires_at,
@@ -364,7 +416,15 @@ export const watchPassService = {
    */
   async getContentPassStatus(userId: string, contentId?: string): Promise<{
     hasActivePass: boolean;
-    activePass: (WatchPassRecord & { remainingHours: number; remainingDays: number; maxResolution: string; downloadAllowed: boolean }) | null;
+    activePass: (WatchPassRecord & {
+      remainingHours: number;
+      remainingDays: number;
+      maxResolution: string;
+      downloadAllowed: boolean;
+      maxDevices: number;
+      allowedDevicesLabel: string;
+      allowedDeviceTypes: string[];
+    }) | null;
     pendingPass: WatchPassRecord | null;
     latestPass: WatchPassRecord | null;
     isExpired: boolean;
@@ -382,6 +442,7 @@ export const watchPassService = {
       const remainingHours = Math.ceil(diffMs / (1000 * 60 * 60));
       const remainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
       const is1080p = active.plan === 'PASS_7D' || active.plan === 'PASS_15D' || active.plan === 'PASS_30D';
+      const limits = WATCH_PASS_DEVICE_LIMITS[active.plan] || { maxDevices: 1, allowedDevicesLabel: '1 Device', allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'] };
 
       activeWithRemaining = {
         ...active,
@@ -389,6 +450,9 @@ export const watchPassService = {
         remainingDays,
         maxResolution: is1080p ? '1080p' : '720p',
         downloadAllowed: is1080p,
+        maxDevices: limits.maxDevices,
+        allowedDevicesLabel: limits.allowedDevicesLabel,
+        allowedDeviceTypes: limits.allowedDeviceTypes,
       };
     }
 
@@ -408,14 +472,30 @@ export const watchPassService = {
    * Get all passes for a user (Active vs Expired vs Pending).
    */
   async getUserPasses(userId: string): Promise<{
-    activePasses: Array<WatchPassRecord & { remainingHours: number; remainingDays: number; maxResolution: string; downloadAllowed: boolean }>;
+    activePasses: Array<WatchPassRecord & {
+      remainingHours: number;
+      remainingDays: number;
+      maxResolution: string;
+      downloadAllowed: boolean;
+      maxDevices: number;
+      allowedDevicesLabel: string;
+      allowedDeviceTypes: string[];
+    }>;
     expiredPasses: WatchPassRecord[];
     pendingPasses: WatchPassRecord[];
   }> {
     const all = await watchPassRepository.getUserPasses(userId);
     const now = new Date().getTime();
 
-    const activePasses: Array<WatchPassRecord & { remainingHours: number; remainingDays: number; maxResolution: string; downloadAllowed: boolean }> = [];
+    const activePasses: Array<WatchPassRecord & {
+      remainingHours: number;
+      remainingDays: number;
+      maxResolution: string;
+      downloadAllowed: boolean;
+      maxDevices: number;
+      allowedDevicesLabel: string;
+      allowedDeviceTypes: string[];
+    }> = [];
     const expiredPasses: WatchPassRecord[] = [];
     const pendingPasses: WatchPassRecord[] = [];
 
@@ -424,6 +504,7 @@ export const watchPassService = {
         const end = new Date(p.expires_at).getTime();
         const diffMs = Math.max(0, end - now);
         const is1080p = p.plan === 'PASS_7D' || p.plan === 'PASS_15D' || p.plan === 'PASS_30D';
+        const limits = WATCH_PASS_DEVICE_LIMITS[p.plan] || { maxDevices: 1, allowedDevicesLabel: '1 Device', allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'] };
 
         activePasses.push({
           ...p,
@@ -431,6 +512,9 @@ export const watchPassService = {
           remainingDays: Math.ceil(diffMs / (1000 * 60 * 60 * 24)),
           maxResolution: is1080p ? '1080p' : '720p',
           downloadAllowed: is1080p,
+          maxDevices: limits.maxDevices,
+          allowedDevicesLabel: limits.allowedDevicesLabel,
+          allowedDeviceTypes: limits.allowedDeviceTypes,
         });
       } else if (p.status === 'EXPIRED') {
         expiredPasses.push(p);

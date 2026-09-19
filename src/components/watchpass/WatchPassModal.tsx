@@ -23,8 +23,18 @@ const DEFAULT_PLANS: WatchPassPlanTemplate[] = [
     priceRupees: 19,
     maxResolution: '720p',
     downloadAllowed: false,
-    description: 'Unlimited catalog streaming for 24 hours in HD 720p.',
-    highlight: 'Quick Access'
+    maxDevices: 1,
+    allowedDevicesLabel: '1 Device',
+    allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'],
+    description: '24 Hours Access • 720p HD • 1 Device',
+    highlight: 'Quick Access',
+    benefits: [
+      '24 Hours Access',
+      'HD 720p',
+      '1 Device',
+      'Unlimited eligible catalog streaming',
+      'No Download'
+    ]
   },
   {
     id: 'PASS_3D',
@@ -35,8 +45,17 @@ const DEFAULT_PLANS: WatchPassPlanTemplate[] = [
     priceRupees: 29,
     maxResolution: '720p',
     downloadAllowed: false,
-    description: 'Full 72 hours of uninterrupted streaming with priority playback.',
-    highlight: 'Weekend Favorite'
+    maxDevices: 1,
+    allowedDevicesLabel: '1 Device',
+    allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'],
+    description: '3 Days Access • 720p HD • 1 Device',
+    highlight: 'Weekend Favorite',
+    benefits: [
+      '3 Days Access',
+      'HD 720p',
+      '1 Device',
+      'No Download'
+    ]
   },
   {
     id: 'PASS_7D',
@@ -47,9 +66,19 @@ const DEFAULT_PLANS: WatchPassPlanTemplate[] = [
     priceRupees: 44,
     maxResolution: '1080p',
     downloadAllowed: true,
-    description: '1080p Full HD streaming with offline downloads enabled.',
+    maxDevices: 2,
+    allowedDevicesLabel: '2 Devices (1 Tablet + 1 TV)',
+    allowedDeviceTypes: ['Tablet', 'TV'],
     popular: true,
-    highlight: 'Recommended'
+    highlight: 'Recommended',
+    description: '',
+    benefits: [
+      '7 Days Access',
+      'Full HD 1080p',
+      'Download Available',
+      '2 Devices',
+      '1 Tablet + 1 TV'
+    ]
   },
   {
     id: 'PASS_15D',
@@ -60,8 +89,18 @@ const DEFAULT_PLANS: WatchPassPlanTemplate[] = [
     priceRupees: 69,
     maxResolution: '1080p',
     downloadAllowed: true,
-    description: 'Half-month premium pass: 1080p Full HD, downloads, and sync.',
-    highlight: 'Best Value'
+    maxDevices: 3,
+    allowedDevicesLabel: '3 Devices (2 Tablets + 1 TV)',
+    allowedDeviceTypes: ['Tablet', 'Tablet', 'TV'],
+    highlight: 'Best Value',
+    description: '',
+    benefits: [
+      '15 Days Access',
+      'Full HD 1080p',
+      'Download Available',
+      '3 Devices',
+      '2 Tablets + 1 TV'
+    ]
   }
 ];
 
@@ -356,7 +395,7 @@ export const WatchPassModal: React.FC = () => {
                           )}
                         </div>
                         <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
-                          {p.description}
+                          {p.allowedDevicesLabel ? `${p.allowedDevicesLabel} • ${p.maxResolution || '720p'}` : p.description}
                         </div>
                       </div>
                     </div>

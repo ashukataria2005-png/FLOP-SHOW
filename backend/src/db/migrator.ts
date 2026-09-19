@@ -384,7 +384,41 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 6 };
+    // Apply incremental 011_subscription_plans_update for PostgreSQL if not already applied
+    const subUpdateMigrationVersion = '011_subscription_plans_update';
+    if (!appliedSet.has(subUpdateMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 011_subscription_plans_update...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          ALTER TABLE subscriptions DROP CONSTRAINT IF EXISTS subscriptions_plan_check;
+          ALTER TABLE subscriptions ADD CONSTRAINT subscriptions_plan_check CHECK(plan IN ('WEEKLY', 'MONTHLY', '3_MONTHS', 'YEARLY'));
+
+          INSERT INTO app_settings (key, value, updated_at)
+          VALUES
+            ('subscription_price_monthly', '89', NOW()::TEXT),
+            ('subscription_price_3_months', '189', NOW()::TEXT),
+            ('subscription_price_yearly', '449', NOW()::TEXT)
+          ON CONFLICT (key) DO UPDATE SET
+            value = EXCLUDED.value,
+            updated_at = EXCLUDED.updated_at;
+
+          DELETE FROM app_settings WHERE key = 'subscription_price_weekly';
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${subUpdateMigrationVersion}', '011_subscription_plans_update.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('011_subscription_plans_update.sql');
+        console.log('✓ [PostgreSQL] Migration 011_subscription_plans_update applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 7 };
   } finally {
     client.release();
     await pool.end();

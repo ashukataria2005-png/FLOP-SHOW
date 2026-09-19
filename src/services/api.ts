@@ -1305,7 +1305,7 @@ export const api = {
       return request<{
         mode: 'PER_CONTENT' | 'SUBSCRIPTION';
         plans: Array<{
-          id: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+          id: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
           name: string;
           durationDays: number;
           priceRupees: number;
@@ -1322,8 +1322,9 @@ export const api = {
         success: boolean;
         config: {
           mode: 'PER_CONTENT' | 'SUBSCRIPTION';
-          weeklyPrice: number;
+          weeklyPrice?: number;
           monthlyPrice: number;
+          threeMonthsPrice: number;
           yearlyPrice: number;
           currencySymbol: string;
           metrics: {
@@ -1340,6 +1341,7 @@ export const api = {
       mode?: 'PER_CONTENT' | 'SUBSCRIPTION';
       weeklyPrice?: number;
       monthlyPrice?: number;
+      threeMonthsPrice?: number;
       yearlyPrice?: number;
     }) {
       return request<{
@@ -1347,8 +1349,9 @@ export const api = {
         message: string;
         config: {
           mode: 'PER_CONTENT' | 'SUBSCRIPTION';
-          weeklyPrice: number;
+          weeklyPrice?: number;
           monthlyPrice: number;
+          threeMonthsPrice: number;
           yearlyPrice: number;
           currencySymbol: string;
           metrics: {
@@ -1372,7 +1375,7 @@ export const api = {
     async getPlans() {
       return request<{
         plans: Array<{
-          id: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+          id: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
           name: string;
           durationDays: number;
           priceRupees: number;
@@ -1386,7 +1389,7 @@ export const api = {
         hasActiveSubscription: boolean;
         activeSubscription: {
           id: string;
-          plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+          plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
           status: 'ACTIVE';
           amount_paid: number;
           start_date: string;
@@ -1396,7 +1399,7 @@ export const api = {
         } | null;
         pendingSubscription: {
           id: string;
-          plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+          plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
           status: 'PENDING';
           amount_paid: number;
           payment_reference: string;
@@ -1406,7 +1409,7 @@ export const api = {
       }>('/subscriptions/my-status');
     },
 
-    async submitRequest(plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', utr: string, userName?: string, userEmail?: string) {
+    async submitRequest(plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', utr: string, userName?: string, userEmail?: string) {
       return request<{
         success: boolean;
         message: string;
@@ -1452,7 +1455,7 @@ export const api = {
       });
     },
 
-    async adminGrant(userId: string, plan: 'WEEKLY' | 'MONTHLY' | 'YEARLY', adminNote?: string) {
+    async adminGrant(userId: string, plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', adminNote?: string) {
       return request<{
         success: boolean;
         message: string;
@@ -1476,6 +1479,9 @@ export const api = {
           priceRupees: number;
           maxResolution?: '720p' | '1080p';
           downloadAllowed?: boolean;
+          maxDevices?: number;
+          allowedDevicesLabel?: string;
+          allowedDeviceTypes?: string[];
           description: string;
           popular?: boolean;
           highlight?: string;
@@ -1500,6 +1506,9 @@ export const api = {
           remainingDays: number;
           maxResolution?: '720p' | '1080p';
           downloadAllowed?: boolean;
+          maxDevices?: number;
+          allowedDevicesLabel?: string;
+          allowedDeviceTypes?: string[];
           payment_reference: string | null;
         } | null;
         pendingPass: {
@@ -1534,6 +1543,9 @@ export const api = {
           remainingDays: number;
           maxResolution?: '720p' | '1080p';
           downloadAllowed?: boolean;
+          maxDevices?: number;
+          allowedDevicesLabel?: string;
+          allowedDeviceTypes?: string[];
           payment_reference: string | null;
         }>;
         expiredPasses: Array<{

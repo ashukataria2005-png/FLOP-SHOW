@@ -12,7 +12,9 @@ import {
   CheckCircle2,
   Sparkles,
   ShieldCheck,
-  Smartphone
+  Smartphone,
+  Tv,
+  Tablet
 } from 'lucide-react';
 import { ContentItem } from '../types/content';
 
@@ -30,7 +32,10 @@ export interface WatchPassPlanTemplate {
   priceRupees: number;
   maxResolution?: '720p' | '1080p';
   downloadAllowed?: boolean;
-  description: string;
+  maxDevices?: number;
+  allowedDevicesLabel?: string;
+  allowedDeviceTypes?: string[];
+  description?: string;
   popular?: boolean;
   highlight?: string;
   benefits?: string[];
@@ -46,14 +51,17 @@ const DEFAULT_WATCH_PASS_PLANS: WatchPassPlanTemplate[] = [
     priceRupees: 19,
     maxResolution: '720p',
     downloadAllowed: false,
-    description: 'Unlimited movies & series across the entire catalog for 24 hours.',
+    maxDevices: 1,
+    allowedDevicesLabel: '1 Device',
+    allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'],
+    description: '',
     highlight: 'Quick Access',
     benefits: [
-      'Unlimited movies & series',
-      '24-Hour full catalog access',
-      'HD 720p streaming',
-      'Streaming only (No downloads)',
-      'Instant activation upon approval',
+      '24 Hours Access',
+      'HD 720p',
+      '1 Device',
+      'Unlimited eligible catalog streaming',
+      'No Download',
     ]
   },
   {
@@ -65,14 +73,16 @@ const DEFAULT_WATCH_PASS_PLANS: WatchPassPlanTemplate[] = [
     priceRupees: 29,
     maxResolution: '720p',
     downloadAllowed: false,
-    description: '72 hours of continuous catalog access with priority playback experience.',
+    maxDevices: 1,
+    allowedDevicesLabel: '1 Device',
+    allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'],
+    description: '',
     highlight: 'Weekend Favorite',
     benefits: [
-      'Unlimited movies & series',
-      '3-Day continuous access',
-      'HD 720p streaming',
-      'Priority playback experience',
-      'Streaming only (No downloads)',
+      '3 Days Access',
+      'HD 720p',
+      '1 Device',
+      'No Download',
     ]
   },
   {
@@ -84,15 +94,17 @@ const DEFAULT_WATCH_PASS_PLANS: WatchPassPlanTemplate[] = [
     priceRupees: 44,
     maxResolution: '1080p',
     downloadAllowed: true,
-    description: 'Full week of unrestricted streaming in 1080p Full HD with offline downloads available.',
+    maxDevices: 2,
+    allowedDevicesLabel: '2 Devices (1 Tablet + 1 TV)',
+    allowedDeviceTypes: ['Tablet', 'TV'],
     popular: true,
     highlight: 'Recommended',
     benefits: [
-      'Unlimited movies & series',
-      '7-Day full catalog access',
-      'Full HD 1080p cinema streaming',
-      'Download Available for offline watch',
-      'Continue Watching cross-device sync',
+      '7 Days Access',
+      'Full HD 1080p',
+      'Download Available',
+      '2 Devices',
+      '1 Tablet + 1 TV',
     ]
   },
   {
@@ -104,15 +116,16 @@ const DEFAULT_WATCH_PASS_PLANS: WatchPassPlanTemplate[] = [
     priceRupees: 69,
     maxResolution: '1080p',
     downloadAllowed: true,
-    description: 'Half-month premium pass with 1080p Full HD, downloads, and lowest daily rate.',
+    maxDevices: 3,
+    allowedDevicesLabel: '3 Devices (2 Tablets + 1 TV)',
+    allowedDeviceTypes: ['Tablet', 'Tablet', 'TV'],
     highlight: 'Best Value',
     benefits: [
-      'Unlimited movies & series',
-      '15-Day extended access',
-      'Full HD 1080p cinema streaming',
-      'Download Available for offline watch',
-      'Continue Watching cross-device sync',
-      'Lowest daily rate',
+      '15 Days Access',
+      'Full HD 1080p',
+      'Download Available',
+      '3 Devices',
+      '2 Tablets + 1 TV',
     ]
   }
 ];
@@ -237,45 +250,26 @@ export const PlansPage: React.FC<PlansPageProps> = ({ onNavigate }) => {
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#E5E7EB' }}>
-                  <Check size={16} color="#60A5FA" />
-                  <span><strong>1 Month Validity</strong> (30 days from purchase)</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#FFFFFF' }}>
+                  <Check size={16} color="var(--brand-gold, #F5C518)" />
+                  <span><strong>1 Month Validity</strong></span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#E5E7EB' }}>
-                  <Check size={16} color="#60A5FA" />
-                  <span><strong>Full HD 1080p</strong> crisp playback</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#FFFFFF' }}>
+                  <Check size={16} color="var(--brand-gold, #F5C518)" />
+                  <span><strong>Full HD 1080p</strong></span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#E5E7EB' }}>
-                  <Download size={16} color="#60A5FA" />
-                  <span><strong>Download Available</strong> for offline watching</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#E5E7EB' }}>
-                  <Check size={16} color="#60A5FA" />
-                  <span>Personal Library listing & resume sync</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#FFFFFF' }}>
+                  <Download size={16} color="var(--brand-gold, #F5C518)" />
+                  <span><strong>Download Available</strong></span>
                 </div>
               </div>
             </div>
 
             <button
               onClick={() => onNavigate('discover')}
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '12px',
-                backgroundColor: 'rgba(96, 165, 250, 0.15)',
-                border: '1.5px solid #60A5FA',
-                color: '#60A5FA',
-                fontWeight: 800,
-                fontSize: '14px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.15s ease'
-              }}
+              className="btn-browse-own"
             >
-              <span>Browse Movies to Own</span>
+              <span>Browse Movie/Series to Own</span>
               <ArrowRight size={16} />
             </button>
           </div>
@@ -285,7 +279,7 @@ export const PlansPage: React.FC<PlansPageProps> = ({ onNavigate }) => {
             style={{
               backgroundColor: 'var(--bg-surface, #12121A)',
               borderRadius: '20px',
-              border: '1.5px solid rgba(147, 197, 253, 0.35)',
+              border: '1.5px solid rgba(245, 166, 35, 0.35)',
               padding: '24px',
               display: 'flex',
               flexDirection: 'column',
@@ -295,10 +289,10 @@ export const PlansPage: React.FC<PlansPageProps> = ({ onNavigate }) => {
           >
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 800, color: '#93C5FD', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   Complete Series Season
                 </span>
-                <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', backgroundColor: 'rgba(147, 197, 253, 0.15)', color: '#93C5FD' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', backgroundColor: 'rgba(245, 166, 35, 0.15)', color: 'var(--brand-gold, #F5C518)' }}>
                   1 Month Access
                 </span>
               </div>
@@ -313,45 +307,30 @@ export const PlansPage: React.FC<PlansPageProps> = ({ onNavigate }) => {
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#E5E7EB' }}>
-                  <Check size={16} color="#93C5FD" />
-                  <span><strong>1 Month Validity</strong> (Entire series & episodes)</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#FFFFFF' }}>
+                  <Check size={16} color="var(--brand-gold, #F5C518)" />
+                  <span><strong>1 Month Validity</strong></span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#93C5FD' }}>
-                  <Check size={16} color="#93C5FD" />
-                  <span><strong>Full HD 1080p</strong> on all episodes</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#FFFFFF' }}>
+                  <Check size={16} color="var(--brand-gold, #F5C518)" />
+                  <span><strong>Full HD 1080p</strong></span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#93C5FD' }}>
-                  <Download size={16} color="#93C5FD" />
-                  <span><strong>Download Available</strong> for every episode</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#FFFFFF' }}>
+                  <Download size={16} color="var(--brand-gold, #F5C518)" />
+                  <span><strong>Download Available</strong></span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#93C5FD' }}>
-                  <Check size={16} color="#93C5FD" />
-                  <span>Episode progress & autoplay tracking</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#FFFFFF' }}>
+                  <Check size={16} color="var(--brand-gold, #F5C518)" />
+                  <span>Full season / all episodes</span>
                 </div>
               </div>
             </div>
 
             <button
               onClick={() => onNavigate('discover')}
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '12px',
-                backgroundColor: 'rgba(147, 197, 253, 0.15)',
-                border: '1.5px solid #93C5FD',
-                color: '#93C5FD',
-                fontWeight: 800,
-                fontSize: '14px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.15s ease'
-              }}
+              className="btn-browse-own"
             >
-              <span>Browse Web Series to Own</span>
+              <span>Browse Movie/Series to Own</span>
               <ArrowRight size={16} />
             </button>
           </div>
@@ -454,7 +433,7 @@ export const PlansPage: React.FC<PlansPageProps> = ({ onNavigate }) => {
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '18px' }}>
                     <span style={{ fontSize: '36px', fontWeight: 900, color: '#FFFFFF' }}>
                       ₹{plan.priceRupees}
                     </span>
@@ -463,49 +442,102 @@ export const PlansPage: React.FC<PlansPageProps> = ({ onNavigate }) => {
                     </span>
                   </div>
 
-                  <p style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: 1.5, marginBottom: '18px' }}>
-                    {plan.description}
-                  </p>
-
+                  {/* Individual feature list strictly adhering to requested specifications */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
-                      <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
-                      <span>Unlimited movies & web series</span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
-                      <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
-                      <span>
-                        Quality: <strong>{plan.maxResolution || (plan.durationDays >= 7 ? '1080p Full HD' : '720p HD')}</strong>
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: plan.downloadAllowed ? '#34D399' : '#9CA3AF' }}>
-                      {plan.downloadAllowed ? (
-                        <>
-                          <Download size={15} color="#34D399" />
-                          <span><strong>Download Available</strong> for offline play</span>
-                        </>
-                      ) : (
-                        <>
+                    {plan.plan === 'PASS_24H' && (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>24 Hours Access</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>HD 720p</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <Smartphone size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>1 Device</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>Unlimited eligible catalog streaming</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#9CA3AF' }}>
                           <Clock size={15} color="#9CA3AF" />
-                          <span>Streaming only (No downloads)</span>
-                        </>
-                      )}
-                    </div>
-
-                    {plan.durationDays === 3 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
-                        <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
-                        <span>Priority playback stream experience</span>
-                      </div>
+                          <span>No Download</span>
+                        </div>
+                      </>
                     )}
 
-                    {plan.durationDays >= 7 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
-                        <Smartphone size={15} color="var(--brand-gold, #F5C518)" />
-                        <span>Continue Watching cross-device sync</span>
-                      </div>
+                    {plan.plan === 'PASS_3D' && (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>3 Days Access</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>HD 720p</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <Smartphone size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>1 Device</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#9CA3AF' }}>
+                          <Clock size={15} color="#9CA3AF" />
+                          <span>No Download</span>
+                        </div>
+                      </>
+                    )}
+
+                    {plan.plan === 'PASS_7D' && (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>7 Days Access</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>Full HD 1080p</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#34D399' }}>
+                          <Download size={15} color="#34D399" />
+                          <span><strong>Download Available</strong></span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <Tablet size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>2 Devices</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--brand-gold, #F5C518)' }}>
+                          <Tv size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>1 Tablet + 1 TV</span>
+                        </div>
+                      </>
+                    )}
+
+                    {plan.plan === 'PASS_15D' && (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>15 Days Access</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>Full HD 1080p</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#34D399' }}>
+                          <Download size={15} color="#34D399" />
+                          <span><strong>Download Available</strong></span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
+                          <Tablet size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>3 Devices</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--brand-gold, #F5C518)' }}>
+                          <Tv size={15} color="var(--brand-gold, #F5C518)" />
+                          <span>2 Tablets + 1 TV</span>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -546,58 +578,80 @@ export const PlansPage: React.FC<PlansPageProps> = ({ onNavigate }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <Crown size={20} color="#A855F7" />
             <h2 style={{ fontSize: '22px', fontWeight: 900, color: '#FFFFFF', margin: 0 }}>
-              VIP Subscriptions
+              VIP Subscription Plans
             </h2>
           </div>
           <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>
-            Catalog-wide VIP membership. Stream all content with zero per-content charges and premium privileges.
+            Catalog-wide VIP membership. Stream all movies and series with zero per-content charges and premium full-season access.
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '18px' }}>
-          {subscriptionPlans.map(sub => {
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '18px' }}>
+          {subscriptionPlans.filter(sub => sub.id !== 'WEEKLY').map(sub => {
             const isMonthly = sub.id === 'MONTHLY';
+            const is3Months = sub.id === '3_MONTHS';
+            const isYearly = sub.id === 'YEARLY';
+
+            const badgeText = is3Months ? 'QUARTERLY VALUE' : isYearly ? 'BEST VALUE • SAVE 58%' : null;
+            const badgeBg = is3Months ? 'var(--brand-gold, #F5C518)' : '#A855F7';
+            const badgeColor = is3Months ? '#000000' : '#FFFFFF';
+
+            const durationSubtitle = isMonthly
+              ? '1 Month (30 Days) • Standard billing'
+              : is3Months
+              ? '3 Months (90 Days) • Only ₹63/mo'
+              : '12 Months (365 Days) • Only ₹37.4/mo';
+
+            const durationUnit = isMonthly ? 'month' : is3Months ? '3 months' : 'full year';
+
             return (
               <div
                 key={sub.id}
                 style={{
                   backgroundColor: 'var(--bg-surface, #12121A)',
                   borderRadius: '20px',
-                  border: isMonthly
+                  border: is3Months
+                    ? '2px solid var(--brand-gold, #F5C518)'
+                    : isYearly
                     ? '2px solid #A855F7'
-                    : '1px solid rgba(255, 255, 255, 0.08)',
+                    : '1px solid rgba(255, 255, 255, 0.12)',
                   padding: '24px',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   position: 'relative',
-                  boxShadow: isMonthly ? '0 12px 30px rgba(168, 85, 247, 0.15)' : 'none'
+                  boxShadow: is3Months
+                    ? '0 12px 30px rgba(245, 197, 24, 0.15)'
+                    : isYearly
+                    ? '0 12px 30px rgba(168, 85, 247, 0.15)'
+                    : 'none'
                 }}
               >
-                {isMonthly && (
+                {badgeText && (
                   <div
                     style={{
                       position: 'absolute',
                       top: '-12px',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      backgroundColor: '#A855F7',
-                      color: '#FFFFFF',
+                      backgroundColor: badgeBg,
+                      color: badgeColor,
                       fontSize: '11px',
                       fontWeight: 900,
                       padding: '3px 12px',
                       borderRadius: '12px',
                       textTransform: 'uppercase',
-                      letterSpacing: '0.08em'
+                      letterSpacing: '0.08em',
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    VIP Choice
+                    {badgeText}
                   </div>
                 )}
 
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#A855F7', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: is3Months ? 'var(--brand-gold, #F5C518)' : '#A855F7', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                       {sub.name}
                     </span>
                     <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 600 }}>
@@ -605,34 +659,34 @@ export const PlansPage: React.FC<PlansPageProps> = ({ onNavigate }) => {
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
                     <span style={{ fontSize: '36px', fontWeight: 900, color: '#FFFFFF' }}>
                       ₹{sub.priceRupees}
                     </span>
                     <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                      / {sub.id === 'WEEKLY' ? 'week' : sub.id === 'MONTHLY' ? 'month' : 'year'}
+                      / {durationUnit}
                     </span>
                   </div>
 
-                  <p style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: 1.5, marginBottom: '18px' }}>
-                    {sub.description}
-                  </p>
+                  <div style={{ fontSize: '12px', color: is3Months ? 'var(--brand-gold, #F5C518)' : isYearly ? '#C084FC' : '#9CA3AF', fontWeight: 600, marginBottom: '18px' }}>
+                    {durationSubtitle}
+                  </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
-                      <CheckCircle2 size={15} color="#A855F7" />
-                      <span>Full HD & 4K Cinema Streaming</span>
+                      <CheckCircle2 size={15} color={is3Months ? 'var(--brand-gold, #F5C518)' : '#A855F7'} />
+                      <span>Full HD 1080p & 4K Cinema Streaming</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
-                      <CheckCircle2 size={15} color="#A855F7" />
-                      <span>Unlimited movies & web series</span>
+                      <CheckCircle2 size={15} color={is3Months ? 'var(--brand-gold, #F5C518)' : '#A855F7'} />
+                      <span>Unlimited movies & web series catalog</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
-                      <CheckCircle2 size={15} color="#A855F7" />
+                      <Download size={15} color="#34D399" />
                       <span>Offline downloads available</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#FFFFFF' }}>
-                      <CheckCircle2 size={15} color="#A855F7" />
+                      <CheckCircle2 size={15} color={is3Months ? 'var(--brand-gold, #F5C518)' : '#A855F7'} />
                       <span>Zero per-content charges</span>
                     </div>
                   </div>
@@ -644,9 +698,9 @@ export const PlansPage: React.FC<PlansPageProps> = ({ onNavigate }) => {
                     width: '100%',
                     padding: '12px',
                     borderRadius: '12px',
-                    backgroundColor: isMonthly ? '#A855F7' : 'rgba(255, 255, 255, 0.08)',
-                    color: '#FFFFFF',
-                    border: isMonthly ? 'none' : '1px solid rgba(255, 255, 255, 0.15)',
+                    backgroundColor: is3Months ? 'var(--brand-gold, #F5C518)' : isYearly ? '#A855F7' : 'rgba(255, 255, 255, 0.08)',
+                    color: is3Months ? '#000000' : '#FFFFFF',
+                    border: is3Months || isYearly ? 'none' : '1px solid rgba(255, 255, 255, 0.15)',
                     fontWeight: 800,
                     fontSize: '14px',
                     cursor: 'pointer',

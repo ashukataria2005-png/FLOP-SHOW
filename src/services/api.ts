@@ -1432,5 +1432,175 @@ export const api = {
         body: JSON.stringify({ userId, plan, adminNote })
       });
     }
+  },
+
+  watchPasses: {
+    async getPlans() {
+      return request<{
+        plans: Array<{
+          id: string;
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          name: string;
+          durationLabel: string;
+          durationDays: number;
+          priceRupees: number;
+          description: string;
+          popular?: boolean;
+          highlight?: string;
+        }>;
+      }>('/watch-passes/plans');
+    },
+
+    async getContentStatus(contentId: string) {
+      return request<{
+        hasActivePass: boolean;
+        activePass: {
+          id: string;
+          content_id: string;
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          status: 'ACTIVE';
+          amount_paid: number;
+          submitted_at: string;
+          activated_at: string;
+          expires_at: string;
+          remainingHours: number;
+          remainingDays: number;
+          payment_reference: string | null;
+        } | null;
+        pendingPass: {
+          id: string;
+          content_id: string;
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          status: 'PENDING';
+          amount_paid: number;
+          payment_reference: string;
+          submitted_at: string;
+        } | null;
+        latestPass: any;
+        isExpired: boolean;
+      }>(`/watch-passes/content-status/${contentId}`);
+    },
+
+    async getMyPasses() {
+      return request<{
+        activePasses: Array<{
+          id: string;
+          content_id: string;
+          content_title?: string;
+          content_poster?: string;
+          content_type?: string;
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          status: 'ACTIVE';
+          amount_paid: number;
+          submitted_at: string;
+          activated_at: string;
+          expires_at: string;
+          remainingHours: number;
+          remainingDays: number;
+          payment_reference: string | null;
+        }>;
+        expiredPasses: Array<{
+          id: string;
+          content_id: string;
+          content_title?: string;
+          content_poster?: string;
+          content_type?: string;
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          status: 'EXPIRED';
+          amount_paid: number;
+          submitted_at: string;
+          activated_at: string | null;
+          expires_at: string | null;
+          payment_reference: string | null;
+        }>;
+        pendingPasses: Array<{
+          id: string;
+          content_id: string;
+          content_title?: string;
+          content_poster?: string;
+          content_type?: string;
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          status: 'PENDING';
+          amount_paid: number;
+          submitted_at: string;
+          payment_reference: string;
+        }>;
+      }>('/watch-passes/my-passes');
+    },
+
+    async submitRequest(data: {
+      contentId: string;
+      plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+      utr: string;
+      userName?: string;
+      userEmail?: string;
+    }) {
+      return request<{
+        success: boolean;
+        message: string;
+        pass: any;
+      }>('/watch-passes/submit-request', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    // Admin endpoints
+    async adminGetRequests(status?: string, limit = 100) {
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      if (limit) params.append('limit', String(limit));
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return request<{ count: number; requests: any[] }>(`/watch-passes/admin/requests${query}`);
+    },
+
+    async adminApprove(passId: string, adminNote?: string) {
+      return request<{
+        success: boolean;
+        message: string;
+        pass: any;
+      }>('/watch-passes/admin/approve', {
+        method: 'POST',
+        body: JSON.stringify({ passId, adminNote })
+      });
+    },
+
+    async adminReject(passId: string, adminNote?: string) {
+      return request<{
+        success: boolean;
+        message: string;
+        pass: any;
+      }>('/watch-passes/admin/reject', {
+        method: 'POST',
+        body: JSON.stringify({ passId, adminNote })
+      });
+    },
+
+    async adminUpdatePlans(prices: {
+      price24h?: number;
+      price3d?: number;
+      price7d?: number;
+      price30d?: number;
+    }) {
+      return request<{
+        success: boolean;
+        message: string;
+        plans: any[];
+      }>('/watch-passes/admin/plans', {
+        method: 'POST',
+        body: JSON.stringify(prices)
+      });
+    },
+
+    async adminGetAnalytics() {
+      return request<{
+        totalPasses: number;
+        activePasses: number;
+        expiredPasses: number;
+        pendingPasses: number;
+        totalRevenueRupees: number;
+        durationBreakdown: Record<string, number>;
+      }>('/watch-passes/admin/analytics');
+    }
   }
 };

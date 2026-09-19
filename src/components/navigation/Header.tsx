@@ -1,7 +1,7 @@
 import React from 'react';
 import { Logo } from '../common/Logo';
 import { useApp } from '../../context/AppContext';
-import { Wallet, Search, Compass, Bookmark, Crown } from 'lucide-react';
+import { Wallet, Search, Compass, Bookmark, Crown, Zap } from 'lucide-react';
 
 interface HeaderProps {
   currentTab: string;
@@ -87,6 +87,22 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
         >
           <Search size={18} />
           Search
+        </button>
+
+        <button
+          onClick={() => onNavigate('plans')}
+          style={{
+            color: currentTab === 'plans' ? 'var(--brand-gold)' : 'var(--text-secondary)',
+            fontWeight: currentTab === 'plans' ? 700 : 500,
+            fontSize: '15px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'color var(--transition-fast)'
+          }}
+        >
+          <Zap size={18} />
+          Plans
         </button>
 
         <button

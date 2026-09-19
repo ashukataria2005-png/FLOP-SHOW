@@ -105,13 +105,14 @@ const navGroups: NavGroup[] = [
       { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck }
     ]
   },
-  // 5. Monetization
+  // 5. Monetization & Access Passes
   {
     id: 'group-monetization',
     title: 'SUBSCRIPTION / MONETIZATION',
     icon: Crown,
     items: [
-      { id: 'admin-monetization', label: 'Subscription / Monetization', icon: Crown }
+      { id: 'admin-monetization', label: 'Subscription / Monetization', icon: Crown },
+      { id: 'admin-watch-pass', label: 'Watch Passes', icon: Zap }
     ]
   },
   // 6. Ads

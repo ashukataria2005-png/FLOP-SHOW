@@ -61,8 +61,9 @@ interface AppContextType {
   saveWatchProgress: (progress: Omit<WatchProgress, 'updatedAt'>) => void;
 
   // Modals & UI Triggers
-  activeModal: 'purchase' | 'recharge' | 'auth' | 'subscription' | null;
+  activeModal: 'purchase' | 'recharge' | 'auth' | 'subscription' | 'watchpass' | null;
   purchaseTarget: ContentItem | null;
+  watchPassTarget: ContentItem | null;
   openPurchaseModal: (item: ContentItem) => void;
   closePurchaseModal: () => void;
   openRechargeModal: () => void;
@@ -71,6 +72,8 @@ interface AppContextType {
   closeAuthModal: () => void;
   openSubscriptionModal: (planId?: 'WEEKLY' | 'MONTHLY' | 'YEARLY', initialStep?: 'choose' | 'pay') => void;
   closeSubscriptionModal: () => void;
+  openWatchPassModal: (item: ContentItem) => void;
+  closeWatchPassModal: () => void;
   subscriptionTargetPlan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
   subscriptionTargetStep: 'choose' | 'pay';
 
@@ -197,8 +200,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [catalog, setCatalog] = useState<ContentItem[]>([]);
 
   // Modal states
-  const [activeModal, setActiveModal] = useState<'purchase' | 'recharge' | 'auth' | 'subscription' | null>(null);
+  const [activeModal, setActiveModal] = useState<'purchase' | 'recharge' | 'auth' | 'subscription' | 'watchpass' | null>(null);
   const [purchaseTarget, setPurchaseTarget] = useState<ContentItem | null>(null);
+  const [watchPassTarget, setWatchPassTarget] = useState<ContentItem | null>(null);
+
+  const openWatchPassModal = (item: ContentItem) => {
+    setWatchPassTarget(item);
+    setActiveModal('watchpass');
+  };
+
+  const closeWatchPassModal = () => {
+    setActiveModal(null);
+    setWatchPassTarget(null);
+  };
 
   // Player state
   const [activePlayerContent, setActivePlayerContent] = useState<ContentItem | null>(null);
@@ -1121,6 +1135,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         saveWatchProgress,
         activeModal,
         purchaseTarget,
+        watchPassTarget,
         openPurchaseModal,
         closePurchaseModal,
         openRechargeModal,
@@ -1129,6 +1144,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         closeAuthModal,
         openSubscriptionModal,
         closeSubscriptionModal,
+        openWatchPassModal,
+        closeWatchPassModal,
         subscriptionTargetPlan,
         subscriptionTargetStep,
         monetizationMode,

@@ -13,6 +13,7 @@ import { paymentRouter } from './routes/paymentRoutes.js';
 import { webhookRouter } from './routes/webhookRoutes.js';
 import { monetizationRouter } from './routes/monetizationRoutes.js';
 import { subscriptionRouter } from './routes/subscriptionRoutes.js';
+import { watchPassRouter } from './routes/watchPassRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
 import { config } from './config/env.js';
@@ -221,6 +222,7 @@ export function createServer(): Express {
   app.use('/api/webhooks', webhookRouter);
   app.use('/api/monetization', monetizationRouter);
   app.use('/api/subscriptions', subscriptionRouter);
+  app.use('/api/watch-passes', watchPassRouter);
 
   // Direct aliases for admin login
   app.post('/api/admin-login', handleAdminLogin);

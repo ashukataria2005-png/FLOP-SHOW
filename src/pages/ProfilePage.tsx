@@ -34,7 +34,8 @@ import {
   Sliders,
   Crown,
   Sparkles,
-  Calendar
+  Calendar,
+  Zap
 } from 'lucide-react';
 
 interface UserPaymentRequest {
@@ -50,7 +51,7 @@ interface UserPaymentRequest {
 
 interface ProfilePageProps {
   onNavigate: (tab: string, param?: string) => void;
-  initialSection?: 'profile' | 'wallet' | 'subscription' | 'settings';
+  initialSection?: 'profile' | 'wallet' | 'subscription' | 'settings' | 'watchpasses';
 }
 
 // In-memory cache for instant switching between profile tabs
@@ -77,12 +78,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     openSubscriptionModal
   } = useApp();
 
-  const [activeSection, setActiveSection] = useState<'profile' | 'wallet' | 'subscription' | 'settings'>(() => {
+  const [activeSection, setActiveSection] = useState<'profile' | 'wallet' | 'subscription' | 'settings' | 'watchpasses'>(() => {
     if (initialSection === 'wallet' && monetizationMode === 'SUBSCRIPTION') {
       return 'subscription';
     }
     return initialSection;
   });
+  const [userWatchPasses, setUserWatchPasses] = useState<{ activePasses: any[]; expiredPasses: any[]; pendingPasses: any[] }>({
+    activePasses: [],
+    expiredPasses: [],
+    pendingPasses: []
+  });
+  const [loadingPasses, setLoadingPasses] = useState(false);
   const [rechargeRequests, setRechargeRequests] = useState<UserPaymentRequest[]>(() => cachedRechargeRequests);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -144,9 +151,31 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     }
   };
 
+  const fetchUserPasses = async () => {
+    if (!isAuthenticated) return;
+    try {
+      setLoadingPasses(true);
+      const res = await api.watchPasses.getMyPasses();
+      if (res) {
+        setUserWatchPasses({
+          activePasses: res.activePasses || [],
+          expiredPasses: res.expiredPasses || [],
+          pendingPasses: res.pendingPasses || []
+        });
+      }
+    } catch {
+      // Graceful fallback
+    } finally {
+      setLoadingPasses(false);
+    }
+  };
+
   useEffect(() => {
     if (activeSection === 'wallet') {
       fetchUserRequests();
+    }
+    if (activeSection === 'watchpasses') {
+      fetchUserPasses();
     }
   }, [isAuthenticated, walletBalance, activeSection]);
 
@@ -344,6 +373,55 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
             ) : null}
           </button>
         )}
+
+        {/* Watch Passes Tab (Independent access mechanism) */}
+        <button
+          onClick={() => setActiveSection('watchpasses')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 18px',
+            borderRadius: '12px',
+            border: activeSection === 'watchpasses' ? '1px solid rgba(245, 166, 35, 0.4)' : '1px solid transparent',
+            backgroundColor: activeSection === 'watchpasses' ? 'rgba(245, 166, 35, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+            color: activeSection === 'watchpasses' ? 'var(--brand-gold, #F5C518)' : 'var(--text-secondary)',
+            fontWeight: activeSection === 'watchpasses' ? 700 : 500,
+            fontSize: '14px',
+            cursor: 'pointer',
+            transition: 'all var(--transition-fast)'
+          }}
+        >
+          <Zap size={16} />
+          <span>Watch Passes</span>
+          {userWatchPasses.activePasses.length > 0 ? (
+            <span
+              style={{
+                padding: '2px 8px',
+                borderRadius: '9999px',
+                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                color: '#10B981',
+                fontSize: '11px',
+                fontWeight: 800
+              }}
+            >
+              {userWatchPasses.activePasses.length} ACTIVE
+            </span>
+          ) : userWatchPasses.pendingPasses.length > 0 ? (
+            <span
+              style={{
+                padding: '2px 8px',
+                borderRadius: '9999px',
+                backgroundColor: 'rgba(245, 197, 24, 0.2)',
+                color: 'var(--brand-gold)',
+                fontSize: '11px',
+                fontWeight: 800
+              }}
+            >
+              PENDING
+            </span>
+          ) : null}
+        </button>
 
         <button
           onClick={() => setActiveSection('settings')}
@@ -2204,6 +2282,214 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* SECTION 5: WATCH PASSES */}
+      {activeSection === 'watchpasses' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Header Info */}
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderRadius: '20px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '16px'
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <Zap size={18} color="var(--brand-gold, #F5C518)" />
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                  My FLOPSHOW Watch Passes
+                </h3>
+              </div>
+              <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0, maxWidth: '620px', lineHeight: 1.5 }}>
+                Temporary access passes for specific movies and series. Separate from permanent library ownership and full catalog subscriptions.
+              </p>
+            </div>
+
+            <button
+              onClick={() => onNavigate('plans')}
+              style={{
+                padding: '10px 18px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                border: '1px solid rgba(245, 197, 24, 0.35)',
+                color: 'var(--brand-gold, #F5C518)',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <span>Browse All Pass Plans</span>
+            </button>
+          </div>
+
+          {/* Pending Passes Alert */}
+          {userWatchPasses.pendingPasses.length > 0 && (
+            <div
+              style={{
+                backgroundColor: 'rgba(245, 197, 24, 0.08)',
+                border: '1.5px solid var(--brand-gold, #F5C518)',
+                borderRadius: '16px',
+                padding: '18px 20px'
+              }}
+            >
+              <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', marginBottom: '8px' }}>
+                Pending Verification Requests ({userWatchPasses.pendingPasses.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {userWatchPasses.pendingPasses.map(p => (
+                  <div
+                    key={p.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '13px',
+                      color: '#E5E7EB',
+                      padding: '8px 12px',
+                      backgroundColor: 'rgba(0,0,0,0.3)',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <span><strong>{p.content_title || 'Content'}</strong> ({p.plan.replace('PASS_', '')})</span>
+                    <span style={{ color: '#9CA3AF' }}>UTR: {p.payment_reference} • ₹{p.amount_paid}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Active Passes */}
+          <div>
+            <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', marginBottom: '14px' }}>
+              Active Watch Passes ({userWatchPasses.activePasses.length})
+            </h4>
+
+            {loadingPasses ? (
+              <div style={{ textAlign: 'center', padding: '32px', color: '#9CA3AF' }}>
+                <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
+                <span>Loading your passes...</span>
+              </div>
+            ) : userWatchPasses.activePasses.length === 0 ? (
+              <div
+                style={{
+                  backgroundColor: 'var(--bg-surface)',
+                  borderRadius: '16px',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  padding: '32px',
+                  textAlign: 'center',
+                  color: '#9CA3AF'
+                }}
+              >
+                <Clock size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                <div style={{ fontSize: '15px', fontWeight: 700, color: '#FFFFFF', marginBottom: '6px' }}>
+                  No Active Watch Passes
+                </div>
+                <p style={{ fontSize: '13px', maxWidth: '400px', margin: '0 auto 18px' }}>
+                  You don't have any active temporary passes right now. Choose any title to start watching!
+                </p>
+                <button
+                  onClick={() => onNavigate('discover')}
+                  className="btn btn-primary btn-sm"
+                >
+                  Explore Catalog
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px' }}>
+                {userWatchPasses.activePasses.map(p => (
+                  <div
+                    key={p.id}
+                    style={{
+                      backgroundColor: 'var(--bg-surface)',
+                      borderRadius: '16px',
+                      border: '1.5px solid #10B981',
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34D399', textTransform: 'uppercase' }}>
+                          Active Pass
+                        </span>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#34D399' }}>
+                          {p.remainingHours > 24 ? `${p.remainingDays} days left` : `${p.remainingHours}h left`}
+                        </span>
+                      </div>
+                      <h5 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 6px' }}>
+                        {p.content_title || 'Content Item'}
+                      </h5>
+                      <div style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '12px' }}>
+                        Activated: {new Date(p.activated_at).toLocaleDateString('en-IN')}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => onNavigate('discover')}
+                      style={{
+                        padding: '9px',
+                        borderRadius: '8px',
+                        backgroundColor: '#10B981',
+                        color: '#0E0E12',
+                        fontWeight: 800,
+                        fontSize: '13px',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Watch Now
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Expired Watch Passes History */}
+          {userWatchPasses.expiredPasses.length > 0 && (
+            <div style={{ marginTop: '14px' }}>
+              <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#9CA3AF', marginBottom: '12px' }}>
+                Past / Expired Passes ({userWatchPasses.expiredPasses.length})
+              </h4>
+              <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
+                {userWatchPasses.expiredPasses.map(p => (
+                  <div
+                    key={p.id}
+                    style={{
+                      padding: '14px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#FFFFFF' }}>{p.content_title || 'Content Item'}</div>
+                      <div style={{ fontSize: '11px', color: '#9CA3AF' }}>Expired on {new Date(p.expires_at || p.updated_at).toLocaleDateString('en-IN')}</div>
+                    </div>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', padding: '2px 8px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
+                      EXPIRED
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -10,7 +10,9 @@ import {
   Plus,
   Check,
   Star,
-  Video
+  Video,
+  Clock,
+  Zap
 } from 'lucide-react';
 
 interface DetailsPageProps {
@@ -32,10 +34,23 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
     getProgress,
     monetizationMode,
     hasActiveSubscription,
-    openSubscriptionModal
+    openSubscriptionModal,
+    openWatchPassModal,
+    isAuthenticated
   } = useApp();
 
   const [details, setDetails] = useState<ContentItem>(item);
+  const [passStatus, setPassStatus] = useState<{
+    hasActivePass: boolean;
+    activePass: any;
+    pendingPass: any;
+    isExpired: boolean;
+  }>({
+    hasActivePass: false,
+    activePass: null,
+    pendingPass: null,
+    isExpired: false
+  });
 
   const getInitialSeasonNumber = (seasonsList?: { seasonNumber: number }[]) => {
     if (!seasonsList || seasonsList.length === 0) return 1;
@@ -63,7 +78,22 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
         }
       })
       .catch(() => {});
-  }, [item.id]);
+
+    if (isAuthenticated) {
+      api.watchPasses.getContentStatus(item.id)
+        .then(res => {
+          if (res) {
+            setPassStatus({
+              hasActivePass: Boolean(res.hasActivePass),
+              activePass: res.activePass,
+              pendingPass: res.pendingPass,
+              isExpired: Boolean(res.isExpired)
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [item.id, isAuthenticated]);
 
   const currentItem = details || item;
   const owned = isOwned(currentItem.id);
@@ -81,7 +111,8 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
   ).slice(0, 4);
 
   const isFreeItem = Boolean(currentItem.isFree || currentItem.price === 0);
-  const canWatch = isFreeItem || owned || (monetizationMode === 'SUBSCRIPTION' && hasActiveSubscription);
+  const hasPass = Boolean(passStatus.hasActivePass);
+  const canWatch = isFreeItem || owned || hasPass || (monetizationMode === 'SUBSCRIPTION' && hasActiveSubscription);
 
   const handlePrimaryAction = () => {
     if (canWatch) {
@@ -279,11 +310,72 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
             >
               <Play size={18} fill="#0E0E12" />
               <span>
-                {monetizationMode === 'SUBSCRIPTION'
-                  ? (canWatch ? 'Watch now' : 'Subscribe to Watch')
-                  : (owned || isFreeItem ? 'Watch now' : `Buy for ₹${currentItem.price}`)}
+                {canWatch
+                  ? 'Watch now'
+                  : monetizationMode === 'SUBSCRIPTION'
+                  ? 'Subscribe to Watch'
+                  : `Buy for ₹${currentItem.price}`}
               </span>
             </button>
+
+            {/* Watch Pass CTA (Shown when user does NOT already permanently own this title and it is not free) */}
+            {!isFreeItem && !owned && (
+              <>
+                {passStatus.hasActivePass ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 18px',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                      border: '1.5px solid #10B981',
+                      color: '#34D399',
+                      fontSize: '13px',
+                      fontWeight: 800
+                    }}
+                  >
+                    <Clock size={16} />
+                    <span>
+                      Pass Active: {passStatus.activePass?.remainingHours > 24 ? `${passStatus.activePass.remainingDays}d left` : `${passStatus.activePass?.remainingHours || 1}h left`}
+                    </span>
+                  </div>
+                ) : passStatus.pendingPass ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 18px',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(245, 197, 24, 0.12)',
+                      border: '1.5px solid var(--brand-gold, #F5C518)',
+                      color: 'var(--brand-gold, #F5C518)',
+                      fontSize: '13px',
+                      fontWeight: 800
+                    }}
+                  >
+                    <Clock size={16} />
+                    <span>Watch Pass Pending Review</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => openWatchPassModal(currentItem)}
+                    className="btn btn-secondary btn-lg"
+                    style={{
+                      minWidth: '160px',
+                      borderColor: 'rgba(245, 197, 24, 0.4)',
+                      backgroundColor: 'rgba(245, 197, 24, 0.1)',
+                      color: 'var(--brand-gold, #F5C518)'
+                    }}
+                  >
+                    <Zap size={17} />
+                    <span>{passStatus.isExpired ? 'Renew Watch Pass' : 'Get Watch Pass'}</span>
+                  </button>
+                )}
+              </>
+            )}
 
             {/* Watch Trailer CTA */}
             {Boolean(currentItem.trailerUrl) && (

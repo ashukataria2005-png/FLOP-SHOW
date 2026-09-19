@@ -4,6 +4,7 @@ import { contentRepository } from '../repositories/contentRepository.js';
 import { purchaseRepository } from '../repositories/purchaseRepository.js';
 import { monetizationService } from './monetizationService.js';
 import { subscriptionService } from './subscriptionService.js';
+import { watchPassService } from './watchPassService.js';
 import { getAdapter } from '../db/adapter.js';
 import { parseYouTubeUrl, isValidMediaUrl } from '../utils/mediaUrl.js';
 
@@ -261,23 +262,31 @@ export const mediaService = {
     }
 
     // 2. Main video access control
+    // ACCESS PRIORITY / ENTITLEMENT RULES:
+    // 1. Admin user -> access allowed
+    // 2. Free content -> access allowed
+    // 3. Existing permanent/valid individual purchase -> access allowed
+    // 4. Active Watch Pass for that exact content -> access allowed
+    // 5. Active full subscription -> access allowed according to existing subscription rules
+    // 6. Otherwise -> access denied
     const isFree = content.price === 0;
     const isAdmin = userRole === 'ADMIN';
     const isOwned = isAdmin || (userId ? await purchaseRepository.isOwned(userId, content.id) : false);
+    const hasActivePass = userId ? await watchPassService.hasActivePass(userId, content.id) : false;
 
     const monetizationMode = await monetizationService.getMonetizationMode();
 
     if (monetizationMode === 'SUBSCRIPTION') {
       const hasActiveSub = userId ? await subscriptionService.hasActiveSubscription(userId) : false;
-      if (!isFree && !isAdmin && !hasActiveSub && !isOwned) {
-        const err = new Error('Active subscription required to watch this movie.');
+      if (!isFree && !isAdmin && !hasActiveSub && !isOwned && !hasActivePass) {
+        const err = new Error('Active subscription or Watch Pass required to watch this movie.');
         (err as any).statusCode = 403;
         (err as any).code = 'SUBSCRIPTION_REQUIRED';
         throw err;
       }
     } else {
-      if (!isFree && !isOwned) {
-        const err = new Error('Purchase required to watch this movie.');
+      if (!isFree && !isOwned && !hasActivePass) {
+        const err = new Error('Purchase or Watch Pass required to watch this movie.');
         (err as any).statusCode = 403;
         (err as any).code = 'PURCHASE_REQUIRED';
         throw err;
@@ -381,23 +390,31 @@ export const mediaService = {
     }
 
     // Main episode access control
+    // ACCESS PRIORITY / ENTITLEMENT RULES:
+    // 1. Admin user -> access allowed
+    // 2. Free content -> access allowed
+    // 3. Existing permanent/valid individual purchase -> access allowed
+    // 4. Active Watch Pass for that exact content -> access allowed
+    // 5. Active full subscription -> access allowed according to existing subscription rules
+    // 6. Otherwise -> access denied
     const isFree = episode.price === 0;
     const isAdmin = userRole === 'ADMIN';
     const isOwned = isAdmin || (userId ? await purchaseRepository.isOwned(userId, episode.content_id) : false);
+    const hasActivePass = userId ? await watchPassService.hasActivePass(userId, episode.content_id) : false;
 
     const monetizationMode = await monetizationService.getMonetizationMode();
 
     if (monetizationMode === 'SUBSCRIPTION') {
       const hasActiveSub = userId ? await subscriptionService.hasActiveSubscription(userId) : false;
-      if (!isFree && !isAdmin && !hasActiveSub && !isOwned) {
-        const err = new Error('Active subscription required to watch this series episode.');
+      if (!isFree && !isAdmin && !hasActiveSub && !isOwned && !hasActivePass) {
+        const err = new Error('Active subscription or Watch Pass required to watch this series episode.');
         (err as any).statusCode = 403;
         (err as any).code = 'SUBSCRIPTION_REQUIRED';
         throw err;
       }
     } else {
-      if (!isFree && !isOwned) {
-        const err = new Error('Purchase required to watch this series episode.');
+      if (!isFree && !isOwned && !hasActivePass) {
+        const err = new Error('Purchase or Watch Pass required to watch this series episode.');
         (err as any).statusCode = 403;
         (err as any).code = 'PURCHASE_REQUIRED';
         throw err;

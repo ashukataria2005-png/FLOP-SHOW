@@ -9,6 +9,10 @@ import {
 import { walletRepository } from '../repositories/walletRepository.js';
 import { purchaseRepository } from '../repositories/purchaseRepository.js';
 import { contentRepository, ContentRecord } from '../repositories/contentRepository.js';
+import { subscriptionRepository, SubscriptionPlan } from '../repositories/subscriptionRepository.js';
+import { watchPassRepository, WatchPassPlan } from '../repositories/watchPassRepository.js';
+import { subscriptionService } from './subscriptionService.js';
+import { watchPassService } from './watchPassService.js';
 
 export interface PublicPaymentConfig {
   upiId: string;
@@ -38,7 +42,7 @@ export const paymentRequestService = {
   },
 
   /**
-   * Admin-only configuration update for UPI settings.
+   * Admin: Update UPI configuration.
    */
   async updatePaymentConfig(data: {
     upiId?: string;
@@ -47,31 +51,25 @@ export const paymentRequestService = {
     approvalMode?: 'MANUAL' | 'AUTOMATIC';
   }): Promise<PublicPaymentConfig> {
     const updates: Record<string, string> = {};
-
-    if (data.upiId !== undefined) {
-      const cleanUpiId = (data.upiId || '').trim();
-      if (!cleanUpiId || !cleanUpiId.includes('@')) {
-        const err = new Error('A valid UPI ID is required (e.g. name@upi).');
+    if (data.upiId) {
+      const clean = data.upiId.trim();
+      if (!clean.includes('@') || clean.length < 5) {
+        const err = new Error('Invalid UPI ID format. Expected format: username@bank');
         (err as any).statusCode = 400;
         throw err;
       }
-      updates.payment_upi_id = cleanUpiId;
+      updates.payment_upi_id = clean;
     }
 
     if (data.enabled !== undefined) {
       updates.payment_upi_enabled = data.enabled ? 'true' : 'false';
     }
 
-    if (data.merchantName !== undefined && data.merchantName.trim()) {
+    if (data.merchantName) {
       updates.payment_upi_merchant_name = data.merchantName.trim();
     }
 
-    if (data.approvalMode !== undefined) {
-      if (!['MANUAL', 'AUTOMATIC'].includes(data.approvalMode)) {
-        const err = new Error('Invalid approval mode. Choose MANUAL or AUTOMATIC.');
-        (err as any).statusCode = 400;
-        throw err;
-      }
+    if (data.approvalMode) {
       updates.payment_approval_mode = data.approvalMode;
     }
 
@@ -83,15 +81,19 @@ export const paymentRequestService = {
 
   /**
    * User submits a manual UPI payment request with UTR.
+   * Supports all 4 paid product types: MOVIE, SERIES, WATCH_PASS, SUBSCRIPTION.
    */
   async submitPaymentRequest(
     userId: string,
     data: {
-      amountRupees: number;
+      amountRupees?: number;
       utr: string;
       userName?: string;
       userEmail?: string;
       contentId?: string | null;
+      productType?: 'MOVIE' | 'SERIES' | 'WATCH_PASS' | 'SUBSCRIPTION';
+      planId?: string | null;
+      planName?: string | null;
     }
   ): Promise<PaymentRequestRecord> {
     const { upiId, upiEnabled } = await this.getPublicPaymentConfig();
@@ -102,34 +104,66 @@ export const paymentRequestService = {
       throw err;
     }
 
-    // Resolve contentId if provided to guarantee valid primary key content.id
+    let productType: 'MOVIE' | 'SERIES' | 'WATCH_PASS' | 'SUBSCRIPTION' = data.productType || 'MOVIE';
     let finalContentId: string | null = null;
-    let targetContent: (ContentRecord & { priceRupees?: number; customPriceRupees?: number | null }) | null = null;
-    if (data.contentId && typeof data.contentId === 'string' && data.contentId.trim()) {
-      targetContent = await contentRepository.findByIdOrSlug(data.contentId.trim());
-      if (!targetContent) {
-        const err = new Error('Content not found for purchase.');
-        (err as any).statusCode = 404;
+    let planId: string | null = data.planId || null;
+    let planName: string | null = data.planName || null;
+    let numRupees = 0;
+
+    // Resolve product details and authoritative backend price
+    if (productType === 'SUBSCRIPTION' || (planId && ['MONTHLY', '3_MONTHS', 'YEARLY', 'WEEKLY'].includes(planId))) {
+      productType = 'SUBSCRIPTION';
+      const subPlan = (planId || 'MONTHLY') as SubscriptionPlan;
+      const planConfig = await subscriptionService.getPlanConfig(subPlan);
+      planId = subPlan;
+      planName = planConfig.name;
+      numRupees = planConfig.priceRupees;
+
+      // Check if user already has an active subscription
+      const currentActive = await subscriptionRepository.getUserActiveSubscription(userId);
+      if (currentActive) {
+        const err = new Error(`You already have an active ${currentActive.plan} subscription.`);
+        (err as any).statusCode = 400;
         throw err;
       }
-      finalContentId = targetContent.id;
-    }
-
-    let numRupees = Math.round(Number(data.amountRupees));
-    // If purchasing content, resolve against content price (custom price or default movie/series price)
-    if (targetContent) {
-      const resolvedPrice = targetContent.priceRupees ?? (targetContent.price > 0 ? Math.round(targetContent.price / 100) : (targetContent.type === 'SERIES' ? 35 : 30));
-      numRupees = resolvedPrice;
+    } else if (productType === 'WATCH_PASS' || (planId && ['PASS_24H', 'PASS_3D', 'PASS_7D', 'PASS_15D', 'PASS_30D'].includes(planId))) {
+      productType = 'WATCH_PASS';
+      const passPlan = (planId || 'PASS_24H') as WatchPassPlan;
+      const planConfig = await watchPassService.getPlanConfig(passPlan);
+      planId = passPlan;
+      planName = planConfig.name;
+      numRupees = planConfig.priceRupees;
+      if (data.contentId) {
+        const content = await contentRepository.findByIdOrSlug(data.contentId);
+        if (content) finalContentId = content.id;
+      }
+    } else {
+      // MOVIE or SERIES
+      if (data.contentId && typeof data.contentId === 'string' && data.contentId.trim()) {
+        const targetContent = await contentRepository.findByIdOrSlug(data.contentId.trim());
+        if (!targetContent) {
+          const err = new Error('Content not found for purchase.');
+          (err as any).statusCode = 404;
+          throw err;
+        }
+        finalContentId = targetContent.id;
+        productType = targetContent.type === 'SERIES' ? 'SERIES' : 'MOVIE';
+        planName = targetContent.title;
+        const resolvedPrice = targetContent.priceRupees ?? (targetContent.price > 0 ? Math.round(targetContent.price / 100) : (targetContent.type === 'SERIES' ? 35 : 30));
+        numRupees = resolvedPrice;
+      } else {
+        numRupees = Math.round(Number(data.amountRupees) || 30);
+      }
     }
 
     if (isNaN(numRupees) || numRupees < 1) {
-      const err = new Error(targetContent ? 'Invalid content purchase price.' : 'Minimum recharge amount is ₹10.');
+      const err = new Error('Invalid purchase amount.');
       (err as any).statusCode = 400;
       throw err;
     }
 
     if (numRupees > 10000) {
-      const err = new Error('Maximum recharge amount per transaction is ₹10,000.');
+      const err = new Error('Maximum payment amount per transaction is ₹10,000.');
       (err as any).statusCode = 400;
       throw err;
     }
@@ -172,6 +206,9 @@ export const paymentRequestService = {
       utr: cleanUtr,
       submittedAt: now,
       contentId: finalContentId,
+      productType,
+      planId,
+      planName,
     });
 
     const created = await paymentRequestRepository.getById(requestId);
@@ -179,7 +216,7 @@ export const paymentRequestService = {
       throw new Error('Failed to record payment request.');
     }
 
-    // AUTOMATIC APPROVAL MODE: Auto-approve immediately and credit wallet
+    // AUTOMATIC APPROVAL MODE: Auto-approve immediately and grant entitlement
     const { approvalMode } = await this.getPublicPaymentConfig();
     if (approvalMode === 'AUTOMATIC') {
       try {
@@ -221,22 +258,19 @@ export const paymentRequestService = {
   },
 
   /**
-   * Admin: Approve payment request and atomically credit wallet.
+   * Admin: Approve payment request and grant exact entitlement.
+   * Completely decoupled from the old wallet system.
    */
   async approvePayment(
     adminId: string,
     paymentRequestId: string,
     adminNote?: string
-  ): Promise<{
-    payment: PaymentRequestRecord;
-    newBalanceRupees: number;
-    message: string;
-  }> {
+  ): Promise<{ payment: PaymentRequestRecord; newBalanceRupees: number; message: string }> {
     const db = getAdapter();
     const now = new Date().toISOString();
 
     return db.transaction(async txAdapter => {
-      // 1. Fetch record inside transaction
+      // 1. Fetch current payment request within lock
       const payment = await paymentRequestRepository.getById(paymentRequestId, txAdapter);
       if (!payment) {
         const err = new Error('Payment request not found.');
@@ -246,11 +280,10 @@ export const paymentRequestService = {
 
       // Idempotency: If already approved, return current state without double-crediting
       if (payment.status === 'APPROVED') {
-        const currentBalancePaise = await walletRepository.getBalance(payment.user_id, txAdapter);
         return {
           payment,
-          newBalanceRupees: currentBalancePaise / 100,
-          message: 'Payment has already been approved and credited.',
+          newBalanceRupees: 0,
+          message: 'Payment has already been approved.',
         };
       }
 
@@ -280,64 +313,105 @@ export const paymentRequestService = {
         txAdapter
       );
 
-      // 3a. Per-title payment: grant ownership entitlement directly in purchases table
-      if (payment.content_id) {
-        const purchaseId = `pur_upi_${crypto.randomUUID()}`;
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        await purchaseRepository.createPurchase(
+      // 3. Grant entitlement based on product_type
+      if (payment.product_type === 'SUBSCRIPTION') {
+        const plan = (payment.plan_id as SubscriptionPlan) || 'MONTHLY';
+        const durationDays = plan === 'YEARLY' ? 365 : (plan === '3_MONTHS' ? 90 : (plan === 'WEEKLY' ? 7 : 30));
+        const startDate = now;
+        const endDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+        const subId = `sub_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+        await subscriptionRepository.createSubscription(
           {
-            id: purchaseId,
+            id: subId,
             userId: payment.user_id,
-            contentId: payment.content_id,
-            amountPaid: payment.amount,
-            status: 'COMPLETED',
-            purchasedAt: now,
+            plan,
+            status: 'ACTIVE',
+            amountPaid: Math.round(payment.amount / 100),
+            paymentMethod: 'MANUAL_UPI',
+            paymentReference: payment.utr,
+            adminId,
+            adminNote: adminNote || 'Approved via payment request',
+            submittedAt: payment.submitted_at,
+            activatedAt: now,
+            startDate,
+            endDate,
+          },
+          txAdapter
+        );
+
+        const updatedPayment = (await paymentRequestRepository.getById(payment.id, txAdapter)) as PaymentRequestRecord;
+        return {
+          payment: updatedPayment,
+          newBalanceRupees: 0,
+          message: `Successfully approved VIP subscription (${plan}) until ${new Date(endDate).toLocaleDateString('en-IN')}.`,
+        };
+      }
+
+      if (payment.product_type === 'WATCH_PASS') {
+        const plan = (payment.plan_id as WatchPassPlan) || 'PASS_24H';
+        const durationMap: Record<string, number> = {
+          PASS_24H: 1,
+          PASS_3D: 3,
+          PASS_7D: 7,
+          PASS_15D: 15,
+          PASS_30D: 30,
+        };
+        const durationDays = durationMap[plan] || 1;
+        const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+        const passId = `wpass_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+        await watchPassRepository.createPass(
+          {
+            id: passId,
+            userId: payment.user_id,
+            contentId: payment.content_id || null,
+            plan,
+            durationDays,
+            amountPaid: Math.round(payment.amount / 100),
+            status: 'ACTIVE',
+            paymentMethod: 'MANUAL_UPI',
+            paymentReference: payment.utr,
+            adminId,
+            adminNote: adminNote || 'Approved via payment request',
+            submittedAt: payment.submitted_at,
+            activatedAt: now,
             expiresAt,
           },
           txAdapter
         );
 
-        const updatedPaymentTitle = (await paymentRequestRepository.getById(
-          payment.id,
-          txAdapter
-        )) as PaymentRequestRecord;
-
+        const updatedPayment = (await paymentRequestRepository.getById(payment.id, txAdapter)) as PaymentRequestRecord;
         return {
-          payment: updatedPaymentTitle,
-          newBalanceRupees: (await walletRepository.getBalance(payment.user_id, txAdapter)) / 100,
-          message: `Successfully approved per-title payment and granted 30-day ownership for content.`,
+          payment: updatedPayment,
+          newBalanceRupees: 0,
+          message: `Successfully approved Watch Pass (${plan}) until ${new Date(expiresAt).toLocaleString('en-IN')}.`,
         };
       }
 
-      // 3b. Wallet recharge: atomically credit user wallet balance
-      const currentBalancePaise = await walletRepository.getBalance(payment.user_id, txAdapter);
-      const newBalancePaise = currentBalancePaise + payment.amount;
-      await walletRepository.updateBalance(payment.user_id, newBalancePaise, now, txAdapter);
+      // MOVIE or SERIES: 30-day ownership in purchases table
+      const purchaseId = `pur_upi_${crypto.randomUUID()}`;
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const contentId = payment.content_id || 'winter-signal-2024';
 
-      // 4. Create transaction ledger audit entry
-      await walletRepository.addTransaction(
+      await purchaseRepository.createPurchase(
         {
-          id: `tx-${crypto.randomUUID()}`,
+          id: purchaseId,
           userId: payment.user_id,
-          type: 'RECHARGE',
-          amount: payment.amount,
-          balanceAfter: newBalancePaise,
-          description: `UPI Wallet Recharge (UTR: ${payment.utr})`,
-          referenceId: payment.utr,
-          createdAt: now,
+          contentId,
+          amountPaid: payment.amount,
+          status: 'COMPLETED',
+          purchasedAt: now,
+          expiresAt,
         },
         txAdapter
       );
 
-      const updatedPayment = (await paymentRequestRepository.getById(
-        payment.id,
-        txAdapter
-      )) as PaymentRequestRecord;
-
+      const updatedPayment = (await paymentRequestRepository.getById(payment.id, txAdapter)) as PaymentRequestRecord;
       return {
         payment: updatedPayment,
-        newBalanceRupees: newBalancePaise / 100,
-        message: `Successfully approved payment and credited ₹${(payment.amount / 100).toFixed(0)} to wallet.`,
+        newBalanceRupees: 0,
+        message: `Successfully approved ${payment.product_type || 'content'} purchase and granted 30-day ownership.`,
       };
     });
   },

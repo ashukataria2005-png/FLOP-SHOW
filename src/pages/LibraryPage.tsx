@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { ContentItem } from '../types/content';
 import { ContentCard } from '../components/cards/ContentCard';
-import { Bookmark, Film, PlayCircle, History, Compass, Clock, RotateCcw, ShieldCheck, Play } from 'lucide-react';
+import { Bookmark, Film, PlayCircle, History, Compass, Clock, RotateCcw, Play } from 'lucide-react';
 
 interface LibraryPageProps {
   onSelectItem: (item: ContentItem) => void;
@@ -134,9 +134,38 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
           >
             {currentItems.map(item => {
               const purchase = purchases.find(p => p.contentId === item.id);
-              const isLegacy = !purchase?.expiresAt;
-              const isExpired = Boolean(purchase?.isExpired);
-              const daysLeft = purchase?.daysRemaining;
+              
+              // Dynamic countdown based on actual expiresAt
+              const countdown = (() => {
+                if (!purchase?.expiresAt) {
+                  return { label: '30 days left', isExpired: Boolean(purchase?.isExpired), isUrgent: false };
+                }
+                const exp = new Date(purchase.expiresAt).getTime();
+                const now = Date.now();
+                const diffMs = exp - now;
+
+                if (purchase.isExpired || diffMs <= 0) {
+                  return { label: 'Expired', isExpired: true, isUrgent: true };
+                }
+
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                if (diffDays >= 2) {
+                  return { label: `${diffDays} days left`, isExpired: false, isUrgent: false };
+                }
+                if (diffDays === 1) {
+                  return { label: '1 day left', isExpired: false, isUrgent: false };
+                }
+                if (diffHours >= 1) {
+                  const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                  return { label: `${diffHours}h ${mins}m left`, isExpired: false, isUrgent: true };
+                }
+                const mins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+                return { label: `${mins}m left`, isExpired: false, isUrgent: true };
+              })();
+
+              const isExpired = countdown.isExpired;
 
               return (
                 <div
@@ -145,9 +174,9 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
                     backgroundColor: 'var(--bg-surface)',
                     borderRadius: '16px',
                     border: isExpired
-                      ? '1px solid rgba(239, 68, 68, 0.35)'
-                      : isLegacy
-                      ? '1px solid rgba(245, 197, 24, 0.3)'
+                      ? '1px solid rgba(239, 68, 68, 0.4)'
+                      : countdown.isUrgent
+                      ? '1px solid rgba(245, 158, 11, 0.4)'
                       : '1px solid rgba(16, 185, 129, 0.35)',
                     overflow: 'hidden',
                     display: 'flex',
@@ -157,7 +186,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
                 >
                   {/* Poster Thumbnail */}
                   <div
-                    onClick={() => onSelectItem(item)}
+                    onClick={() => isExpired ? openPurchaseModal(item) : onSelectItem(item)}
                     style={{
                       position: 'relative',
                       aspectRatio: '16 / 9',
@@ -173,7 +202,8 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
                       style={{
                         width: '100%',
                         height: '100%',
-                        objectFit: 'cover'
+                        objectFit: 'cover',
+                        filter: isExpired ? 'grayscale(0.7) brightness(0.6)' : 'none'
                       }}
                     />
                     <div
@@ -199,29 +229,16 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
                         alignItems: 'center',
                         gap: '5px',
                         backgroundColor: isExpired
-                          ? 'rgba(239, 68, 68, 0.9)'
-                          : isLegacy
-                          ? 'rgba(245, 197, 24, 0.95)'
+                          ? 'rgba(239, 68, 68, 0.95)'
+                          : countdown.isUrgent
+                          ? 'rgba(245, 158, 11, 0.95)'
                           : 'rgba(16, 185, 129, 0.92)',
-                        color: isLegacy ? '#0E0E12' : '#FFFFFF'
+                        color: '#FFFFFF',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
                       }}
                     >
-                      {isExpired ? (
-                        <>
-                          <Clock size={12} />
-                          <span>Expired</span>
-                        </>
-                      ) : isLegacy ? (
-                        <>
-                          <ShieldCheck size={12} />
-                          <span>Permanent</span>
-                        </>
-                      ) : (
-                        <>
-                          <Clock size={12} />
-                          <span>Expires in {daysLeft != null ? (daysLeft > 0 ? `${daysLeft}d` : '<1d') : '30d'}</span>
-                        </>
-                      )}
+                      <Clock size={12} />
+                      <span>{countdown.label}</span>
                     </div>
                   </div>
 
@@ -232,7 +249,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
                         {item.type.toUpperCase()} • 1080P FHD
                       </div>
                       <h4
-                        onClick={() => onSelectItem(item)}
+                        onClick={() => isExpired ? openPurchaseModal(item) : onSelectItem(item)}
                         style={{
                           fontSize: '15px',
                           fontWeight: 800,
@@ -266,7 +283,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
                         }}
                       >
                         <RotateCcw size={14} />
-                        <span>Renew for 1 Month (₹{item.type === 'series' ? 35 : 30})</span>
+                        <span>Renew for 1 Month (₹{item.price || (item.type === 'series' ? 35 : 30)})</span>
                       </button>
                     ) : (
                       <button

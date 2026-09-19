@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { paymentRequestService } from '../services/paymentRequestService.js';
 import { subscriptionService } from '../services/subscriptionService.js';
 import { subscriptionRepository } from '../repositories/subscriptionRepository.js';
 import { requireAuth, AuthenticatedRequest } from '../middlewares/authMiddleware.js';
@@ -32,7 +33,7 @@ subscriptionRouter.get('/my-status', requireAuth, async (req: AuthenticatedReque
   }
 });
 
-// User submits manual UPI subscription payment request with UTR (Status: PENDING)
+// User submits manual UPI subscription payment request with UTR (Creates unified payment request)
 subscriptionRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { plan, utr, paymentReference, userName, userEmail } = req.body;
@@ -44,17 +45,22 @@ subscriptionRouter.post('/submit-request', requireAuth, async (req: Authenticate
       return;
     }
 
-    const sub = await subscriptionService.submitManualSubscriptionRequest(req.user!.id, {
-      plan,
+    const payReq = await paymentRequestService.submitPaymentRequest(req.user!.id, {
+      productType: 'SUBSCRIPTION',
+      planId: plan,
       utr: finalUtr,
       userName: userName || (req.user as any)?.name,
       userEmail: userEmail || req.user!.email,
     });
 
+    const isApproved = payReq.status === 'APPROVED';
+
     res.status(201).json({
       success: true,
-      message: 'Subscription payment submitted successfully. Your subscription will become active once verified by an administrator.',
-      subscription: sub,
+      message: isApproved
+        ? 'Subscription payment approved! Your VIP subscription is now ACTIVE.'
+        : 'Subscription payment submitted successfully. Your subscription will become active once verified by an administrator.',
+      subscription: payReq,
     });
   } catch (err) {
     next(err);

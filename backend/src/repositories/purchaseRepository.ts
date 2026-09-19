@@ -84,9 +84,8 @@ export const purchaseRepository = {
 
   /**
    * Server-side entitlement check:
-   * Purchase is active if status is COMPLETED and either:
-   * 1. expires_at IS NULL (Legacy permanent purchase)
-   * 2. expires_at > CURRENT_TIMESTAMP (Active 1-month purchase)
+   * Purchase is active strictly if status is COMPLETED and expires_at > CURRENT_TIMESTAMP.
+   * No permanent purchases are permitted.
    */
   async isOwned(userId: string, contentId: string, adapter?: DbAdapter): Promise<boolean> {
     const db = adapter || getAdapter();
@@ -97,7 +96,8 @@ export const purchaseRepository = {
        WHERE p.user_id = ?
          AND (p.content_id = ? OR c.id = ? OR c.slug = ?)
          AND p.status = 'COMPLETED'
-         AND (p.expires_at IS NULL OR p.expires_at > ?)
+         AND p.expires_at IS NOT NULL
+         AND p.expires_at > ?
        LIMIT 1;`,
       [userId, contentId, contentId, contentId, now]
     );
@@ -120,13 +120,15 @@ export const purchaseRepository = {
 
     const now = Date.now();
     return (rows as any[]).map(p => {
-      const isExpired = p.expires_at ? new Date(p.expires_at).getTime() <= now : false;
-      const daysRemaining = p.expires_at
-        ? Math.max(0, Math.ceil((new Date(p.expires_at).getTime() - now) / (1000 * 60 * 60 * 24)))
-        : null;
+      const expiresAt = p.expires_at || (p.purchased_at ? new Date(new Date(p.purchased_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : null);
+      const isExpired = expiresAt ? new Date(expiresAt).getTime() <= now : true;
+      const daysRemaining = expiresAt
+        ? Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now) / (1000 * 60 * 60 * 24)))
+        : 0;
 
       return {
         ...p,
+        expires_at: expiresAt,
         is_expired: isExpired,
         days_remaining: daysRemaining,
       };

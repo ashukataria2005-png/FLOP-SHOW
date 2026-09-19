@@ -24,18 +24,25 @@ paymentRouter.get('/config', async (_req, res, next) => {
 // Submit a new manual UPI payment request with UTR
 paymentRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
-    const { amount, utr, userName, userEmail, contentId } = req.body;
+    const { amount, utr, userName, userEmail, contentId, productType, planId, planName } = req.body;
     const request = await paymentRequestService.submitPaymentRequest(req.user!.id, {
-      amountRupees: Number(amount),
+      amountRupees: amount !== undefined && amount !== null && amount !== '' ? Number(amount) : undefined,
       utr,
       userName: userName || (req.user as any)?.name,
       userEmail: userEmail || req.user!.email,
       contentId: contentId || null,
+      productType: productType || 'MOVIE',
+      planId: planId || null,
+      planName: planName || null,
     });
+
+    const isApproved = request.status === 'APPROVED';
 
     res.status(201).json({
       success: true,
-      message: 'Payment request submitted successfully. Awaiting administrator verification.',
+      message: isApproved
+        ? 'Payment approved! Access is now active.'
+        : 'Payment request submitted successfully. Awaiting administrator verification.',
       payment: request,
     });
   } catch (err) {

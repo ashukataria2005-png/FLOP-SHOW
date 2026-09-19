@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { watchPassService } from '../services/watchPassService.js';
+import { paymentRequestService } from '../services/paymentRequestService.js';
 import { requireAuth, AuthenticatedRequest } from '../middlewares/authMiddleware.js';
 import { requireAdmin } from '../middlewares/adminMiddleware.js';
 import { adminService } from '../services/adminService.js';
@@ -42,7 +43,7 @@ watchPassRouter.get('/my-passes', requireAuth, async (req: AuthenticatedRequest,
   }
 });
 
-// Submit manual UPI Watch Pass purchase request with UTR (Status: PENDING)
+// Submit manual UPI Watch Pass purchase request with UTR (Creates unified payment request)
 watchPassRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { contentId, plan, utr, paymentReference, userName, userEmail } = req.body;
@@ -55,18 +56,24 @@ watchPassRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRe
       return;
     }
 
-    const pass = await watchPassService.submitPassRequest(req.user!.id, {
+    const payReq = await paymentRequestService.submitPaymentRequest(req.user!.id, {
+      productType: 'WATCH_PASS',
+      planId: plan,
       contentId: contentId || null,
-      plan,
       utr: finalUtr,
       userName: userName || (req.user as any)?.name,
       userEmail: userEmail || req.user!.email,
     });
 
+    const isApproved = payReq.status === 'APPROVED';
+
     res.status(201).json({
       success: true,
-      message: 'Watch Pass payment submitted successfully. Access will become active once verified by an administrator.',
-      pass,
+      message: isApproved
+        ? 'Watch Pass payment approved! Catalog-wide access is now active.'
+        : 'Watch Pass payment submitted successfully. Access will become active once verified by an administrator.',
+      pass: payReq,
+      payment: payReq,
     });
   } catch (err) {
     next(err);

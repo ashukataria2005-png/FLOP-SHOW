@@ -1,7 +1,7 @@
 import React from 'react';
 import { Logo } from '../common/Logo';
 import { useApp } from '../../context/AppContext';
-import { Wallet, Search, Compass, Bookmark, Crown, Zap } from 'lucide-react';
+import { Search, Compass, Bookmark, Crown, Zap } from 'lucide-react';
 
 interface HeaderProps {
   currentTab: string;
@@ -11,7 +11,6 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
   const {
     user,
-    walletBalance,
     monetizationMode,
     hasActiveSubscription,
     activeSubscription,
@@ -122,40 +121,8 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
         </button>
       </nav>
 
-      {/* Right Action Icons: Wallet balance / Subscription pill & Avatar */}
+      {/* Right Action Icons: Subscription pill & Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        {/* Mode A: Wallet Balance Pill */}
-        {monetizationMode === 'PER_CONTENT' && (
-          <button
-            onClick={() => onNavigate('profile', 'wallet')}
-            title="Open Wallet in Profile"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-pill)',
-              backgroundColor: 'rgba(245, 166, 35, 0.12)',
-              border: '1px solid rgba(245, 166, 35, 0.3)',
-              color: 'var(--brand-gold)',
-              fontSize: '14px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all var(--transition-fast)'
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.backgroundColor = 'rgba(245, 166, 35, 0.2)';
-              e.currentTarget.style.borderColor = 'var(--brand-gold)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.backgroundColor = 'rgba(245, 166, 35, 0.12)';
-              e.currentTarget.style.borderColor = 'rgba(245, 166, 35, 0.3)';
-            }}
-          >
-            <Wallet size={15} />
-            <span>₹{walletBalance}</span>
-          </button>
-        )}
 
         {/* Mode B: Subscription Badge / CTA */}
         {monetizationMode === 'SUBSCRIPTION' && (

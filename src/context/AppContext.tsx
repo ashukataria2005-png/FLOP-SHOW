@@ -388,25 +388,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           setIsAuthenticated(true);
 
           // Fetch purchases for restored session
-          api.library.getPurchases().then((backendPurchases) => {
-            const localPurchases = backendPurchases.map((p: any) => ({
-              id: p.id,
-              contentId: p.content_id,
-              title: p.title,
-              price: p.amount_paid / 100,
-              purchasedAt: new Date(p.purchased_at).toLocaleString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              })
-            }));
-            setPurchases(localPurchases);
-          }).catch((err) => {
-            console.warn('Failed to sync purchases from backend', err);
-          });
+          syncPurchases();
 
           // Sync wallet transactions from backend
           syncTransactions();

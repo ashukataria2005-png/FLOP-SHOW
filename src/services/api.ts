@@ -501,14 +501,39 @@ export const api = {
       return request<{ upiId: string; upiEnabled: boolean; merchantName: string; approvalMode?: 'MANUAL' | 'AUTOMATIC' }>('/payments/config');
     },
 
-    async submitRequest(amountRupees: number, utr: string, userName?: string, userEmail?: string, contentId?: string | null) {
+    async submitRequest(
+      amountRupeesOrData: number | { amountRupees?: number; utr: string; userName?: string; userEmail?: string; contentId?: string | null; productType?: string; planId?: string | null; planName?: string | null },
+      utr?: string,
+      userName?: string,
+      userEmail?: string,
+      contentId?: string | null
+    ) {
+      const payload = typeof amountRupeesOrData === 'object'
+        ? {
+            amount: amountRupeesOrData.amountRupees,
+            utr: amountRupeesOrData.utr,
+            userName: amountRupeesOrData.userName,
+            userEmail: amountRupeesOrData.userEmail,
+            contentId: amountRupeesOrData.contentId || null,
+            productType: amountRupeesOrData.productType || 'MOVIE',
+            planId: amountRupeesOrData.planId || null,
+            planName: amountRupeesOrData.planName || null,
+          }
+        : {
+            amount: amountRupeesOrData,
+            utr: utr!,
+            userName,
+            userEmail,
+            contentId: contentId || null,
+            productType: 'MOVIE',
+          };
       return request<{
         success: boolean;
         message: string;
         payment: any;
       }>('/payments/submit-request', {
         method: 'POST',
-        body: JSON.stringify({ amount: amountRupees, utr, userName, userEmail, contentId: contentId || null })
+        body: JSON.stringify(payload)
       });
     },
 

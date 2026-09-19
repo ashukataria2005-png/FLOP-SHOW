@@ -24,11 +24,53 @@ interface PaymentRequest {
   upi_id_snapshot: string;
   utr: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  product_type?: 'MOVIE' | 'SERIES' | 'WATCH_PASS' | 'SUBSCRIPTION';
+  plan_id?: string | null;
+  plan_name?: string | null;
+  content_id?: string | null;
   admin_id: string | null;
   admin_note: string | null;
   submitted_at: string;
   processed_at: string | null;
 }
+
+const getProductBadge = (p: PaymentRequest) => {
+  const type = p.product_type || 'MOVIE';
+  if (type === 'SUBSCRIPTION') {
+    return {
+      label: 'VIP SUBSCRIPTION',
+      color: '#C084FC',
+      bg: 'rgba(192, 132, 252, 0.15)',
+      border: 'rgba(192, 132, 252, 0.3)',
+      subtitle: p.plan_name || p.plan_id || 'VIP Plan'
+    };
+  }
+  if (type === 'WATCH_PASS') {
+    return {
+      label: 'WATCH PASS',
+      color: '#38BDF8',
+      bg: 'rgba(56, 189, 248, 0.15)',
+      border: 'rgba(56, 189, 248, 0.3)',
+      subtitle: p.plan_name || p.plan_id || 'Watch Pass'
+    };
+  }
+  if (type === 'SERIES') {
+    return {
+      label: 'SERIES',
+      color: '#FB923C',
+      bg: 'rgba(251, 146, 60, 0.15)',
+      border: 'rgba(251, 146, 60, 0.3)',
+      subtitle: p.plan_name || '30-Day Series Pass'
+    };
+  }
+  return {
+    label: 'MOVIE',
+    color: 'var(--brand-gold, #F5C518)',
+    bg: 'rgba(245, 197, 24, 0.15)',
+    border: 'rgba(245, 197, 24, 0.3)',
+    subtitle: p.plan_name || '30-Day Movie Pass'
+  };
+};
 
 interface Metrics {
   pendingCount: number;
@@ -123,7 +165,7 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
     try {
       setActionLoading(true);
       const res = await api.payments.approvePayment(selectedPayment.id, adminNote);
-      showToast(res.message || 'Payment approved and wallet credited!', 'success');
+      showToast(res.message || 'Payment approved and access activated!', 'success');
       setSelectedPayment(null);
       await loadData();
     } catch (err: any) {
@@ -156,6 +198,8 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
       r.utr.toLowerCase().includes(q) ||
       (r.user_name && r.user_name.toLowerCase().includes(q)) ||
       (r.user_email && r.user_email.toLowerCase().includes(q)) ||
+      (r.plan_name && r.plan_name.toLowerCase().includes(q)) ||
+      (r.product_type && r.product_type.toLowerCase().includes(q)) ||
       r.id.toLowerCase().includes(q)
     );
   });
@@ -170,7 +214,7 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
             <span>UPI Payments & Verification</span>
           </h1>
           <p style={{ fontSize: '14px', color: '#9CA3AF', margin: 0 }}>
-            Review manual user recharge requests, verify submitted UTRs against your UPI receipts, and approve wallet credits.
+            Review user UPI payment requests across Movies, Series, Watch Passes, and VIP Subscriptions. Verify submitted UTRs and approve access.
           </p>
         </div>
 
@@ -346,13 +390,13 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
           </div>
           <div>
             <span style={{ fontSize: '12px', color: '#10B981', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Approved Recharges
+              Approved Purchases
             </span>
             <div style={{ fontSize: '28px', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.1, marginTop: '2px' }}>
               {metrics.approvedCount}
             </div>
             <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
-              Credited: ₹{(metrics.approvedAmountPaise / 100).toFixed(0)}
+              Total: ₹{(metrics.approvedAmountPaise / 100).toFixed(0)}
             </span>
           </div>
         </div>
@@ -500,6 +544,7 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
                 <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.02)', color: '#9CA3AF' }}>
                   <th style={{ padding: '14px 18px', fontWeight: 700 }}>Request ID / Date</th>
                   <th style={{ padding: '14px 18px', fontWeight: 700 }}>User Details</th>
+                  <th style={{ padding: '14px 18px', fontWeight: 700 }}>Product / Plan</th>
                   <th style={{ padding: '14px 18px', fontWeight: 700 }}>Amount</th>
                   <th style={{ padding: '14px 18px', fontWeight: 700 }}>Submitted UTR</th>
                   <th style={{ padding: '14px 18px', fontWeight: 700 }}>Status</th>
@@ -538,6 +583,37 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
                     <td style={{ padding: '14px 18px' }}>
                       <div style={{ fontWeight: 700, color: '#FFFFFF' }}>{p.user_name || 'Anonymous User'}</div>
                       <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{p.user_email || p.user_id}</div>
+                    </td>
+
+                    {/* Product / Plan */}
+                    <td style={{ padding: '14px 18px' }}>
+                      {(() => {
+                        const badge = getProductBadge(p);
+                        return (
+                          <div>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                fontSize: '10px',
+                                fontWeight: 800,
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                backgroundColor: badge.bg,
+                                color: badge.color,
+                                border: `1px solid ${badge.border}`,
+                                letterSpacing: '0.04em',
+                                textTransform: 'uppercase',
+                                marginBottom: '4px'
+                              }}
+                            >
+                              {badge.label}
+                            </span>
+                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#E0E0E0' }}>
+                              {badge.subtitle}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Amount */}
@@ -714,11 +790,46 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '12px' }}>
                   <div>
-                    <span style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase' }}>Recharge Amount</span>
+                    <span style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase' }}>Purchase Amount</span>
                     <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', marginTop: '2px' }}>
                       ₹{(selectedPayment.amount / 100).toFixed(0)}
                     </div>
                   </div>
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase' }}>Product & Plan</span>
+                    <div style={{ marginTop: '4px' }}>
+                      {(() => {
+                        const badge = getProductBadge(selectedPayment);
+                        return (
+                          <div>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                fontSize: '10px',
+                                fontWeight: 800,
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                backgroundColor: badge.bg,
+                                color: badge.color,
+                                border: `1px solid ${badge.border}`,
+                                letterSpacing: '0.04em',
+                                textTransform: 'uppercase',
+                                marginBottom: '2px'
+                              }}
+                            >
+                              {badge.label}
+                            </span>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#FFFFFF' }}>
+                              {badge.subtitle}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '12px' }}>
                   <div>
                     <span style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase' }}>Current Status</span>
                     <div style={{ marginTop: '4px' }}>
@@ -810,7 +921,7 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
                   marginBottom: '20px'
                 }}
               >
-                <strong style={{ color: 'var(--brand-gold, #F5C518)' }}>Verification Checklist:</strong> Verify this UTR in your UPI app or bank statement. Approving will atomically credit <strong>₹{(selectedPayment.amount / 100).toFixed(0)}</strong> to the user's wallet.
+                <strong style={{ color: 'var(--brand-gold, #F5C518)' }}>Verification Checklist:</strong> Verify this UTR in your UPI app or bank statement. Approving will activate the user's {selectedPayment.product_type === 'SUBSCRIPTION' ? 'VIP subscription' : selectedPayment.product_type === 'WATCH_PASS' ? 'Watch Pass' : 'entitlement'} immediately.
               </div>
 
               {/* Admin Note Input */}
@@ -887,7 +998,7 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
                     ) : (
                       <CheckCircle2 size={16} />
                     )}
-                    <span>Approve & Credit ₹{(selectedPayment.amount / 100).toFixed(0)}</span>
+                    <span>Approve & Grant Access</span>
                   </button>
                 </div>
               ) : (

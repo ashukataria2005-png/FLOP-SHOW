@@ -499,7 +499,45 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 10 };
+    // Apply incremental 015_universal_payment_approval for PostgreSQL if not already applied
+    const universalApprovalMigrationVersion = '015_universal_payment_approval';
+    if (!appliedSet.has(universalApprovalMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 015_universal_payment_approval...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          ALTER TABLE upi_payment_requests ADD COLUMN IF NOT EXISTS product_type VARCHAR(32) NOT NULL DEFAULT 'MOVIE';
+          ALTER TABLE upi_payment_requests ADD COLUMN IF NOT EXISTS plan_id TEXT DEFAULT NULL;
+          ALTER TABLE upi_payment_requests ADD COLUMN IF NOT EXISTS plan_name TEXT DEFAULT NULL;
+
+          CREATE INDEX IF NOT EXISTS idx_upi_payment_product_type ON upi_payment_requests(product_type);
+          CREATE INDEX IF NOT EXISTS idx_upi_payment_plan_id ON upi_payment_requests(plan_id);
+
+          UPDATE upi_payment_requests
+          SET product_type = CASE
+            WHEN content_id IS NOT NULL THEN (SELECT COALESCE(type, 'MOVIE') FROM content WHERE id = upi_payment_requests.content_id LIMIT 1)
+            ELSE 'MOVIE'
+          END
+          WHERE product_type = 'MOVIE' AND content_id IS NOT NULL;
+
+          UPDATE purchases
+          SET expires_at = (purchased_at::TIMESTAMPTZ + INTERVAL '30 days')::TEXT
+          WHERE expires_at IS NULL AND purchased_at IS NOT NULL;
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${universalApprovalMigrationVersion}', '015_universal_payment_approval.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('015_universal_payment_approval.sql');
+        console.log('✓ [PostgreSQL] Migration 015_universal_payment_approval applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 11 };
   } finally {
     client.release();
     await pool.end();

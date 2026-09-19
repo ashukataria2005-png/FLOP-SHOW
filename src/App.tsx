@@ -30,7 +30,6 @@ import { AdminMonetizationPage } from './pages/admin/AdminMonetizationPage';
 import { AdminWatchPassPage } from './pages/admin/AdminWatchPassPage';
 import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage';
 import { PurchaseModal } from './components/purchase/PurchaseModal';
-import { RechargeModal } from './components/wallet/RechargeModal';
 import { SubscriptionModal } from './components/subscription/SubscriptionModal';
 import { WatchPassModal } from './components/watchpass/WatchPassModal';
 import { AuthModal } from './components/auth/AuthModal';
@@ -450,7 +449,6 @@ const AppContent: React.FC = () => {
       {/* Overlays & Modals */}
       <PlanSelectionModal />
       <PurchaseModal />
-      <RechargeModal />
       <SubscriptionModal />
       <WatchPassModal />
       <AuthModal />

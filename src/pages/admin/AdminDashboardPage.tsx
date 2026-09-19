@@ -231,7 +231,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     {
       label: 'Trending #1',
       desc: stats.currentTrending1
-        ? `#1: ${stats.currentTrending1.title} (${stats.currentTrending1.type}) â€¢ Manage in Catalog`
+        ? `#1: ${stats.currentTrending1.title} (${stats.currentTrending1.type}) • Manage in Catalog`
         : 'Catalog Trending #1 showcase title',
       action: () => onNavigateTab('admin-trending'),
       icon: TrendingUp,
@@ -399,7 +399,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                 Today's Performance
               </h2>
               <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                Active window: <strong>12:00:00 AM â†’ 11:59:59 PM</strong> ({formattedTodayDate}) â€¢ Auto-rolls over at midnight
+                Active window: <strong>12:00:00 AM → 11:59:59 PM</strong> ({formattedTodayDate}) • Auto-rolls over at midnight
               </span>
             </div>
           </div>
@@ -556,10 +556,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                       Today's Revenue / Gross Intake
                     </div>
                     <div style={{ fontSize: '28px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                      â‚¹{today.todayRevenueRupees}
+                      ₹{today.todayRevenueRupees}
                     </div>
                     <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                      â‚¹{today.todayPurchasesRevenueRupees} content sales + â‚¹{today.todayUpiRevenueRupees} UPI recharges
+                      ₹{today.todayPurchasesRevenueRupees} content sales + ₹{today.todayUpiRevenueRupees} UPI recharges
                     </div>
                   </div>
 
@@ -578,7 +578,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                       Today's Profit / Net Margin
                     </div>
                     <div style={{ fontSize: '28px', fontWeight: 900, color: '#34D399', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                      â‚¹{today.todayProfitRupees}
+                      ₹{today.todayProfitRupees}
                     </div>
                     <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
                       Gross 100% margin (Zero server hosting deduction)
@@ -602,7 +602,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                       Total Subscription Revenue
                     </div>
                     <div style={{ fontSize: '28px', fontWeight: 900, color: '#34D399', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                      â‚¹{subConfig?.metrics?.totalRevenueRupees || 0}
+                      ₹{subConfig?.metrics?.totalRevenueRupees || 0}
                     </div>
                     <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
                       Approved subscription gross intake
@@ -657,10 +657,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                 </div>
               </div>
               <div className="stat-value" style={{ fontSize: '26px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                â‚¹{currentMode === 'PER_CONTENT' ? today.todayRevenueRupees : (subConfig?.metrics?.totalRevenueRupees || 0)}
+                ₹{currentMode === 'PER_CONTENT' ? today.todayRevenueRupees : (subConfig?.metrics?.totalRevenueRupees || 0)}
               </div>
               <p className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF', margin: '0 0 8px' }}>
-                {currentMode === 'PER_CONTENT' ? `â‚¹${today.todayPurchasesRevenueRupees} sales` : 'Approved passes'}
+                {currentMode === 'PER_CONTENT' ? `₹${today.todayPurchasesRevenueRupees} sales` : 'Approved passes'}
               </p>
             </div>
             <div className="stat-action" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
@@ -691,7 +691,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                 </div>
               </div>
               <div className="stat-value" style={{ fontSize: '26px', fontWeight: 900, color: '#34D399', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                {currentMode === 'PER_CONTENT' ? `â‚¹${today.todayProfitRupees}` : (subConfig?.metrics?.activeCount || 0)}
+                {currentMode === 'PER_CONTENT' ? `₹${today.todayProfitRupees}` : (subConfig?.metrics?.activeCount || 0)}
               </div>
               <p className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF', margin: '0 0 8px' }}>
                 {currentMode === 'PER_CONTENT' ? '100% net margin' : 'Active users'}
@@ -767,7 +767,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   {today.todayPurchasesCount}
                 </div>
                 <p className="stat-desc" style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
-                  â‚¹{today.todayPurchasesRevenueRupees} content revenue
+                  ₹{today.todayPurchasesRevenueRupees} content revenue
                 </p>
               </div>
               <div className="stat-action" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#34D399' }}>
@@ -837,7 +837,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   </div>
                 </div>
                 <div className="stat-value" style={{ fontSize: '30px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '6px' }}>
-                  â‚¹{today.todayUpiRevenueRupees}
+                  ₹{today.todayUpiRevenueRupees}
                 </div>
                 <p className="stat-desc" style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
                   {today.todayUpiApprovedCount} approved UPI recharges
@@ -913,7 +913,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   {today.pendingPaymentRequestsCount}
                 </div>
                 <p className="stat-desc" style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
-                  â‚¹{today.pendingPaymentAmountRupees} awaiting approval
+                  ₹{today.pendingPaymentAmountRupees} awaiting approval
                 </p>
               </div>
               <div className="stat-action" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)' }}>
@@ -945,7 +945,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   </div>
                 </div>
                 <div className="stat-value" style={{ fontSize: '20px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)', letterSpacing: '-0.01em', lineHeight: 1.2, margin: '6px 0' }}>
-                  â‚¹{subConfig?.weeklyPrice || 49} / â‚¹{subConfig?.monthlyPrice || 149} / â‚¹{subConfig?.yearlyPrice || 999}
+                  ₹{subConfig?.weeklyPrice || 49} / ₹{subConfig?.monthlyPrice || 149} / ₹{subConfig?.yearlyPrice || 999}
                 </div>
                 <p className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF', margin: '0 0 10px' }}>
                   Weekly / Monthly / Yearly passes
@@ -1054,7 +1054,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               {stats.totalUsers}
             </div>
             <span style={{ fontSize: '11px', color: 'var(--brand-gold, #F5C518)', marginTop: '4px' }}>
-              Manage users â†’
+              Manage users →
             </span>
           </div>
 
@@ -1075,7 +1075,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               Total Revenue
             </span>
             <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '6px' }}>
-              â‚¹{stats.totalRevenueRupees}
+              ₹{stats.totalRevenueRupees}
             </div>
             <span style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
               All-time platform gross
@@ -1110,7 +1110,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               {stats.totalMovies}
             </div>
             <span style={{ fontSize: '11px', color: 'var(--brand-gold, #F5C518)', marginTop: '4px' }}>
-              View Movies catalog â†’
+              View Movies catalog →
             </span>
           </div>
 
@@ -1142,7 +1142,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               {stats.totalSeries}
             </div>
             <span style={{ fontSize: '11px', color: 'var(--brand-gold, #F5C518)', marginTop: '4px' }}>
-              View Series catalog â†’
+              View Series catalog →
             </span>
           </div>
         </div>
@@ -1216,7 +1216,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   </span>
                 </div>
                 <span style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px', display: 'block' }}>
-                  Records strictly within <strong>00:00:00 AM â†’ 11:59:59 PM</strong> calendar day
+                  Records strictly within <strong>00:00:00 AM → 11:59:59 PM</strong> calendar day
                 </span>
               </div>
 
@@ -1263,15 +1263,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
                         <span>Content Purchases Revenue (Paise to INR):</span>
-                        <strong style={{ color: '#10B981' }}>+â‚¹{today.todayPurchasesRevenueRupees}</strong>
+                        <strong style={{ color: '#10B981' }}>+₹{today.todayPurchasesRevenueRupees}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
                         <span>Approved UPI Wallet Recharge Deposits:</span>
-                        <strong style={{ color: '#10B981' }}>+â‚¹{today.todayUpiRevenueRupees}</strong>
+                        <strong style={{ color: '#10B981' }}>+₹{today.todayUpiRevenueRupees}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
                         <span>External Bandwidth / Hosting / CDN Expenses:</span>
-                        <strong style={{ color: '#9CA3AF' }}>â‚¹0.00 (Unconfigured in platform)</strong>
+                        <strong style={{ color: '#9CA3AF' }}>₹0.00 (Unconfigured in platform)</strong>
                       </div>
                       <div
                         style={{
@@ -1285,7 +1285,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                         }}
                       >
                         <span>Net Calculated Operating Profit:</span>
-                        <span style={{ color: 'var(--brand-gold, #F5C518)' }}>â‚¹{today.todayProfitRupees}</span>
+                        <span style={{ color: 'var(--brand-gold, #F5C518)' }}>₹{today.todayProfitRupees}</span>
                       </div>
                     </div>
                   </div>
@@ -1382,7 +1382,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                               </div>
                               <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
                                 {record.email || record.userEmail || ''}
-                                {record.contentType ? ` â€¢ ${record.contentType}` : ''}
+                                {record.contentType ? ` • ${record.contentType}` : ''}
                                 {record.utr && (
                                   <button
                                     type="button"
@@ -1420,7 +1420,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                             <div style={{ textAlign: 'right' }}>
                               {record.amountRupees !== undefined && (
                                 <div style={{ fontSize: '15px', fontWeight: 800, color: '#10B981' }}>
-                                  â‚¹{record.amountRupees}
+                                  ₹{record.amountRupees}
                                 </div>
                               )}
                               {record.status && (
@@ -1473,7 +1473,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               }}
             >
               <span style={{ fontSize: '12px', color: '#6B7280' }}>
-                Window: 00:00:00 AM â†’ 11:59:59 PM ({today.calendarDate})
+                Window: 00:00:00 AM → 11:59:59 PM ({today.calendarDate})
               </span>
 
               <div style={{ display: 'flex', gap: '10px' }}>

@@ -177,7 +177,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Quick Login state (device-bound persistent admin session token â€” NEVER plaintext password)
+  // Quick Login state (device-bound persistent admin session token — NEVER plaintext password)
   const [quickLoginData, setQuickLoginData] = useState<AdminQuickLoginData | null>(() => {
     try {
       const raw = localStorage.getItem(ADMIN_QUICK_LOGIN_KEY);
@@ -382,7 +382,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 marginBottom: '14px'
               }}
             >
-              <span>âš¡ Remembered Device â€¢ Quick Login</span>
+              <span>⚡ Remembered Device • Quick Login</span>
             </div>
 
             <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF', marginBottom: '8px' }}>
@@ -866,7 +866,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               color: '#D1D5DB'
             }}
           >
-            <span style={{ color: 'var(--brand-gold, #F5C518)', fontWeight: 800 }}>â€¢</span>
+            <span style={{ color: 'var(--brand-gold, #F5C518)', fontWeight: 800 }}>•</span>
             <span>{currentSectionLabel}</span>
           </div>
         </div>

@@ -329,6 +329,25 @@ async function main() {
       }
     });
 
+    await runTest('UPI Payment Request (POST /api/payments/submit-request) per-title movie purchase', async () => {
+      const testUtr = `UTR${Date.now().toString().slice(-8)}`;
+      const res = await fetch(`${baseUrl}/api/payments/submit-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${testUserToken}`
+        },
+        body: JSON.stringify({
+          amount: 30,
+          utr: testUtr,
+          contentId: 'winter-signal-2024'
+        })
+      });
+      const data = await res.json();
+      console.log('TEST submit-request response:', res.status, JSON.stringify(data));
+      if (!res.ok) throw new Error(`Status ${res.status}: ${JSON.stringify(data)}`);
+    });
+
     // ------------------------------------------------------------------------
     // TEST 11: Insufficient Balance Rejection
     // ------------------------------------------------------------------------

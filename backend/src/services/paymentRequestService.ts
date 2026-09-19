@@ -8,6 +8,7 @@ import {
 } from '../repositories/paymentRequestRepository.js';
 import { walletRepository } from '../repositories/walletRepository.js';
 import { purchaseRepository } from '../repositories/purchaseRepository.js';
+import { contentRepository, ContentRecord } from '../repositories/contentRepository.js';
 
 export interface PublicPaymentConfig {
   upiId: string;
@@ -101,7 +102,22 @@ export const paymentRequestService = {
       throw err;
     }
 
-    const numRupees = Math.round(Number(data.amountRupees));
+    // Resolve contentId if provided to guarantee valid primary key content.id
+    let finalContentId: string | null = null;
+    let targetContent: ContentRecord | null = null;
+    if (data.contentId && typeof data.contentId === 'string' && data.contentId.trim()) {
+      targetContent = await contentRepository.findByIdOrSlug(data.contentId.trim());
+      if (targetContent) {
+        finalContentId = targetContent.id;
+      }
+    }
+
+    let numRupees = Math.round(Number(data.amountRupees));
+    // If purchasing content and amount was 0 or invalid, apply hybrid title price (₹35 for series, ₹30 for movie)
+    if (targetContent && (isNaN(numRupees) || numRupees < 10)) {
+      numRupees = targetContent.type === 'SERIES' ? 35 : 30;
+    }
+
     if (isNaN(numRupees) || numRupees < 10) {
       const err = new Error('Minimum recharge amount is ₹10.');
       (err as any).statusCode = 400;
@@ -151,7 +167,7 @@ export const paymentRequestService = {
       upiIdSnapshot: upiId,
       utr: cleanUtr,
       submittedAt: now,
-      contentId: data.contentId || null,
+      contentId: finalContentId,
     });
 
     const created = await paymentRequestRepository.getById(requestId);

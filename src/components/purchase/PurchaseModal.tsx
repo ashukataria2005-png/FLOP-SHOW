@@ -57,13 +57,18 @@ export const PurchaseModal: React.FC = () => {
   // Fetch balance and config whenever modal opens
   useEffect(() => {
     if (activeModal === 'purchase' && purchaseTarget) {
+      const defaultPrice = purchaseTarget.type === 'series' ? 35 : 30;
+      const targetPrice = (typeof purchaseTarget.price === 'number' && purchaseTarget.price >= 10)
+        ? purchaseTarget.price
+        : defaultPrice;
+
       if (isAuthenticated) {
         setLiveBalance(walletBalance);
         api.wallet.getBalance()
           .then(res => {
             if (typeof res.balanceRupees === 'number') {
               setLiveBalance(res.balanceRupees);
-              if (res.balanceRupees >= purchaseTarget.price) {
+              if (res.balanceRupees >= targetPrice) {
                 setPayMethod('WALLET');
               } else {
                 setPayMethod('UPI');
@@ -96,10 +101,13 @@ export const PurchaseModal: React.FC = () => {
     if (activeModal === 'purchase' && purchaseTarget && payMethod === 'UPI') {
       const upi = upiConfig?.upiId || 'flopshow@upi';
       const merchant = upiConfig?.merchantName || 'FLOPSHOW';
-      const price = Number(purchaseTarget.price) || (purchaseTarget.type === 'series' ? 35 : 30);
+      const defaultPrice = purchaseTarget.type === 'series' ? 35 : 30;
+      const priceToCharge = (typeof purchaseTarget.price === 'number' && purchaseTarget.price >= 10)
+        ? purchaseTarget.price
+        : defaultPrice;
 
       setQrLoading(true);
-      generateUpiQrDataUrl(upi, price, merchant)
+      generateUpiQrDataUrl(upi, priceToCharge, merchant)
         .then(url => {
           if (!isCancelled) {
             setQrCodeUrl(url);
@@ -119,7 +127,10 @@ export const PurchaseModal: React.FC = () => {
 
   if (activeModal !== 'purchase' || !purchaseTarget) return null;
 
-  const price = purchaseTarget.price;
+  const hybridPrice = purchaseTarget.type === 'series' ? 35 : 30;
+  const price = (typeof purchaseTarget.price === 'number' && purchaseTarget.price >= 10)
+    ? purchaseTarget.price
+    : hybridPrice;
   const hasSufficientBalance = liveBalance >= price;
 
   const handleCopyUpi = () => {

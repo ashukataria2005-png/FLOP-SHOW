@@ -343,7 +343,48 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 5 };
+    // Apply incremental 010_hybrid_plans_system for PostgreSQL if not already applied
+    const hybridMigrationVersion = '010_hybrid_plans_system';
+    if (!appliedSet.has(hybridMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 010_hybrid_plans_system...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          ALTER TABLE purchases ADD COLUMN IF NOT EXISTS expires_at TEXT DEFAULT NULL;
+
+          ALTER TABLE watch_passes ALTER COLUMN content_id DROP NOT NULL;
+
+          ALTER TABLE watch_passes DROP CONSTRAINT IF EXISTS watch_passes_plan_check;
+          ALTER TABLE watch_passes ADD CONSTRAINT watch_passes_plan_check CHECK(plan IN ('PASS_24H', 'PASS_3D', 'PASS_7D', 'PASS_15D', 'PASS_30D'));
+
+          INSERT INTO app_settings (key, value, updated_at)
+          VALUES
+            ('watch_pass_price_24h', '19', NOW()::TEXT),
+            ('watch_pass_price_3d', '29', NOW()::TEXT),
+            ('watch_pass_price_7d', '44', NOW()::TEXT),
+            ('watch_pass_price_15d', '69', NOW()::TEXT),
+            ('per_movie_price', '30', NOW()::TEXT),
+            ('per_series_price', '35', NOW()::TEXT)
+          ON CONFLICT (key) DO UPDATE SET
+            value = EXCLUDED.value,
+            updated_at = EXCLUDED.updated_at;
+
+          DELETE FROM app_settings WHERE key = 'watch_pass_price_30d';
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${hybridMigrationVersion}', '010_hybrid_plans_system.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('010_hybrid_plans_system.sql');
+        console.log('✓ [PostgreSQL] Migration 010_hybrid_plans_system applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 6 };
   } finally {
     client.release();
     await pool.end();
@@ -375,7 +416,7 @@ export async function runMigrationsAsync(): Promise<{ applied: string[]; total: 
 // ─────────────────────────────────────────────────────────────────────────────
 // Direct CLI execution: tsx backend/src/db/migrator.ts
 // ─────────────────────────────────────────────────────────────────────────────
-if (process.argv[1] && process.argv[1].endsWith('migrator.ts')) {
+if (process.argv[1] && (process.argv[1].endsWith('migrator.ts') || process.argv[1].includes('migrator'))) {
   runMigrationsAsync()
     .then(result => {
       console.log(`Migrations complete. Applied: ${result.applied.length}/${result.total}`);

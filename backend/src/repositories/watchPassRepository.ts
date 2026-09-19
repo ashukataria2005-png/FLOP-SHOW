@@ -1,13 +1,13 @@
 import { getAdapter } from '../db/adapter.js';
 
-export type WatchPassPlan = 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+export type WatchPassPlan = 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D' | 'PASS_30D';
 export type WatchPassStatus = 'PENDING' | 'ACTIVE' | 'EXPIRED' | 'REJECTED';
 export type WatchPassPaymentMethod = 'MANUAL_UPI' | 'ADMIN_GRANT' | 'GATEWAY';
 
 export interface WatchPassRecord {
   id: string;
   user_id: string;
-  content_id: string;
+  content_id: string | null;
   plan: WatchPassPlan;
   duration_days: number;
   amount_paid: number;
@@ -47,29 +47,30 @@ export const watchPassRepository = {
   },
 
   /**
-   * Check if user has an active, unexpired watch pass for this specific content.
+   * Check if user has an active, unexpired watch pass.
+   * Catalog-wide temporary access — unlocks all eligible paid content.
    */
-  async hasActivePass(userId: string, contentId: string): Promise<boolean> {
-    if (!userId || !contentId) return false;
+  async hasActivePass(userId: string, _contentId?: string): Promise<boolean> {
+    if (!userId) return false;
     await this.markExpiredPasses();
     const db = getAdapter();
     const now = new Date().toISOString();
 
     const { rows } = await db.query(
       `SELECT id FROM watch_passes
-       WHERE user_id = ? AND content_id = ? AND status = 'ACTIVE'
+       WHERE user_id = ? AND status = 'ACTIVE'
          AND (expires_at IS NULL OR expires_at > ?)
        LIMIT 1`,
-      [userId, contentId, now]
+      [userId, now]
     );
 
     return rows.length > 0;
   },
 
   /**
-   * Get the active watch pass record for a user and content.
+   * Get the active watch pass record for a user.
    */
-  async getUserActivePass(userId: string, contentId: string): Promise<WatchPassRecord | null> {
+  async getUserActivePass(userId: string, _contentId?: string): Promise<WatchPassRecord | null> {
     await this.markExpiredPasses();
     const db = getAdapter();
     const now = new Date().toISOString();
@@ -77,31 +78,31 @@ export const watchPassRepository = {
     const { rows } = await db.query(
       `SELECT wp.*, c.title as content_title, c.poster as content_poster, c.type as content_type
        FROM watch_passes wp
-       JOIN content c ON wp.content_id = c.id
-       WHERE wp.user_id = ? AND wp.content_id = ? AND wp.status = 'ACTIVE'
+       LEFT JOIN content c ON wp.content_id = c.id
+       WHERE wp.user_id = ? AND wp.status = 'ACTIVE'
          AND (wp.expires_at IS NULL OR wp.expires_at > ?)
        ORDER BY wp.expires_at DESC
        LIMIT 1`,
-      [userId, contentId, now]
+      [userId, now]
     );
 
     return (rows[0] as WatchPassRecord) || null;
   },
 
   /**
-   * Get latest pass record for user and content (to check if PENDING request already exists).
+   * Get latest pending or active pass record for user.
    */
-  async getUserLatestPass(userId: string, contentId: string): Promise<WatchPassRecord | null> {
+  async getUserLatestPass(userId: string, _contentId?: string): Promise<WatchPassRecord | null> {
     await this.markExpiredPasses();
     const db = getAdapter();
     const { rows } = await db.query(
       `SELECT wp.*, c.title as content_title, c.poster as content_poster, c.type as content_type
        FROM watch_passes wp
-       JOIN content c ON wp.content_id = c.id
-       WHERE wp.user_id = ? AND wp.content_id = ?
+       LEFT JOIN content c ON wp.content_id = c.id
+       WHERE wp.user_id = ?
        ORDER BY wp.created_at DESC
        LIMIT 1`,
-      [userId, contentId]
+      [userId]
     );
     return (rows[0] as WatchPassRecord) || null;
   },
@@ -127,7 +128,7 @@ export const watchPassRepository = {
       `SELECT wp.*, c.title as content_title, c.poster as content_poster, c.type as content_type,
               u.name as user_name, u.email as user_email
        FROM watch_passes wp
-       JOIN content c ON wp.content_id = c.id
+       LEFT JOIN content c ON wp.content_id = c.id
        JOIN users u ON wp.user_id = u.id
        WHERE wp.id = ? LIMIT 1`,
       [passId]
@@ -141,7 +142,7 @@ export const watchPassRepository = {
   async createPass(data: {
     id: string;
     userId: string;
-    contentId: string;
+    contentId?: string | null;
     plan: WatchPassPlan;
     durationDays: number;
     amountPaid: number;
@@ -166,7 +167,7 @@ export const watchPassRepository = {
       [
         data.id,
         data.userId,
-        data.contentId,
+        data.contentId || null,
         data.plan,
         data.durationDays,
         data.amountPaid,
@@ -243,7 +244,7 @@ export const watchPassRepository = {
     const { rows } = await db.query(
       `SELECT wp.*, c.title as content_title, c.poster as content_poster, c.type as content_type
        FROM watch_passes wp
-       JOIN content c ON wp.content_id = c.id
+       LEFT JOIN content c ON wp.content_id = c.id
        WHERE wp.user_id = ?
        ORDER BY wp.created_at DESC`,
       [userId]
@@ -262,7 +263,7 @@ export const watchPassRepository = {
       SELECT wp.*, c.title as content_title, c.poster as content_poster, c.type as content_type,
              u.name as user_name, u.email as user_email
       FROM watch_passes wp
-      JOIN content c ON wp.content_id = c.id
+      LEFT JOIN content c ON wp.content_id = c.id
       JOIN users u ON wp.user_id = u.id
     `;
     const params: any[] = [];
@@ -287,8 +288,11 @@ export const watchPassRepository = {
     activePasses: number;
     expiredPasses: number;
     pendingPasses: number;
+    rejectedPasses: number;
     totalRevenueRupees: number;
-    durationBreakdown: Record<WatchPassPlan, number>;
+    durationBreakdown: Record<string, number>;
+    revenueByPlan: Record<string, number>;
+    activeByPlan: Record<string, number>;
   }> {
     await this.markExpiredPasses();
     const db = getAdapter();
@@ -299,6 +303,7 @@ export const watchPassRepository = {
         SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END) as active_count,
         SUM(CASE WHEN status = 'EXPIRED' THEN 1 ELSE 0 END) as expired_count,
         SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending_count,
+        SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END) as rejected_count,
         SUM(CASE WHEN status IN ('ACTIVE', 'EXPIRED') THEN amount_paid ELSE 0 END) as total_rev
       FROM watch_passes
     `);
@@ -306,22 +311,42 @@ export const watchPassRepository = {
     const stats = countRows[0] as any;
 
     const { rows: planRows } = await db.query(`
-      SELECT plan, COUNT(*) as count
+      SELECT plan,
+             COUNT(*) as count,
+             SUM(amount_paid) as plan_rev,
+             SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END) as active_in_plan
       FROM watch_passes
       WHERE status IN ('ACTIVE', 'EXPIRED')
       GROUP BY plan
     `);
 
-    const durationBreakdown: Record<WatchPassPlan, number> = {
+    const durationBreakdown: Record<string, number> = {
       PASS_24H: 0,
       PASS_3D: 0,
       PASS_7D: 0,
-      PASS_30D: 0,
+      PASS_15D: 0,
+    };
+
+    const revenueByPlan: Record<string, number> = {
+      PASS_24H: 0,
+      PASS_3D: 0,
+      PASS_7D: 0,
+      PASS_15D: 0,
+    };
+
+    const activeByPlan: Record<string, number> = {
+      PASS_24H: 0,
+      PASS_3D: 0,
+      PASS_7D: 0,
+      PASS_15D: 0,
     };
 
     for (const row of planRows as any[]) {
-      if (row.plan in durationBreakdown) {
-        durationBreakdown[row.plan as WatchPassPlan] = Number(row.count) || 0;
+      const p = row.plan;
+      if (p in durationBreakdown) {
+        durationBreakdown[p] = Number(row.count) || 0;
+        revenueByPlan[p] = Number(row.plan_rev) || 0;
+        activeByPlan[p] = Number(row.active_in_plan) || 0;
       }
     }
 
@@ -330,8 +355,11 @@ export const watchPassRepository = {
       activePasses: Number(stats?.active_count || 0),
       expiredPasses: Number(stats?.expired_count || 0),
       pendingPasses: Number(stats?.pending_count || 0),
+      rejectedPasses: Number(stats?.rejected_count || 0),
       totalRevenueRupees: Number(stats?.total_rev || 0),
       durationBreakdown,
+      revenueByPlan,
+      activeByPlan,
     };
   }
 };

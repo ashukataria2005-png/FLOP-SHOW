@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { ContentItem } from '../types/content';
 import { ContentCard } from '../components/cards/ContentCard';
-import { Bookmark, Film, PlayCircle, History, Compass } from 'lucide-react';
+import { Bookmark, Film, PlayCircle, History, Compass, Clock, RotateCcw, ShieldCheck, Play } from 'lucide-react';
 
 interface LibraryPageProps {
   onSelectItem: (item: ContentItem) => void;
@@ -10,7 +10,7 @@ interface LibraryPageProps {
 }
 
 export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNavigate }) => {
-  const { purchases, myList, watchProgress, catalog } = useApp();
+  const { purchases, myList, watchProgress, catalog, openPurchaseModal } = useApp();
   const activeCatalog = catalog || [];
   const [activeTab, setActiveTab] = useState<'owned' | 'saved' | 'progress' | 'history'>('owned');
 
@@ -124,17 +124,191 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
 
       {/* Content Grid or Professional Empty State */}
       {currentItems.length > 0 ? (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-            gap: 'clamp(12px, 2.5vw, 20px)'
-          }}
-        >
-          {currentItems.map(item => (
-            <ContentCard key={item.id} item={item} onSelect={onSelectItem} />
-          ))}
-        </div>
+        activeTab === 'owned' ? (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: 'clamp(14px, 2.5vw, 22px)'
+            }}
+          >
+            {currentItems.map(item => {
+              const purchase = purchases.find(p => p.contentId === item.id);
+              const isLegacy = !purchase?.expiresAt;
+              const isExpired = Boolean(purchase?.isExpired);
+              const daysLeft = purchase?.daysRemaining;
+
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    backgroundColor: 'var(--bg-surface)',
+                    borderRadius: '16px',
+                    border: isExpired
+                      ? '1px solid rgba(239, 68, 68, 0.35)'
+                      : isLegacy
+                      ? '1px solid rgba(245, 197, 24, 0.3)'
+                      : '1px solid rgba(16, 185, 129, 0.35)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+                  }}
+                >
+                  {/* Poster Thumbnail */}
+                  <div
+                    onClick={() => onSelectItem(item)}
+                    style={{
+                      position: 'relative',
+                      aspectRatio: '16 / 9',
+                      width: '100%',
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                      backgroundColor: '#12121A'
+                    }}
+                  >
+                    <img
+                      src={item.backdropUrl || item.posterUrl}
+                      alt={item.title}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.85) 100%)'
+                      }}
+                    />
+
+                    {/* Validity Badge */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        left: '8px',
+                        zIndex: 2,
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        backgroundColor: isExpired
+                          ? 'rgba(239, 68, 68, 0.9)'
+                          : isLegacy
+                          ? 'rgba(245, 197, 24, 0.95)'
+                          : 'rgba(16, 185, 129, 0.92)',
+                        color: isLegacy ? '#0E0E12' : '#FFFFFF'
+                      }}
+                    >
+                      {isExpired ? (
+                        <>
+                          <Clock size={12} />
+                          <span>Expired</span>
+                        </>
+                      ) : isLegacy ? (
+                        <>
+                          <ShieldCheck size={12} />
+                          <span>Permanent</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock size={12} />
+                          <span>Expires in {daysLeft != null ? (daysLeft > 0 ? `${daysLeft}d` : '<1d') : '30d'}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card Content & Renew CTA */}
+                  <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between', gap: '12px' }}>
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--brand-gold)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>
+                        {item.type.toUpperCase()} • 1080P FHD
+                      </div>
+                      <h4
+                        onClick={() => onSelectItem(item)}
+                        style={{
+                          fontSize: '15px',
+                          fontWeight: 800,
+                          color: '#FFFFFF',
+                          margin: 0,
+                          cursor: 'pointer',
+                          lineHeight: 1.3
+                        }}
+                      >
+                        {item.title}
+                      </h4>
+                    </div>
+
+                    {isExpired ? (
+                      <button
+                        onClick={() => openPurchaseModal(item)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          backgroundColor: 'var(--brand-gold)',
+                          color: '#0E0E12',
+                          border: 'none',
+                          fontWeight: 800,
+                          fontSize: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <RotateCcw size={14} />
+                        <span>Renew for 1 Month (₹{item.type === 'series' ? 35 : 30})</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onSelectItem(item)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                          color: '#FFFFFF',
+                          border: '1px solid rgba(255, 255, 255, 0.18)',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Play size={14} fill="#FFFFFF" />
+                        <span>Watch Now</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: 'clamp(12px, 2.5vw, 20px)'
+            }}
+          >
+            {currentItems.map(item => (
+              <ContentCard key={item.id} item={item} onSelect={onSelectItem} />
+            ))}
+          </div>
+        )
       ) : (
         /* Empty State */
         <div

@@ -5,10 +5,8 @@ import {
   WatchPassPlan,
   WatchPassRecord,
   WatchPassStatus,
-  WatchPassPaymentMethod
 } from '../repositories/watchPassRepository.js';
 import { contentRepository } from '../repositories/contentRepository.js';
-import { purchaseRepository } from '../repositories/purchaseRepository.js';
 
 export interface WatchPassPlanConfig {
   id: string;
@@ -17,43 +15,47 @@ export interface WatchPassPlanConfig {
   durationLabel: string;
   durationDays: number;
   priceRupees: number;
+  maxResolution: '720p' | '1080p';
+  downloadAllowed: boolean;
   description: string;
   popular?: boolean;
   highlight?: string;
+  benefits: string[];
 }
 
-const DURATION_DAYS_MAP: Record<WatchPassPlan, number> = {
+const DURATION_DAYS_MAP: Record<string, number> = {
   PASS_24H: 1,
   PASS_3D: 3,
   PASS_7D: 7,
+  PASS_15D: 15,
   PASS_30D: 30,
 };
 
-const PLAN_NAME_MAP: Record<WatchPassPlan, string> = {
+const PLAN_NAME_MAP: Record<string, string> = {
   PASS_24H: '24 Hours Pass',
   PASS_3D: '3 Days Pass',
   PASS_7D: '7 Days Pass',
-  PASS_30D: '30 Days Pass',
+  PASS_15D: '15 Days Pass',
 };
 
-const PLAN_DESC_MAP: Record<WatchPassPlan, string> = {
-  PASS_24H: 'Perfect for movie night. 24 hours of instant playback on your chosen title.',
-  PASS_3D: 'Ideal for weekend bingeing. 72 hours of uninterrupted access to this title.',
-  PASS_7D: 'Full week of playback. Watch at your own pace across all devices in HD.',
-  PASS_30D: 'Extended monthly title pass. Re-watch and finish complete series anytime.',
+const PLAN_DESC_MAP: Record<string, string> = {
+  PASS_24H: 'Unlimited streaming across the entire catalog for 24 hours in HD 720p.',
+  PASS_3D: 'Full 3 days of uninterrupted catalog-wide access with priority playback experience.',
+  PASS_7D: 'Full week of unrestricted streaming in 1080p Full HD with offline downloads available.',
+  PASS_15D: 'Half-month premium pass. Enjoy 1080p Full HD, downloads, and seamless cross-device watching.',
 };
 
 export const watchPassService = {
   /**
    * Return dynamic plan pricing configured by the Administrator in app_settings.
-   * Prices are NEVER hardcoded throughout the system.
+   * Exactly 4 standard plans: 24H, 3D, 7D, 15D.
    */
   async getPlans(): Promise<WatchPassPlanConfig[]> {
     const settings = await adminService.getSettings();
-    const p24 = parseInt(settings.watch_pass_price_24h || '29', 10);
-    const p3d = parseInt(settings.watch_pass_price_3d || '49', 10);
-    const p7d = parseInt(settings.watch_pass_price_7d || '79', 10);
-    const p30d = parseInt(settings.watch_pass_price_30d || '149', 10);
+    const p24 = parseInt(settings.watch_pass_price_24h || '19', 10);
+    const p3d = parseInt(settings.watch_pass_price_3d || '29', 10);
+    const p7d = parseInt(settings.watch_pass_price_7d || '44', 10);
+    const p15d = parseInt(settings.watch_pass_price_15d || '69', 10);
 
     return [
       {
@@ -62,9 +64,18 @@ export const watchPassService = {
         name: PLAN_NAME_MAP.PASS_24H,
         durationLabel: '24 Hours',
         durationDays: 1,
-        priceRupees: isNaN(p24) ? 29 : p24,
+        priceRupees: isNaN(p24) ? 19 : p24,
+        maxResolution: '720p',
+        downloadAllowed: false,
         description: PLAN_DESC_MAP.PASS_24H,
-        highlight: 'Quick Access'
+        highlight: 'Quick Access',
+        benefits: [
+          'Unlimited movies & web series',
+          '24-Hour full catalog access',
+          '720p HD streaming',
+          'Streaming only (No downloads)',
+          'Instant activation after verification',
+        ],
       },
       {
         id: 'PASS_3D',
@@ -72,9 +83,18 @@ export const watchPassService = {
         name: PLAN_NAME_MAP.PASS_3D,
         durationLabel: '3 Days',
         durationDays: 3,
-        priceRupees: isNaN(p3d) ? 49 : p3d,
+        priceRupees: isNaN(p3d) ? 29 : p3d,
+        maxResolution: '720p',
+        downloadAllowed: false,
         description: PLAN_DESC_MAP.PASS_3D,
-        highlight: 'Weekend Favorite'
+        highlight: 'Weekend Favorite',
+        benefits: [
+          'Unlimited movies & web series',
+          '3-Day continuous catalog access',
+          '720p HD streaming',
+          'Priority playback experience',
+          'Streaming only (No downloads)',
+        ],
       },
       {
         id: 'PASS_7D',
@@ -82,61 +102,87 @@ export const watchPassService = {
         name: PLAN_NAME_MAP.PASS_7D,
         durationLabel: '7 Days',
         durationDays: 7,
-        priceRupees: isNaN(p7d) ? 79 : p7d,
-        description: PLAN_DESC_MAP.PASS_7D,
+        priceRupees: isNaN(p7d) ? 44 : p7d,
+        maxResolution: '1080p',
+        downloadAllowed: true,
         popular: true,
-        highlight: 'Most Popular'
+        highlight: 'Recommended',
+        benefits: [
+          'Unlimited movies & web series',
+          '7-Day full catalog access',
+          'Full HD 1080p cinema streaming',
+          'Download Available for offline watch',
+          'Continue Watching cross-device sync',
+        ],
       },
       {
-        id: 'PASS_30D',
-        plan: 'PASS_30D',
-        name: PLAN_NAME_MAP.PASS_30D,
-        durationLabel: '30 Days',
-        durationDays: 30,
-        priceRupees: isNaN(p30d) ? 149 : p30d,
-        description: PLAN_DESC_MAP.PASS_30D,
-        highlight: 'Best Value'
-      }
+        id: 'PASS_15D',
+        plan: 'PASS_15D',
+        name: PLAN_NAME_MAP.PASS_15D,
+        durationLabel: '15 Days',
+        durationDays: 15,
+        priceRupees: isNaN(p15d) ? 69 : p15d,
+        maxResolution: '1080p',
+        downloadAllowed: true,
+        highlight: 'Best Value',
+        benefits: [
+          'Unlimited movies & web series',
+          '15-Day extended catalog access',
+          'Full HD 1080p cinema streaming',
+          'Download Available for offline watch',
+          'Continue Watching cross-device sync',
+          'Lowest per-day rate',
+        ],
+      },
     ];
   },
 
   async getPlanConfig(plan: WatchPassPlan): Promise<WatchPassPlanConfig> {
     const plans = await this.getPlans();
     const found = plans.find(p => p.plan === plan);
-    if (!found) {
-      const err = new Error(`Invalid watch pass plan: ${plan}`);
-      (err as any).statusCode = 400;
-      throw err;
-    }
-    return found;
+    if (found) return found;
+
+    const days = DURATION_DAYS_MAP[plan] || 1;
+    return {
+      id: plan,
+      plan,
+      name: PLAN_NAME_MAP[plan] || `${days} Days Pass`,
+      durationLabel: `${days} Days`,
+      durationDays: days,
+      priceRupees: 44,
+      maxResolution: days >= 7 ? '1080p' : '720p',
+      downloadAllowed: days >= 7,
+      description: PLAN_DESC_MAP[plan] || 'FLOPSHOW Watch Pass',
+      benefits: ['Unlimited movies & web series'],
+    };
   },
 
   /**
-   * Submit manual UPI payment request for a specific movie or series.
-   * Status starts as PENDING.
-   * User does NOT receive playback access while pending.
+   * User submits a manual UPI payment for a catalog-wide Watch Pass.
+   * Creates a PENDING request waiting for administrator approval.
    */
   async submitPassRequest(
     userId: string,
     data: {
-      contentId: string;
+      contentId?: string | null;
       plan: WatchPassPlan;
       utr: string;
       userName?: string;
       userEmail?: string;
     }
   ): Promise<WatchPassRecord> {
-    if (!['PASS_24H', 'PASS_3D', 'PASS_7D', 'PASS_30D'].includes(data.plan)) {
-      const err = new Error('Invalid watch pass plan selected.');
+    if (!['PASS_24H', 'PASS_3D', 'PASS_7D', 'PASS_15D'].includes(data.plan)) {
+      const err = new Error('Invalid watch pass plan selected. Choose from 24H, 3D, 7D, or 15D.');
       (err as any).statusCode = 400;
       throw err;
     }
 
-    const content = await contentRepository.getById(data.contentId);
-    if (!content) {
-      const err = new Error('Selected movie or series was not found.');
-      (err as any).statusCode = 404;
-      throw err;
+    let finalContentId: string | null = null;
+    if (data.contentId && data.contentId !== 'ALL_CATALOG') {
+      const content = await contentRepository.getById(data.contentId);
+      if (content) {
+        finalContentId = content.id;
+      }
     }
 
     const cleanUtr = (data.utr || '').trim().replace(/[^a-zA-Z0-9]/g, '');
@@ -161,18 +207,10 @@ export const watchPassService = {
       }
     }
 
-    // If user already owns this content permanently, advise them
-    const owned = await purchaseRepository.isOwned(userId, data.contentId);
-    if (owned) {
-      const err = new Error('You already permanently own this title in your Library! A temporary pass is not needed.');
-      (err as any).statusCode = 400;
-      throw err;
-    }
-
-    // Check if user already has a pending pass for this specific title
-    const latest = await watchPassRepository.getUserLatestPass(userId, data.contentId);
+    // Check if user already has a pending pass request
+    const latest = await watchPassRepository.getUserLatestPass(userId);
     if (latest && latest.status === 'PENDING') {
-      const err = new Error('You already have a Watch Pass request for this title pending administrator review.');
+      const err = new Error('You already have a Watch Pass request pending administrator verification.');
       (err as any).statusCode = 409;
       throw err;
     }
@@ -184,7 +222,7 @@ export const watchPassService = {
     return watchPassRepository.createPass({
       id: passId,
       userId,
-      contentId: data.contentId,
+      contentId: finalContentId,
       plan: data.plan,
       durationDays: planConfig.durationDays,
       amountPaid: planConfig.priceRupees,
@@ -221,26 +259,25 @@ export const watchPassService = {
       throw err;
     }
 
-    const durationDays = DURATION_DAYS_MAP[pass.plan] || pass.duration_days || 1;
     const now = new Date();
-    const activatedAt = now.toISOString();
+    const durationDays = Number(pass.duration_days) || DURATION_DAYS_MAP[pass.plan] || 1;
 
-    // Check if user has an existing active pass for this content that hasn't expired yet
-    const existingActive = await watchPassRepository.getUserActivePass(pass.user_id, pass.content_id);
+    // Check if user currently has an active pass to extend validity seamlessly
+    const currentActive = await watchPassRepository.getUserActivePass(pass.user_id);
     let baseTime = now.getTime();
-    if (existingActive && existingActive.expires_at) {
-      const existingExpiryTime = new Date(existingActive.expires_at).getTime();
-      if (existingExpiryTime > baseTime) {
-        // Seamless extension: add duration onto remaining time
-        baseTime = existingExpiryTime;
+    if (currentActive && currentActive.expires_at) {
+      const currentExpiryMs = new Date(currentActive.expires_at).getTime();
+      if (currentExpiryMs > baseTime) {
+        baseTime = currentExpiryMs;
       }
     }
 
     const expiresAt = new Date(baseTime + durationDays * 24 * 60 * 60 * 1000).toISOString();
+    const activatedAt = now.toISOString();
 
     return watchPassRepository.updateStatus(passId, 'ACTIVE', {
       adminId,
-      adminNote: adminNote || 'Approved by administrator.',
+      adminNote: adminNote || 'Payment approved via Admin Ledger.',
       activatedAt,
       expiresAt,
     });
@@ -262,7 +299,7 @@ export const watchPassService = {
     }
 
     if (pass.status !== 'PENDING') {
-      const err = new Error(`Cannot reject watch pass with status "${pass.status}". Only PENDING passes can be rejected.`);
+      const err = new Error(`Cannot reject watch pass with status "${pass.status}".`);
       (err as any).statusCode = 400;
       throw err;
     }
@@ -274,18 +311,60 @@ export const watchPassService = {
   },
 
   /**
-   * Check if a user currently has authorized active access to a specific content via watch pass.
+   * Check if a user currently has authorized active access via watch pass.
+   * Catalog-wide: returns true for all titles while active.
    */
-  async hasActivePass(userId: string, contentId: string): Promise<boolean> {
-    return watchPassRepository.hasActivePass(userId, contentId);
+  async hasActivePass(userId: string, _contentId?: string): Promise<boolean> {
+    return watchPassRepository.hasActivePass(userId);
   },
 
   /**
-   * Get pass status for user on a specific title (for DetailsPage).
+   * Get active pass capabilities (quality cap, download entitlement, time remaining).
    */
-  async getContentPassStatus(userId: string, contentId: string): Promise<{
+  async getActivePassCapabilities(userId: string): Promise<{
     hasActivePass: boolean;
-    activePass: (WatchPassRecord & { remainingHours: number; remainingDays: number }) | null;
+    plan?: WatchPassPlan;
+    maxResolution: '720p' | '1080p';
+    downloadAllowed: boolean;
+    remainingHours: number;
+    remainingDays: number;
+    expiresAt?: string;
+  }> {
+    const active = await watchPassRepository.getUserActivePass(userId);
+    if (!active || !active.expires_at) {
+      return {
+        hasActivePass: false,
+        maxResolution: '1080p',
+        downloadAllowed: false,
+        remainingHours: 0,
+        remainingDays: 0,
+      };
+    }
+
+    const now = Date.now();
+    const end = new Date(active.expires_at).getTime();
+    const diffMs = Math.max(0, end - now);
+    const remainingHours = Math.ceil(diffMs / (1000 * 60 * 60));
+    const remainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    const is1080p = active.plan === 'PASS_7D' || active.plan === 'PASS_15D' || active.plan === 'PASS_30D';
+    return {
+      hasActivePass: true,
+      plan: active.plan,
+      maxResolution: is1080p ? '1080p' : '720p',
+      downloadAllowed: is1080p,
+      remainingHours,
+      remainingDays,
+      expiresAt: active.expires_at,
+    };
+  },
+
+  /**
+   * Get pass status for user (for DetailsPage and PlansPage).
+   */
+  async getContentPassStatus(userId: string, contentId?: string): Promise<{
+    hasActivePass: boolean;
+    activePass: (WatchPassRecord & { remainingHours: number; remainingDays: number; maxResolution: string; downloadAllowed: boolean }) | null;
     pendingPass: WatchPassRecord | null;
     latestPass: WatchPassRecord | null;
     isExpired: boolean;
@@ -302,10 +381,14 @@ export const watchPassService = {
       const diffMs = Math.max(0, end - now);
       const remainingHours = Math.ceil(diffMs / (1000 * 60 * 60));
       const remainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      const is1080p = active.plan === 'PASS_7D' || active.plan === 'PASS_15D' || active.plan === 'PASS_30D';
+
       activeWithRemaining = {
         ...active,
         remainingHours,
         remainingDays,
+        maxResolution: is1080p ? '1080p' : '720p',
+        downloadAllowed: is1080p,
       };
     }
 
@@ -325,14 +408,14 @@ export const watchPassService = {
    * Get all passes for a user (Active vs Expired vs Pending).
    */
   async getUserPasses(userId: string): Promise<{
-    activePasses: Array<WatchPassRecord & { remainingHours: number; remainingDays: number }>;
+    activePasses: Array<WatchPassRecord & { remainingHours: number; remainingDays: number; maxResolution: string; downloadAllowed: boolean }>;
     expiredPasses: WatchPassRecord[];
     pendingPasses: WatchPassRecord[];
   }> {
     const all = await watchPassRepository.getUserPasses(userId);
     const now = new Date().getTime();
 
-    const activePasses: Array<WatchPassRecord & { remainingHours: number; remainingDays: number }> = [];
+    const activePasses: Array<WatchPassRecord & { remainingHours: number; remainingDays: number; maxResolution: string; downloadAllowed: boolean }> = [];
     const expiredPasses: WatchPassRecord[] = [];
     const pendingPasses: WatchPassRecord[] = [];
 
@@ -340,10 +423,14 @@ export const watchPassService = {
       if (p.status === 'ACTIVE' && p.expires_at) {
         const end = new Date(p.expires_at).getTime();
         const diffMs = Math.max(0, end - now);
+        const is1080p = p.plan === 'PASS_7D' || p.plan === 'PASS_15D' || p.plan === 'PASS_30D';
+
         activePasses.push({
           ...p,
           remainingHours: Math.ceil(diffMs / (1000 * 60 * 60)),
           remainingDays: Math.ceil(diffMs / (1000 * 60 * 60 * 24)),
+          maxResolution: is1080p ? '1080p' : '720p',
+          downloadAllowed: is1080p,
         });
       } else if (p.status === 'EXPIRED') {
         expiredPasses.push(p);

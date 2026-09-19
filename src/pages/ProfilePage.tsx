@@ -2310,7 +2310,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                 </h3>
               </div>
               <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0, maxWidth: '620px', lineHeight: 1.5 }}>
-                Temporary access passes for specific movies and series. Separate from permanent library ownership and full catalog subscriptions.
+                Catalog-wide temporary access passes for unlimited streaming across all eligible movies and series. Separate from permanent library ownership and full catalog subscriptions.
               </p>
             </div>
 
@@ -2362,7 +2362,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                       borderRadius: '8px'
                     }}
                   >
-                    <span><strong>{p.content_title || 'Content'}</strong> ({p.plan.replace('PASS_', '')})</span>
+                    <span><strong>{p.content_title || 'Catalog-Wide Access'}</strong> ({p.plan ? p.plan.replace('PASS_', '') : 'PASS'})</span>
                     <span style={{ color: '#9CA3AF' }}>UTR: {p.payment_reference} • ₹{p.amount_paid}</span>
                   </div>
                 ))}
@@ -2397,13 +2397,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                   No Active Watch Passes
                 </div>
                 <p style={{ fontSize: '13px', maxWidth: '400px', margin: '0 auto 18px' }}>
-                  You don't have any active temporary passes right now. Choose any title to start watching!
+                  You don't have an active catalog pass right now. Get a 24H, 3D, 7D, or 15D Watch Pass to start streaming!
                 </p>
                 <button
-                  onClick={() => onNavigate('discover')}
+                  onClick={() => onNavigate('plans')}
                   className="btn btn-primary btn-sm"
                 >
-                  Explore Catalog
+                  Browse Pass Plans
                 </button>
               </div>
             ) : (
@@ -2424,14 +2424,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <span style={{ fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34D399', textTransform: 'uppercase' }}>
-                          Active Pass
+                          Active Pass ({p.plan ? p.plan.replace('PASS_', '') : 'PASS'})
                         </span>
                         <span style={{ fontSize: '12px', fontWeight: 700, color: '#34D399' }}>
                           {p.remainingHours > 24 ? `${p.remainingDays} days left` : `${p.remainingHours}h left`}
                         </span>
                       </div>
                       <h5 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 6px' }}>
-                        {p.content_title || 'Content Item'}
+                        {p.content_title || 'Catalog-Wide Access'}
                       </h5>
                       <div style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '12px' }}>
                         Activated: {new Date(p.activated_at).toLocaleDateString('en-IN')}

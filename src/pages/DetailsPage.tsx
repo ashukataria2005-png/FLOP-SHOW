@@ -12,7 +12,9 @@ import {
   Star,
   Video,
   Clock,
-  Zap
+  Zap,
+  Download,
+  Loader2
 } from 'lucide-react';
 
 interface DetailsPageProps {
@@ -36,10 +38,12 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
     hasActiveSubscription,
     openSubscriptionModal,
     openWatchPassModal,
-    isAuthenticated
+    isAuthenticated,
+    showToast
   } = useApp();
 
   const [details, setDetails] = useState<ContentItem>(item);
+  const [downloading, setDownloading] = useState(false);
   const [passStatus, setPassStatus] = useState<{
     hasActivePass: boolean;
     activePass: any;
@@ -51,6 +55,25 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
     pendingPass: null,
     isExpired: false
   });
+
+  const handleDownload = async () => {
+    if (!isAuthenticated) {
+      showToast('Please sign in to download content.', 'info');
+      return;
+    }
+    setDownloading(true);
+    try {
+      const res = await api.media.downloadContent(details.id);
+      if (res?.downloadUrl) {
+        window.open(res.downloadUrl, '_blank');
+        showToast(`Starting download: ${details.title}`, 'success');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Offline download is only available on 7-Day & 15-Day Watch Passes, 1-Month Ownership, and VIP Subscriptions.', 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const getInitialSeasonNumber = (seasonsList?: { seasonNumber: number }[]) => {
     if (!seasonsList || seasonsList.length === 0) return 1;
@@ -314,9 +337,32 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
                   ? 'Watch now'
                   : monetizationMode === 'SUBSCRIPTION'
                   ? 'Subscribe to Watch'
-                  : `Buy for ₹${currentItem.price}`}
+                  : `Own for 1 Month (₹${isSeries ? 35 : 30})`}
               </span>
             </button>
+
+            {/* Download CTA (Available when user can watch) */}
+            {canWatch && (
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="btn btn-secondary btn-lg"
+                style={{
+                  minWidth: '140px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                title="Download for offline viewing"
+              >
+                {downloading ? (
+                  <Loader2 size={18} className="animate-spin" color="var(--brand-gold)" />
+                ) : (
+                  <Download size={18} color="var(--brand-gold)" />
+                )}
+                <span>{downloading ? 'Preparing...' : 'Download'}</span>
+              </button>
+            )}
 
             {/* Watch Pass CTA (Shown when user does NOT already permanently own this title and it is not free) */}
             {!isFreeItem && !owned && (
@@ -371,7 +417,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
                     }}
                   >
                     <Zap size={17} />
-                    <span>{passStatus.isExpired ? 'Renew Watch Pass' : 'Get Watch Pass'}</span>
+                    <span>{passStatus.isExpired ? 'Renew Watch Pass' : 'Get Watch Pass (From ₹19)'}</span>
                   </button>
                 )}
               </>

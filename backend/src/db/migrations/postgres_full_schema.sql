@@ -184,6 +184,7 @@ CREATE TABLE IF NOT EXISTS purchases (
   amount_paid INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'COMPLETED' CHECK(status IN ('COMPLETED', 'REFUNDED', 'FAILED')),
   purchased_at TEXT NOT NULL,
+  expires_at TEXT DEFAULT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (content_id) REFERENCES content(id) ON DELETE CASCADE,
   CONSTRAINT uq_purchases_user_content UNIQUE (user_id, content_id)
@@ -191,6 +192,7 @@ CREATE TABLE IF NOT EXISTS purchases (
 
 CREATE INDEX IF NOT EXISTS idx_purchases_user ON purchases(user_id);
 CREATE INDEX IF NOT EXISTS idx_purchases_content ON purchases(content_id);
+CREATE INDEX IF NOT EXISTS idx_purchases_expires_at ON purchases(expires_at);
 
 -- ==============================================================================
 -- 10. WATCH PROGRESS
@@ -377,8 +379,8 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_payment_ref ON subscriptions(paymen
 CREATE TABLE IF NOT EXISTS watch_passes (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
-  content_id TEXT NOT NULL,
-  plan TEXT NOT NULL CHECK(plan IN ('PASS_24H', 'PASS_3D', 'PASS_7D', 'PASS_30D')),
+  content_id TEXT,
+  plan TEXT NOT NULL CHECK(plan IN ('PASS_24H', 'PASS_3D', 'PASS_7D', 'PASS_15D', 'PASS_30D')),
   duration_days REAL NOT NULL DEFAULT 1,
   amount_paid INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL CHECK(status IN ('PENDING', 'ACTIVE', 'EXPIRED', 'REJECTED')) DEFAULT 'PENDING',
@@ -395,7 +397,7 @@ CREATE TABLE IF NOT EXISTS watch_passes (
   FOREIGN KEY (content_id) REFERENCES content(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_watch_passes_user_content ON watch_passes(user_id, content_id, status);
+CREATE INDEX IF NOT EXISTS idx_watch_passes_user_content ON watch_passes(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_watch_passes_content ON watch_passes(content_id);
 CREATE INDEX IF NOT EXISTS idx_watch_passes_status ON watch_passes(status);
 CREATE INDEX IF NOT EXISTS idx_watch_passes_expires_at ON watch_passes(expires_at);
@@ -403,10 +405,12 @@ CREATE INDEX IF NOT EXISTS idx_watch_passes_payment_ref ON watch_passes(payment_
 
 INSERT INTO app_settings (key, value, updated_at)
 VALUES
-  ('watch_pass_price_24h', '29', NOW()::TEXT),
-  ('watch_pass_price_3d', '49', NOW()::TEXT),
-  ('watch_pass_price_7d', '79', NOW()::TEXT),
-  ('watch_pass_price_30d', '149', NOW()::TEXT)
+  ('watch_pass_price_24h', '19', NOW()::TEXT),
+  ('watch_pass_price_3d', '29', NOW()::TEXT),
+  ('watch_pass_price_7d', '44', NOW()::TEXT),
+  ('watch_pass_price_15d', '69', NOW()::TEXT),
+  ('per_movie_price', '30', NOW()::TEXT),
+  ('per_series_price', '35', NOW()::TEXT)
 ON CONFLICT (key) DO NOTHING;
 
 -- ==============================================================================

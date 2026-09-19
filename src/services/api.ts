@@ -627,6 +627,8 @@ export const api = {
         title: string;
         poster?: string;
         authorized: boolean;
+        maxResolution?: '720p' | '1080p';
+        downloadAllowed?: boolean;
       }>(`/media/content/${contentId}?type=${mediaType}`);
       if (res && res.url) {
         res.url = resolveMediaUrl(res.url, API_BASE_URL);
@@ -645,9 +647,37 @@ export const api = {
         title: string;
         poster?: string;
         authorized: boolean;
+        maxResolution?: '720p' | '1080p';
+        downloadAllowed?: boolean;
       }>(`/media/episode/${episodeId}?type=${mediaType}`);
       if (res && res.url) {
         res.url = resolveMediaUrl(res.url, API_BASE_URL);
+      }
+      return res;
+    },
+
+    async downloadContent(contentId: string) {
+      const res = await request<{
+        success: boolean;
+        downloadUrl: string;
+        title: string;
+        mimeType?: string;
+      }>(`/media/download/content/${contentId}`);
+      if (res && res.downloadUrl) {
+        res.downloadUrl = resolveMediaUrl(res.downloadUrl, API_BASE_URL);
+      }
+      return res;
+    },
+
+    async downloadEpisode(episodeId: string) {
+      const res = await request<{
+        success: boolean;
+        downloadUrl: string;
+        title: string;
+        mimeType?: string;
+      }>(`/media/download/episode/${episodeId}`);
+      if (res && res.downloadUrl) {
+        res.downloadUrl = resolveMediaUrl(res.downloadUrl, API_BASE_URL);
       }
       return res;
     }
@@ -1439,14 +1469,17 @@ export const api = {
       return request<{
         plans: Array<{
           id: string;
-          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D';
           name: string;
           durationLabel: string;
           durationDays: number;
           priceRupees: number;
+          maxResolution?: '720p' | '1080p';
+          downloadAllowed?: boolean;
           description: string;
           popular?: boolean;
           highlight?: string;
+          benefits?: string[];
         }>;
       }>('/watch-passes/plans');
     },
@@ -1456,8 +1489,8 @@ export const api = {
         hasActivePass: boolean;
         activePass: {
           id: string;
-          content_id: string;
-          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          content_id: string | null;
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D' | 'PASS_30D';
           status: 'ACTIVE';
           amount_paid: number;
           submitted_at: string;
@@ -1465,12 +1498,14 @@ export const api = {
           expires_at: string;
           remainingHours: number;
           remainingDays: number;
+          maxResolution?: '720p' | '1080p';
+          downloadAllowed?: boolean;
           payment_reference: string | null;
         } | null;
         pendingPass: {
           id: string;
-          content_id: string;
-          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          content_id: string | null;
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D' | 'PASS_30D';
           status: 'PENDING';
           amount_paid: number;
           payment_reference: string;
@@ -1485,11 +1520,11 @@ export const api = {
       return request<{
         activePasses: Array<{
           id: string;
-          content_id: string;
+          content_id: string | null;
           content_title?: string;
           content_poster?: string;
           content_type?: string;
-          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D' | 'PASS_30D';
           status: 'ACTIVE';
           amount_paid: number;
           submitted_at: string;
@@ -1497,15 +1532,17 @@ export const api = {
           expires_at: string;
           remainingHours: number;
           remainingDays: number;
+          maxResolution?: '720p' | '1080p';
+          downloadAllowed?: boolean;
           payment_reference: string | null;
         }>;
         expiredPasses: Array<{
           id: string;
-          content_id: string;
+          content_id: string | null;
           content_title?: string;
           content_poster?: string;
           content_type?: string;
-          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D' | 'PASS_30D';
           status: 'EXPIRED';
           amount_paid: number;
           submitted_at: string;
@@ -1515,11 +1552,11 @@ export const api = {
         }>;
         pendingPasses: Array<{
           id: string;
-          content_id: string;
+          content_id: string | null;
           content_title?: string;
           content_poster?: string;
           content_type?: string;
-          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+          plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D' | 'PASS_30D';
           status: 'PENDING';
           amount_paid: number;
           submitted_at: string;
@@ -1529,8 +1566,8 @@ export const api = {
     },
 
     async submitRequest(data: {
-      contentId: string;
-      plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D';
+      contentId?: string | null;
+      plan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D';
       utr: string;
       userName?: string;
       userEmail?: string;
@@ -1580,7 +1617,7 @@ export const api = {
       price24h?: number;
       price3d?: number;
       price7d?: number;
-      price30d?: number;
+      price15d?: number;
     }) {
       return request<{
         success: boolean;
@@ -1598,8 +1635,11 @@ export const api = {
         activePasses: number;
         expiredPasses: number;
         pendingPasses: number;
+        rejectedPasses: number;
         totalRevenueRupees: number;
         durationBreakdown: Record<string, number>;
+        revenueByPlan: Record<string, number>;
+        activeByPlan: Record<string, number>;
       }>('/watch-passes/admin/analytics');
     }
   }

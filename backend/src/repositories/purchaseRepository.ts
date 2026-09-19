@@ -7,9 +7,13 @@ export interface PurchaseRecord {
   amount_paid: number;
   status: 'COMPLETED' | 'REFUNDED' | 'FAILED';
   purchased_at: string;
+  expires_at?: string | null;
+  is_expired?: boolean;
+  days_remaining?: number;
   title?: string;
   poster?: string;
   type?: string;
+  slug?: string;
 }
 
 export const purchaseRepository = {
@@ -21,38 +25,76 @@ export const purchaseRepository = {
       amountPaid: number;
       status?: 'COMPLETED' | 'REFUNDED' | 'FAILED';
       purchasedAt: string;
+      expiresAt?: string | null;
     },
     adapter?: DbAdapter
   ): Promise<void> {
     const db = adapter || getAdapter();
-    await db.run(
-      `INSERT INTO purchases (id, user_id, content_id, amount_paid, status, purchased_at)
-       VALUES (?, ?, ?, ?, ?, ?);`,
-      [
-        purchase.id,
-        purchase.userId,
-        purchase.contentId,
-        purchase.amountPaid,
-        purchase.status || 'COMPLETED',
-        purchase.purchasedAt,
-      ]
+    const status = purchase.status || 'COMPLETED';
+
+    // Check if an existing purchase row exists for this user and content (to handle repurchase after expiration)
+    const { rows: existingRows } = await db.query(
+      `SELECT id FROM purchases WHERE user_id = ? AND content_id = ? LIMIT 1;`,
+      [purchase.userId, purchase.contentId]
     );
+
+    if (existingRows.length > 0) {
+      // Update existing purchase with new validity and amount
+      await db.run(
+        `UPDATE purchases
+         SET amount_paid = ?, status = ?, purchased_at = ?, expires_at = ?
+         WHERE user_id = ? AND content_id = ?;`,
+        [
+          purchase.amountPaid,
+          status,
+          purchase.purchasedAt,
+          purchase.expiresAt || null,
+          purchase.userId,
+          purchase.contentId,
+        ]
+      );
+    } else {
+      await db.run(
+        `INSERT INTO purchases (id, user_id, content_id, amount_paid, status, purchased_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?);`,
+        [
+          purchase.id,
+          purchase.userId,
+          purchase.contentId,
+          purchase.amountPaid,
+          status,
+          purchase.purchasedAt,
+          purchase.expiresAt || null,
+        ]
+      );
+    }
   },
 
+  /**
+   * Server-side entitlement check:
+   * Purchase is active if status is COMPLETED and either:
+   * 1. expires_at IS NULL (Legacy permanent purchase)
+   * 2. expires_at > CURRENT_TIMESTAMP (Active 1-month purchase)
+   */
   async isOwned(userId: string, contentId: string, adapter?: DbAdapter): Promise<boolean> {
     const db = adapter || getAdapter();
+    const now = new Date().toISOString();
     const { rows } = await db.query(
       `SELECT 1 FROM purchases p
        LEFT JOIN content c ON (p.content_id = c.id OR p.content_id = c.slug)
        WHERE p.user_id = ?
          AND (p.content_id = ? OR c.id = ? OR c.slug = ?)
          AND p.status = 'COMPLETED'
+         AND (p.expires_at IS NULL OR p.expires_at > ?)
        LIMIT 1;`,
-      [userId, contentId, contentId, contentId]
+      [userId, contentId, contentId, contentId, now]
     );
     return rows.length > 0;
   },
 
+  /**
+   * Get all user purchases with expiry details and active status.
+   */
   async getPurchasesByUser(userId: string): Promise<PurchaseRecord[]> {
     const db = getAdapter();
     const { rows } = await db.query(
@@ -63,6 +105,19 @@ export const purchaseRepository = {
        ORDER BY p.purchased_at DESC;`,
       [userId]
     );
-    return rows as PurchaseRecord[];
+
+    const now = Date.now();
+    return (rows as any[]).map(p => {
+      const isExpired = p.expires_at ? new Date(p.expires_at).getTime() <= now : false;
+      const daysRemaining = p.expires_at
+        ? Math.max(0, Math.ceil((new Date(p.expires_at).getTime() - now) / (1000 * 60 * 60 * 24)))
+        : null;
+
+      return {
+        ...p,
+        is_expired: isExpired,
+        days_remaining: daysRemaining,
+      };
+    });
   },
 };

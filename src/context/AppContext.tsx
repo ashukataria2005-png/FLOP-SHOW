@@ -72,8 +72,9 @@ interface AppContextType {
   closeAuthModal: () => void;
   openSubscriptionModal: (planId?: 'WEEKLY' | 'MONTHLY' | 'YEARLY', initialStep?: 'choose' | 'pay') => void;
   closeSubscriptionModal: () => void;
-  openWatchPassModal: (item: ContentItem) => void;
+  openWatchPassModal: (item?: ContentItem | null, defaultPlan?: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D') => void;
   closeWatchPassModal: () => void;
+  watchPassInitialPlan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D';
   subscriptionTargetPlan: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
   subscriptionTargetStep: 'choose' | 'pay';
 
@@ -203,9 +204,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [activeModal, setActiveModal] = useState<'purchase' | 'recharge' | 'auth' | 'subscription' | 'watchpass' | null>(null);
   const [purchaseTarget, setPurchaseTarget] = useState<ContentItem | null>(null);
   const [watchPassTarget, setWatchPassTarget] = useState<ContentItem | null>(null);
+  const [watchPassInitialPlan, setWatchPassInitialPlan] = useState<'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D'>('PASS_7D');
 
-  const openWatchPassModal = (item: ContentItem) => {
-    setWatchPassTarget(item);
+  const openWatchPassModal = (item?: ContentItem | null, defaultPlan?: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D') => {
+    setWatchPassTarget(item || null);
+    if (defaultPlan) setWatchPassInitialPlan(defaultPlan);
     setActiveModal('watchpass');
   };
 
@@ -493,10 +496,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, []);
 
-  // Synchronize subscription status whenever user authentication changes
+  // Synchronize subscription status and purchases whenever user authentication changes
   useEffect(() => {
     refreshSubscriptionStatus();
+    if (isAuthenticated) {
+      syncPurchases();
+    }
   }, [isAuthenticated, user?.id]);
+
+  const syncPurchases = async () => {
+    try {
+      const backendPurchases = await api.library.getPurchases();
+      if (Array.isArray(backendPurchases)) {
+        const localPurchases: PurchaseRecord[] = backendPurchases.map((p: any) => ({
+          id: p.id,
+          contentId: p.content_id || p.contentId,
+          title: p.title || p.content_title || '',
+          price: typeof p.amount_paid === 'number' ? p.amount_paid / 100 : (p.price || 0),
+          purchasedAt: new Date(p.created_at || p.purchased_at || Date.now()).toLocaleString('en-IN', {
+            day: 'numeric', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: true
+          }),
+          expiresAt: p.expires_at || null,
+          isExpired: Boolean(p.is_expired),
+          daysRemaining: typeof p.days_remaining === 'number' ? p.days_remaining : null,
+          contentType: p.content_type || 'movie',
+          poster: p.poster || null
+        }));
+        setPurchases(localPurchases);
+      }
+    } catch {
+      // Keep existing purchases on network error
+    }
+  };
 
   // Proactive background session refresh to prevent random expiry during long editing sessions
   useEffect(() => {
@@ -562,19 +594,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     closeAuthModal();
     showToast(`Signed in as ${name}`, 'success');
     // Fetch authoritative purchases from backend for the newly logged-in user
-    api.library.getPurchases().then((backendPurchases) => {
-      const localPurchases = backendPurchases.map((p: any) => ({
-        id: p.id,
-        contentId: p.content_id || p.contentId,
-        title: p.title,
-        price: typeof p.amount_paid === 'number' ? p.amount_paid / 100 : (p.price || 0),
-        purchasedAt: new Date(p.purchased_at || Date.now()).toLocaleString('en-IN', {
-          day: 'numeric', month: 'short', year: 'numeric',
-          hour: '2-digit', minute: '2-digit', hour12: true
-        })
-      }));
-      setPurchases(localPurchases);
-    }).catch(() => { /* keep the empty reset */ });
+    syncPurchases();
     // Sync wallet transactions
     syncTransactions();
     // Sync watch progress from backend
@@ -711,6 +731,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const catalogItem = catalog.find(c => c.id === contentId || (c as any).slug === contentId);
     if (catalogItem && catalogItem.price === 0) return true; // Free items are always owned
     return purchases.some(p => {
+      if (p.isExpired) return false;
       if (p.contentId === contentId) return true;
       if (catalogItem && (p.contentId === catalogItem.id || (catalogItem as any).slug === p.contentId)) return true;
       return false;
@@ -718,20 +739,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const buyContent = async (item: ContentItem): Promise<{ success: boolean; message: string }> => {
-    // Prevent double charge if already owned (local check is a fast-path UX optimisation only)
+    // Prevent double charge if already actively owned
     if (isOwned(item.id)) {
       return {
         success: true,
         message: 'You already own this title.'
       };
     }
-
-    // NOTE: We intentionally do NOT perform an optimistic client-side wallet balance check here.
-    // The previous optimistic check used potentially stale React/localStorage wallet state
-    // and could incorrectly show "Insufficient balance" for a valid account (e.g. after
-    // switching accounts, after recharge, or when the local state is out of sync).
-    // The backend atomically validates the REAL wallet balance inside a DB transaction
-    // and returns the authoritative error when balance is genuinely insufficient.
 
     try {
       const result = await api.purchases.buy(item.id);
@@ -741,7 +755,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
       syncTransactions();
 
-      // Format purchase entry
+      // Format purchase entry with 30-day validity
       const newPurchaseEntry: PurchaseRecord = {
         id: (result as any).purchase?.id || `pur-${item.id}-${Date.now()}`,
         contentId: item.id,
@@ -754,25 +768,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           hour: "2-digit",
           minute: "2-digit",
           hour12: true
-        })
+        }),
+        expiresAt: (result as any).purchase?.expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        isExpired: false,
+        daysRemaining: 30,
+        contentType: item.type,
+        poster: item.posterUrl
       };
 
       // Refetch purchases to get the updated list from backend
       try {
         const backendPurchases = await api.library.getPurchases();
-        const localPurchases = backendPurchases.map((p: any) => ({
+        const localPurchases: PurchaseRecord[] = backendPurchases.map((p: any) => ({
           id: p.id,
           contentId: p.content_id || p.contentId,
-          title: p.title,
+          title: p.title || p.content_title || item.title,
           price: typeof p.amount_paid === 'number' ? p.amount_paid / 100 : (p.price || item.price),
-          purchasedAt: new Date(p.purchased_at || Date.now()).toLocaleString("en-IN", {
+          purchasedAt: new Date(p.created_at || p.purchased_at || Date.now()).toLocaleString("en-IN", {
             day: "numeric",
             month: "short",
             year: "numeric",
             hour: "2-digit",
             minute: "2-digit",
             hour12: true
-          })
+          }),
+          expiresAt: p.expires_at || null,
+          isExpired: Boolean(p.is_expired),
+          daysRemaining: typeof p.days_remaining === 'number' ? p.days_remaining : null,
+          contentType: p.content_type || item.type,
+          poster: p.poster || item.posterUrl
         }));
 
         if (!localPurchases.some(p => p.contentId === item.id)) {
@@ -783,28 +807,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setPurchases(prev => [newPurchaseEntry, ...prev.filter(p => p.contentId !== item.id)]);
       }
 
-      showToast(`Unlocked "${item.title}"! Enjoy streaming.`, 'success');
+      showToast(`Unlocked "${item.title}" for 1 Month! Enjoy streaming.`, 'success');
       return { success: true, message: 'Purchase complete.' };
     } catch (err: any) {
       if (err.status === 409) {
-        // Backend confirms already owned - update local state without deducting wallet
-        if (!purchases.some(p => p.contentId === item.id)) {
-          setPurchases(prev => [{
-            id: `pur-${item.id}`,
-            contentId: item.id,
-            title: item.title,
-            price: item.price,
-            purchasedAt: new Date().toLocaleString("en-IN", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true
-            })
-          }, ...prev]);
+        // Backend confirms already actively owned
+        if (!purchases.some(p => p.contentId === item.id && !p.isExpired)) {
+          await syncPurchases();
         }
-        return { success: true, message: 'You already own this title.' };
+        return { success: true, message: 'You already own an active pass for this title.' };
       }
       return { success: false, message: err.message || 'Purchase failed' };
     }
@@ -908,6 +919,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let sourceUrl = '';
     let episodeId = episode?.id;
     let activeVcdnStatus: string | undefined = undefined;
+    let activeMaxResolution: '720p' | '1080p' | undefined = undefined;
+    let activeDownloadAllowed: boolean | undefined = undefined;
 
     if (content.type === 'series') {
       // If no specific episode was provided, try to find from progress or first season episode
@@ -958,6 +971,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if ((mediaRes as any)?.vcdnStatus) {
           activeVcdnStatus = (mediaRes as any).vcdnStatus;
         }
+        if ((mediaRes as any)?.maxResolution) {
+          activeMaxResolution = (mediaRes as any).maxResolution;
+        }
+        if (typeof (mediaRes as any)?.downloadAllowed === 'boolean') {
+          activeDownloadAllowed = (mediaRes as any).downloadAllowed;
+        }
       } catch (err: any) {
         if (err?.code === 'SUBSCRIPTION_REQUIRED' || (monetizationMode === 'SUBSCRIPTION' && (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403))) {
           openSubscriptionModal();
@@ -997,6 +1016,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         if ((mediaRes as any)?.vcdnStatus) {
           activeVcdnStatus = (mediaRes as any).vcdnStatus;
+        }
+        if ((mediaRes as any)?.maxResolution) {
+          activeMaxResolution = (mediaRes as any).maxResolution;
+        }
+        if (typeof (mediaRes as any)?.downloadAllowed === 'boolean') {
+          activeDownloadAllowed = (mediaRes as any).downloadAllowed;
         }
       } catch (err: any) {
         if (err?.code === 'SUBSCRIPTION_REQUIRED' || (monetizationMode === 'SUBSCRIPTION' && (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403))) {
@@ -1042,7 +1067,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       contentId: content.id,
       episodeId,
       initialTimeSeconds: resumeTime,
-      vcdnStatus: activeVcdnStatus || (content as any)?.vcdnStatus
+      vcdnStatus: activeVcdnStatus || (content as any)?.vcdnStatus,
+      maxResolution: activeMaxResolution,
+      downloadAllowed: activeDownloadAllowed
     });
   };
 
@@ -1146,6 +1173,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         closeSubscriptionModal,
         openWatchPassModal,
         closeWatchPassModal,
+        watchPassInitialPlan,
         subscriptionTargetPlan,
         subscriptionTargetStep,
         monetizationMode,

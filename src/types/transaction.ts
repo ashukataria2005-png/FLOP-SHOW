@@ -16,4 +16,9 @@ export interface PurchaseRecord {
   title: string;
   price: number;
   purchasedAt: string;
+  expiresAt?: string | null;
+  isExpired?: boolean;
+  daysRemaining?: number | null;
+  contentType?: string;
+  poster?: string;
 }

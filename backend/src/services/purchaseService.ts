@@ -36,25 +36,34 @@ export const purchaseService = {
       throw err;
     }
 
-    // 2. Check ownership
+    // 2. Check active ownership
     const alreadyOwned = await purchaseRepository.isOwned(userId, content.id);
     if (alreadyOwned) {
-      const err = new Error('You already own this title.');
+      const err = new Error('You already have active ownership of this title.');
       (err as any).statusCode = 409;
       throw err;
     }
 
-    // 3. Obtain REAL price from database (in paise)
-    const realPricePaise = content.price;
-    const realPriceRupees = realPricePaise / 100;
+    // 3. Obtain HYBRID price from database/business rules (in paise)
+    // Free content is 0 paise. Paid movies are ₹30 (3000 paise). Paid series are ₹35 (3500 paise).
+    let realPricePaise = 0;
+    let expiresAt: string | null = null;
     const now = new Date().toISOString();
+
+    if (content.price > 0) {
+      realPricePaise = content.type === 'SERIES' ? 3500 : 3000;
+      // 1 Month / 30 Days validity for new purchases
+      expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    const realPriceRupees = realPricePaise / 100;
     const purchaseId = `pur-${crypto.randomUUID()}`;
     const db = getAdapter();
 
     return db.transaction(async txAdapter => {
       // Re-verify inside atomic lock to prevent race conditions
       if (await purchaseRepository.isOwned(userId, content.id, txAdapter)) {
-        const err = new Error('You already own this title.');
+        const err = new Error('You already have active ownership of this title.');
         (err as any).statusCode = 409;
         throw err;
       }
@@ -74,7 +83,7 @@ export const purchaseService = {
       const newBalance = currentBalance - realPricePaise;
       await walletRepository.updateBalance(userId, newBalance, now, txAdapter);
 
-      // Create purchase record
+      // Create or renew purchase record
       await purchaseRepository.createPurchase(
         {
           id: purchaseId,
@@ -83,6 +92,7 @@ export const purchaseService = {
           amountPaid: realPricePaise,
           status: 'COMPLETED',
           purchasedAt: now,
+          expiresAt,
         },
         txAdapter
       );
@@ -96,7 +106,7 @@ export const purchaseService = {
             type: 'PURCHASE',
             amount: realPricePaise,
             balanceAfter: newBalance,
-            description: `Purchased: ${content.title}`,
+            description: `Purchased 1-Month Access: ${content.title}`,
             referenceId: content.id,
             createdAt: now,
           },
@@ -111,6 +121,9 @@ export const purchaseService = {
         amount_paid: realPricePaise,
         status: 'COMPLETED',
         purchased_at: now,
+        expires_at: expiresAt,
+        is_expired: false,
+        days_remaining: expiresAt ? 30 : undefined,
         title: content.title,
         poster: content.poster,
         type: content.type,
@@ -120,7 +133,9 @@ export const purchaseService = {
         success: true,
         purchase: purchaseRecord,
         remainingBalanceRupees: newBalance / 100,
-        message: `Successfully purchased "${content.title}".`,
+        message: expiresAt
+          ? `Successfully acquired "${content.title}" for 1 month.`
+          : `Successfully unlocked "${content.title}".`,
       };
     });
   },

@@ -7,7 +7,8 @@ import {
   ShieldCheck,
   Loader2,
   Film,
-  ArrowRight
+  ArrowRight,
+  Zap
 } from 'lucide-react';
 import { generateUpiQrDataUrl } from '../../utils/upiQr';
 import { WatchPassPlanTemplate } from '../../pages/PlansPage';
@@ -19,8 +20,10 @@ const DEFAULT_PLANS: WatchPassPlanTemplate[] = [
     name: '24 Hours Pass',
     durationLabel: '24 Hours',
     durationDays: 1,
-    priceRupees: 29,
-    description: '24 hours of instant playback on this single chosen title.',
+    priceRupees: 19,
+    maxResolution: '720p',
+    downloadAllowed: false,
+    description: 'Unlimited catalog streaming for 24 hours in HD 720p.',
     highlight: 'Quick Access'
   },
   {
@@ -29,8 +32,10 @@ const DEFAULT_PLANS: WatchPassPlanTemplate[] = [
     name: '3 Days Pass',
     durationLabel: '3 Days',
     durationDays: 3,
-    priceRupees: 49,
-    description: '72 hours of uninterrupted access to this movie or series.',
+    priceRupees: 29,
+    maxResolution: '720p',
+    downloadAllowed: false,
+    description: 'Full 72 hours of uninterrupted streaming with priority playback.',
     highlight: 'Weekend Favorite'
   },
   {
@@ -39,19 +44,23 @@ const DEFAULT_PLANS: WatchPassPlanTemplate[] = [
     name: '7 Days Pass',
     durationLabel: '7 Days',
     durationDays: 7,
-    priceRupees: 79,
-    description: 'Full week of playback. Watch at your own pace in HD.',
+    priceRupees: 44,
+    maxResolution: '1080p',
+    downloadAllowed: true,
+    description: '1080p Full HD streaming with offline downloads enabled.',
     popular: true,
-    highlight: 'Most Popular'
+    highlight: 'Recommended'
   },
   {
-    id: 'PASS_30D',
-    plan: 'PASS_30D',
-    name: '30 Days Pass',
-    durationLabel: '30 Days',
-    durationDays: 30,
-    priceRupees: 149,
-    description: 'Extended monthly title pass. Re-watch and finish complete series.',
+    id: 'PASS_15D',
+    plan: 'PASS_15D',
+    name: '15 Days Pass',
+    durationLabel: '15 Days',
+    durationDays: 15,
+    priceRupees: 69,
+    maxResolution: '1080p',
+    downloadAllowed: true,
+    description: 'Half-month premium pass: 1080p Full HD, downloads, and sync.',
     highlight: 'Best Value'
   }
 ];
@@ -60,6 +69,7 @@ export const WatchPassModal: React.FC = () => {
   const {
     activeModal,
     watchPassTarget,
+    watchPassInitialPlan,
     closeWatchPassModal,
     isAuthenticated,
     openAuthModal,
@@ -68,7 +78,7 @@ export const WatchPassModal: React.FC = () => {
   } = useApp();
 
   const [plans, setPlans] = useState<WatchPassPlanTemplate[]>(DEFAULT_PLANS);
-  const [selectedPlanId, setSelectedPlanId] = useState<'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_30D'>('PASS_7D');
+  const [selectedPlanId, setSelectedPlanId] = useState<'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D'>('PASS_7D');
   const [step, setStep] = useState<'choose' | 'pay'>('choose');
   const [utr, setUtr] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -89,6 +99,9 @@ export const WatchPassModal: React.FC = () => {
 
   useEffect(() => {
     if (activeModal === 'watchpass') {
+      if (watchPassInitialPlan) {
+        setSelectedPlanId(watchPassInitialPlan);
+      }
       api.payments.getConfig()
         .then(cfg => {
           if (cfg?.upiId) setUpiConfig(cfg);
@@ -98,7 +111,7 @@ export const WatchPassModal: React.FC = () => {
       api.watchPasses.getPlans()
         .then(res => {
           if (res?.plans && Array.isArray(res.plans) && res.plans.length > 0) {
-            setPlans(res.plans);
+            setPlans(res.plans as WatchPassPlanTemplate[]);
           }
         })
         .catch(() => {});
@@ -107,7 +120,7 @@ export const WatchPassModal: React.FC = () => {
       setUtr('');
       setErrorMessage(null);
     }
-  }, [activeModal]);
+  }, [activeModal, watchPassInitialPlan]);
 
   // Dynamically generate UPI QR code when reaching 'pay' step with selected pass amount
   useEffect(() => {
@@ -115,7 +128,7 @@ export const WatchPassModal: React.FC = () => {
     if (step === 'pay' && selectedPlan) {
       const upi = upiConfig?.upiId || 'flopshow@upi';
       const merchant = upiConfig?.merchantName || 'FLOPSHOW';
-      const price = Number(selectedPlan.priceRupees) || 79;
+      const price = Number(selectedPlan.priceRupees) || 44;
 
       setQrLoading(true);
       generateUpiQrDataUrl(upi, price, merchant)
@@ -136,7 +149,7 @@ export const WatchPassModal: React.FC = () => {
     };
   }, [step, upiConfig?.upiId, upiConfig?.merchantName, selectedPlan?.priceRupees, selectedPlanId]);
 
-  if (activeModal !== 'watchpass' || !watchPassTarget) return null;
+  if (activeModal !== 'watchpass') return null;
 
   const handleCopyUpi = () => {
     if (navigator.clipboard) {
@@ -164,7 +177,7 @@ export const WatchPassModal: React.FC = () => {
 
     try {
       const res = await api.watchPasses.submitRequest({
-        contentId: watchPassTarget.id,
+        contentId: watchPassTarget?.id || null,
         plan: selectedPlanId,
         utr: clean,
         userName: user?.name,
@@ -172,7 +185,7 @@ export const WatchPassModal: React.FC = () => {
       });
 
       if (res?.success) {
-        showToast('Watch Pass payment submitted! Access will be activated upon admin verification.', 'success');
+        showToast('Watch Pass request submitted! Catalog-wide access will activate upon admin approval.', 'success');
         closeWatchPassModal();
       } else {
         setErrorMessage(res?.message || 'Failed to submit Watch Pass request.');
@@ -244,47 +257,67 @@ export const WatchPassModal: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
           <div
             style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '8px',
+              width: '34px',
+              height: '34px',
+              borderRadius: '10px',
               backgroundColor: 'rgba(245, 197, 24, 0.15)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'var(--brand-gold, #F5C518)'
+              color: 'var(--brand-gold, #F5C518)',
+              flexShrink: 0
             }}
           >
-            <Film size={16} />
+            {watchPassTarget ? <Film size={18} /> : <Zap size={18} />}
           </div>
           <div>
             <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Watch Pass For
+              {watchPassTarget ? 'Watch Pass Target' : 'Catalog-Wide Access'}
             </span>
             <div style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.2 }}>
-              {watchPassTarget.title}
+              {watchPassTarget ? watchPassTarget.title : 'Unlimited Catalog Watch Pass'}
             </div>
           </div>
+        </div>
+
+        {/* Catalog-wide notice */}
+        <div
+          style={{
+            backgroundColor: 'rgba(245, 197, 24, 0.08)',
+            border: '1px solid rgba(245, 197, 24, 0.2)',
+            borderRadius: '10px',
+            padding: '8px 12px',
+            fontSize: '12px',
+            color: '#FDE047',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '18px'
+          }}
+        >
+          <Zap size={14} style={{ flexShrink: 0 }} />
+          <span>This pass unlocks unlimited streaming of all eligible titles across the entire catalog during its active validity.</span>
         </div>
 
         {/* STEP 1: CHOOSE PLAN DURATION */}
         {step === 'choose' && (
           <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 6px', color: '#FFFFFF' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: '#FFFFFF' }}>
               Select Pass Duration
             </h2>
-            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 20px', lineHeight: 1.5 }}>
-              Choose how long you'd like temporary playback access to this title. Access starts upon verification.
+            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 16px', lineHeight: 1.5 }}>
+              Choose your temporary access duration. Access activates immediately upon admin verification.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '22px' }}>
               {plans.map(p => {
                 const isSelected = selectedPlanId === p.plan;
                 return (
                   <div
                     key={p.id}
-                    onClick={() => setSelectedPlanId(p.plan)}
+                    onClick={() => setSelectedPlanId(p.plan as any)}
                     style={{
-                      padding: '14px 16px',
+                      padding: '12px 16px',
                       borderRadius: '14px',
                       backgroundColor: isSelected ? 'rgba(245, 197, 24, 0.12)' : 'rgba(255, 255, 255, 0.03)',
                       border: isSelected ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
@@ -298,22 +331,27 @@ export const WatchPassModal: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div
                         style={{
-                          width: '20px',
-                          height: '20px',
+                          width: '18px',
+                          height: '18px',
                           borderRadius: '50%',
-                          border: isSelected ? '6px solid var(--brand-gold, #F5C518)' : '2px solid #6B7280',
+                          border: isSelected ? '5px solid var(--brand-gold, #F5C518)' : '2px solid #6B7280',
                           backgroundColor: '#0E0E12',
                           flexShrink: 0
                         }}
                       />
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '14px', fontWeight: 800, color: isSelected ? 'var(--brand-gold, #F5C518)' : '#FFFFFF' }}>
                             {p.name}
                           </span>
                           {p.popular && (
                             <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px', backgroundColor: 'var(--brand-gold, #F5C518)', color: '#0E0E12', textTransform: 'uppercase' }}>
-                              Popular
+                              Recommended
+                            </span>
+                          )}
+                          {p.highlight && !p.popular && (
+                            <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.1)', color: '#D1D5DB' }}>
+                              {p.highlight}
                             </span>
                           )}
                         </div>
@@ -326,6 +364,9 @@ export const WatchPassModal: React.FC = () => {
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontSize: '20px', fontWeight: 900, color: '#FFFFFF' }}>
                         ₹{p.priceRupees}
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#9CA3AF' }}>
+                        {p.maxResolution || (p.durationDays >= 7 ? '1080p' : '720p')}
                       </div>
                     </div>
                   </div>
@@ -396,14 +437,16 @@ export const WatchPassModal: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: '18px'
+                marginBottom: '16px'
               }}
             >
               <div>
                 <span style={{ fontSize: '13px', fontWeight: 700, color: '#FFFFFF' }}>
                   {selectedPlan.name} ({selectedPlan.durationLabel})
                 </span>
-                <div style={{ fontSize: '11px', color: '#9CA3AF' }}>Temporary single-title access pass</div>
+                <div style={{ fontSize: '11px', color: '#9CA3AF' }}>
+                  Unlimited catalog access • {selectedPlan.maxResolution || (selectedPlan.durationDays >= 7 ? '1080p Full HD' : '720p HD')}
+                </div>
               </div>
               <div style={{ fontSize: '22px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)' }}>
                 ₹{selectedPlan.priceRupees}
@@ -453,7 +496,7 @@ export const WatchPassModal: React.FC = () => {
                 border: '1px solid rgba(255, 255, 255, 0.12)',
                 borderRadius: '12px',
                 padding: '10px 14px',
-                marginBottom: '18px'
+                marginBottom: '16px'
               }}
             >
               <div>

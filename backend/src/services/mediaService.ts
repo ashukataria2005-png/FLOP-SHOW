@@ -24,6 +24,8 @@ export interface MediaPlayableResponse {
   vcdnStatus?: string | null;
   vcdnPlaybackUrl?: string | null;
   mediaProvider?: string | null;
+  maxResolution?: '720p' | '1080p';
+  downloadAllowed?: boolean;
 }
 
 export const mediaService = {
@@ -266,30 +268,36 @@ export const mediaService = {
     // 1. Admin user -> access allowed
     // 2. Free content -> access allowed
     // 3. Existing permanent/valid individual purchase -> access allowed
-    // 4. Active Watch Pass for that exact content -> access allowed
+    // 4. Active Watch Pass across catalog -> access allowed
     // 5. Active full subscription -> access allowed according to existing subscription rules
     // 6. Otherwise -> access denied
     const isFree = content.price === 0;
     const isAdmin = userRole === 'ADMIN';
     const isOwned = isAdmin || (userId ? await purchaseRepository.isOwned(userId, content.id) : false);
-    const hasActivePass = userId ? await watchPassService.hasActivePass(userId, content.id) : false;
+    const hasActivePass = userId ? await watchPassService.hasActivePass(userId) : false;
+    const hasActiveSub = userId ? await subscriptionService.hasActiveSubscription(userId) : false;
 
-    const monetizationMode = await monetizationService.getMonetizationMode();
+    if (!isAdmin && !isFree && !isOwned && !hasActivePass && !hasActiveSub) {
+      const monetizationMode = await monetizationService.getMonetizationMode();
+      const err = new Error(
+        monetizationMode === 'SUBSCRIPTION'
+          ? 'Active subscription or Watch Pass required to watch this movie.'
+          : 'Purchase or Watch Pass required to watch this movie.'
+      );
+      (err as any).statusCode = 403;
+      (err as any).code = monetizationMode === 'SUBSCRIPTION' ? 'SUBSCRIPTION_REQUIRED' : 'PURCHASE_REQUIRED';
+      throw err;
+    }
 
-    if (monetizationMode === 'SUBSCRIPTION') {
-      const hasActiveSub = userId ? await subscriptionService.hasActiveSubscription(userId) : false;
-      if (!isFree && !isAdmin && !hasActiveSub && !isOwned && !hasActivePass) {
-        const err = new Error('Active subscription or Watch Pass required to watch this movie.');
-        (err as any).statusCode = 403;
-        (err as any).code = 'SUBSCRIPTION_REQUIRED';
-        throw err;
-      }
-    } else {
-      if (!isFree && !isOwned && !hasActivePass) {
-        const err = new Error('Purchase or Watch Pass required to watch this movie.');
-        (err as any).statusCode = 403;
-        (err as any).code = 'PURCHASE_REQUIRED';
-        throw err;
+    // Determine quality and download capabilities
+    let maxResolution: '720p' | '1080p' = '1080p';
+    let downloadAllowed = true;
+
+    if (!isAdmin && !isFree && !isOwned && !hasActiveSub) {
+      if (hasActivePass && userId) {
+        const passCaps = await watchPassService.getActivePassCapabilities(userId);
+        maxResolution = passCaps.maxResolution;
+        downloadAllowed = passCaps.downloadAllowed;
       }
     }
 
@@ -335,6 +343,8 @@ export const mediaService = {
       vcdnStatus,
       vcdnPlaybackUrl,
       mediaProvider,
+      maxResolution,
+      downloadAllowed,
     };
   },
 
@@ -394,30 +404,36 @@ export const mediaService = {
     // 1. Admin user -> access allowed
     // 2. Free content -> access allowed
     // 3. Existing permanent/valid individual purchase -> access allowed
-    // 4. Active Watch Pass for that exact content -> access allowed
+    // 4. Active Watch Pass across catalog -> access allowed
     // 5. Active full subscription -> access allowed according to existing subscription rules
     // 6. Otherwise -> access denied
     const isFree = episode.price === 0;
     const isAdmin = userRole === 'ADMIN';
     const isOwned = isAdmin || (userId ? await purchaseRepository.isOwned(userId, episode.content_id) : false);
-    const hasActivePass = userId ? await watchPassService.hasActivePass(userId, episode.content_id) : false;
+    const hasActivePass = userId ? await watchPassService.hasActivePass(userId) : false;
+    const hasActiveSub = userId ? await subscriptionService.hasActiveSubscription(userId) : false;
 
-    const monetizationMode = await monetizationService.getMonetizationMode();
+    if (!isAdmin && !isFree && !isOwned && !hasActivePass && !hasActiveSub) {
+      const monetizationMode = await monetizationService.getMonetizationMode();
+      const err = new Error(
+        monetizationMode === 'SUBSCRIPTION'
+          ? 'Active subscription or Watch Pass required to watch this series episode.'
+          : 'Purchase or Watch Pass required to watch this series episode.'
+      );
+      (err as any).statusCode = 403;
+      (err as any).code = monetizationMode === 'SUBSCRIPTION' ? 'SUBSCRIPTION_REQUIRED' : 'PURCHASE_REQUIRED';
+      throw err;
+    }
 
-    if (monetizationMode === 'SUBSCRIPTION') {
-      const hasActiveSub = userId ? await subscriptionService.hasActiveSubscription(userId) : false;
-      if (!isFree && !isAdmin && !hasActiveSub && !isOwned && !hasActivePass) {
-        const err = new Error('Active subscription or Watch Pass required to watch this series episode.');
-        (err as any).statusCode = 403;
-        (err as any).code = 'SUBSCRIPTION_REQUIRED';
-        throw err;
-      }
-    } else {
-      if (!isFree && !isOwned && !hasActivePass) {
-        const err = new Error('Purchase or Watch Pass required to watch this series episode.');
-        (err as any).statusCode = 403;
-        (err as any).code = 'PURCHASE_REQUIRED';
-        throw err;
+    // Determine quality and download capabilities
+    let maxResolution: '720p' | '1080p' = '1080p';
+    let downloadAllowed = true;
+
+    if (!isAdmin && !isFree && !isOwned && !hasActiveSub) {
+      if (hasActivePass && userId) {
+        const passCaps = await watchPassService.getActivePassCapabilities(userId);
+        maxResolution = passCaps.maxResolution;
+        downloadAllowed = passCaps.downloadAllowed;
       }
     }
 
@@ -462,6 +478,8 @@ export const mediaService = {
       vcdnStatus,
       vcdnPlaybackUrl,
       mediaProvider,
+      maxResolution,
+      downloadAllowed,
     };
   },
 

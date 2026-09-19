@@ -32,6 +32,8 @@ export interface MediaPlayerSource {
   durationSeconds?: number;
   initialTimeSeconds?: number;
   vcdnStatus?: string;
+  maxResolution?: '720p' | '1080p';
+  downloadAllowed?: boolean;
 }
 
 export interface MediaPlayerProps {
@@ -310,7 +312,21 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       hls.loadSource(source.url);
       hls.attachMedia(video);
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+        // Enforce 720p resolution cap for 24H & 3D Watch Passes
+        if (source.maxResolution === '720p' && data.levels && data.levels.length > 0) {
+          let maxCapIndex = -1;
+          data.levels.forEach((lvl, idx) => {
+            if (lvl.height && lvl.height <= 720) {
+              if (maxCapIndex === -1 || (lvl.height > (data.levels[maxCapIndex].height || 0))) {
+                maxCapIndex = idx;
+              }
+            }
+          });
+          if (maxCapIndex !== -1) {
+            hls.autoLevelCapping = maxCapIndex;
+          }
+        }
         setIsInitialLoading(false);
         setIsBuffering(false);
         setErrorMessage(null);

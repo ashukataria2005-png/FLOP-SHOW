@@ -48,15 +48,15 @@ watchPassRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRe
     const { contentId, plan, utr, paymentReference, userName, userEmail } = req.body;
     const finalUtr = utr || paymentReference;
 
-    if (!contentId || !plan || !finalUtr) {
+    if (!plan || !finalUtr) {
       res.status(400).json({
-        error: { code: 'BAD_REQUEST', message: 'contentId, plan, and payment UTR are required.' }
+        error: { code: 'BAD_REQUEST', message: 'Plan and payment UTR are required.' }
       });
       return;
     }
 
     const pass = await watchPassService.submitPassRequest(req.user!.id, {
-      contentId,
+      contentId: contentId || null,
       plan,
       utr: finalUtr,
       userName: userName || (req.user as any)?.name,

@@ -26,7 +26,7 @@ interface DetailsPageProps {
 export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelectItem }) => {
   const {
     isOwned,
-    openPurchaseModal,
+    openPlanSelector,
     startPlaying,
     playTrailer,
     inMyList,
@@ -36,7 +36,6 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
     getProgress,
     monetizationMode,
     hasActiveSubscription,
-    openSubscriptionModal,
     openWatchPassModal,
     isAuthenticated,
     showToast
@@ -140,20 +139,16 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
   const handlePrimaryAction = () => {
     if (canWatch) {
       startPlaying(currentItem);
-    } else if (monetizationMode === 'SUBSCRIPTION') {
-      openSubscriptionModal();
     } else {
-      openPurchaseModal(currentItem);
+      openPlanSelector(currentItem);
     }
   };
 
   const handlePlayEpisode = (episode: Episode) => {
     if (canWatch) {
       startPlaying(currentItem, episode);
-    } else if (monetizationMode === 'SUBSCRIPTION') {
-      openSubscriptionModal();
     } else {
-      openPurchaseModal(currentItem);
+      openPlanSelector(currentItem);
     }
   };
 
@@ -335,9 +330,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
               <span>
                 {canWatch
                   ? 'Watch now'
-                  : monetizationMode === 'SUBSCRIPTION'
-                  ? 'Subscribe to Watch'
-                  : `Own for 1 Month (₹${isSeries ? 35 : 30})`}
+                  : 'Subscribe to Watch'}
               </span>
             </button>
 

@@ -10,6 +10,7 @@ export interface SafeUser {
   id: string;
   name: string;
   email: string;
+  phone?: string | null;
   role: 'USER' | 'ADMIN';
   status: 'ACTIVE' | 'SUSPENDED' | 'PENDING';
   createdAt: string;
@@ -21,6 +22,7 @@ export function toSafeUser(user: UserRecord): SafeUser {
     id: user.id,
     name: user.name,
     email: user.email,
+    phone: user.phone || null,
     role: user.role,
     status: user.status,
     createdAt: user.created_at,
@@ -31,23 +33,53 @@ export function toSafeUser(user: UserRecord): SafeUser {
 export const authService = {
   async register(params: {
     name: string;
-    email: string;
+    email?: string;
+    phone?: string;
     password: string;
   }): Promise<{ user: SafeUser; token: string }> {
-    const cleanEmail = params.email.trim().toLowerCase();
-    const cleanName = params.name.trim();
+    const cleanName = (params.name || '').trim();
+    const rawEmail = (params.email || '').trim().toLowerCase();
+    const rawPhone = (params.phone || '').trim().replace(/[^0-9]/g, '');
 
-    if (!cleanEmail || !params.password || !cleanName) {
-      throw new Error('Name, email, and password are required.');
+    if (!cleanName) {
+      throw new Error('Name is required.');
     }
 
-    if (params.password.length < 6) {
+    if (!params.password || params.password.length < 6) {
       throw new Error('Password must be at least 6 characters long.');
     }
 
-    const existing = await userRepository.findByEmail(cleanEmail);
-    if (existing) {
-      const err = new Error('An account with this email already exists.');
+    if (!rawEmail && !rawPhone) {
+      throw new Error('Please provide an email address or mobile number to register.');
+    }
+
+    let finalEmail = rawEmail;
+    let finalPhone: string | null = null;
+
+    if (rawPhone) {
+      if (rawPhone.length < 10) {
+        throw new Error('Please enter a valid 10-digit mobile number.');
+      }
+      finalPhone = rawPhone.length > 10 ? rawPhone.slice(-10) : rawPhone;
+      // If user registered with mobile only, generate synthetic email
+      if (!finalEmail) {
+        finalEmail = `${finalPhone}@flopshow.user`;
+      }
+      const existingPhone = await userRepository.findByPhone(finalPhone);
+      if (existingPhone) {
+        const err = new Error('An account with this mobile number already exists.');
+        (err as any).statusCode = 409;
+        throw err;
+      }
+    }
+
+    if (rawEmail && (!rawEmail.includes('@') || !rawEmail.includes('.'))) {
+      throw new Error('Please enter a valid email address.');
+    }
+
+    const existingEmail = await userRepository.findByEmail(finalEmail);
+    if (existingEmail) {
+      const err = new Error('An account with this email address already exists.');
       (err as any).statusCode = 409;
       throw err;
     }
@@ -60,7 +92,8 @@ export const authService = {
     await userRepository.create({
       id,
       name: cleanName,
-      email: cleanEmail,
+      email: finalEmail,
+      phone: finalPhone,
       passwordHash,
       role: 'USER',
       status: 'ACTIVE',
@@ -91,10 +124,10 @@ export const authService = {
     email: string;
     password: string;
   }): Promise<{ user: SafeUser; token: string }> {
-    const cleanEmail = params.email.trim().toLowerCase();
+    const rawInput = (params.email || '').trim();
 
-    if (!cleanEmail || !params.password) {
-      const err = new Error('Email and password are required.');
+    if (!rawInput || !params.password) {
+      const err = new Error('Email or mobile number and password are required.');
       (err as any).statusCode = 400;
       throw err;
     }
@@ -102,9 +135,9 @@ export const authService = {
     // Direct Admin credentials check
     if (
       config.adminPassword &&
-      (cleanEmail.toLowerCase() === config.adminId.toLowerCase() ||
-        cleanEmail.toLowerCase() === 'admin' ||
-        cleanEmail.toLowerCase() === 'ashukataria2005@gmail.com') &&
+      (rawInput.toLowerCase() === config.adminId.toLowerCase() ||
+        rawInput.toLowerCase() === 'admin' ||
+        rawInput.toLowerCase() === 'ashukataria2005@gmail.com') &&
       params.password === config.adminPassword
     ) {
       const db = getAdapter();
@@ -127,9 +160,9 @@ export const authService = {
       }
     }
 
-    const userRecord = await userRepository.findByEmail(cleanEmail);
+    const userRecord = await userRepository.findByEmailOrPhone(rawInput);
     if (!userRecord) {
-      const err = new Error('Invalid email or password.');
+      const err = new Error('Invalid email, mobile number or password.');
       (err as any).statusCode = 401;
       throw err;
     }

@@ -8,8 +8,8 @@ export const authRouter = Router();
 // POST /api/auth/register
 authRouter.post('/register', async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
-    const result = await authService.register({ name, email, password });
+    const { name, email, phone, password } = req.body;
+    const result = await authService.register({ name, email, phone, password });
     const wallet = await walletService.getBalance(result.user.id);
 
     res.status(201).json({

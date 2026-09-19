@@ -418,7 +418,34 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 7 };
+    // Apply incremental 012_payment_approval_mode_and_phone for PostgreSQL if not already applied
+    const approvalModeMigrationVersion = '012_payment_approval_mode_and_phone';
+    if (!appliedSet.has(approvalModeMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 012_payment_approval_mode_and_phone...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT NULL;
+          CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+
+          INSERT INTO app_settings (key, value, updated_at)
+          VALUES ('payment_approval_mode', 'MANUAL', NOW()::TEXT)
+          ON CONFLICT (key) DO NOTHING;
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${approvalModeMigrationVersion}', '012_payment_approval_mode_and_phone.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('012_payment_approval_mode_and_phone.sql');
+        console.log('✓ [PostgreSQL] Migration 012_payment_approval_mode_and_phone applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 8 };
   } finally {
     client.release();
     await pool.end();

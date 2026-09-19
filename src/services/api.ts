@@ -259,10 +259,10 @@ export const api = {
   // AUTHENTICATION
   // --------------------------------------------------------------------------
   auth: {
-    async register(name: string, email: string, password: string) {
+    async register(name: string, email?: string, password?: string, phone?: string) {
       const data = await request<{ user: any; token: string; wallet: any }>('/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ name, email, phone, password })
       });
       tokenStorage.set(data.token);
       return data;
@@ -494,7 +494,7 @@ export const api = {
   // --------------------------------------------------------------------------
   payments: {
     async getConfig() {
-      return request<{ upiId: string; upiEnabled: boolean; merchantName: string }>('/payments/config');
+      return request<{ upiId: string; upiEnabled: boolean; merchantName: string; approvalMode?: 'MANUAL' | 'AUTOMATIC' }>('/payments/config');
     },
 
     async submitRequest(amountRupees: number, utr: string, userName?: string, userEmail?: string) {
@@ -528,10 +528,10 @@ export const api = {
     },
 
     async getAdminSettings() {
-      return request<{ upiId: string; upiEnabled: boolean; merchantName: string }>('/payments/admin/settings');
+      return request<{ upiId: string; upiEnabled: boolean; merchantName: string; approvalMode: 'MANUAL' | 'AUTOMATIC' }>('/payments/admin/settings');
     },
 
-    async updateAdminSettings(data: { upiId: string; enabled: boolean; merchantName?: string }) {
+    async updateAdminSettings(data: { upiId?: string; enabled?: boolean; merchantName?: string; approvalMode?: 'MANUAL' | 'AUTOMATIC' }) {
       return request<{ success: boolean; message: string; config: any }>('/payments/admin/settings', {
         method: 'POST',
         body: JSON.stringify(data)

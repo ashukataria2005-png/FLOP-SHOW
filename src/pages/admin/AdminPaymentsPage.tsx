@@ -58,13 +58,16 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
   const [adminNote, setAdminNote] = useState<string>('');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [copiedUtr, setCopiedUtr] = useState<string | null>(null);
+  const [approvalMode, setApprovalMode] = useState<'MANUAL' | 'AUTOMATIC'>('MANUAL');
+  const [modeSwitching, setModeSwitching] = useState<boolean>(false);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [reqsRes, metricsRes] = await Promise.all([
+      const [reqsRes, metricsRes, settingsRes] = await Promise.all([
         api.payments.getAdminRequests(activeFilter, 100),
-        api.payments.getAdminMetrics()
+        api.payments.getAdminMetrics(),
+        api.payments.getAdminSettings().catch(() => null)
       ]);
 
       if (reqsRes && reqsRes.requests) {
@@ -73,10 +76,27 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
       if (metricsRes) {
         setMetrics(metricsRes);
       }
+      if (settingsRes?.approvalMode) {
+        setApprovalMode(settingsRes.approvalMode);
+      }
     } catch (err: any) {
       showToast(err.message || 'Failed to load payment requests.', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleModeSwitch = async (newMode: 'MANUAL' | 'AUTOMATIC') => {
+    if (newMode === approvalMode || modeSwitching) return;
+    try {
+      setModeSwitching(true);
+      await api.payments.updateAdminSettings({ approvalMode: newMode });
+      setApprovalMode(newMode);
+      showToast(`Payment Approval Mode changed to ${newMode === 'AUTOMATIC' ? 'Automatic Approval' : 'Manual Verification'}.`, 'success');
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to update approval mode.', 'error');
+    } finally {
+      setModeSwitching(false);
     }
   };
 
@@ -173,6 +193,88 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           <span>Refresh</span>
         </button>
+      </div>
+
+      {/* PAYMENT APPROVAL MODE SWITCHER */}
+      <div
+        style={{
+          backgroundColor: 'var(--bg-surface, #12121A)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          borderRadius: '16px',
+          padding: '20px 24px',
+          marginBottom: '28px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '20px'
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <ShieldCheck size={20} color="var(--brand-gold, #F5C518)" />
+            <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Payment Approval Mode
+            </h3>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 900,
+                padding: '3px 10px',
+                borderRadius: '12px',
+                backgroundColor: approvalMode === 'AUTOMATIC' ? 'rgba(52, 211, 153, 0.18)' : 'rgba(245, 197, 24, 0.18)',
+                color: approvalMode === 'AUTOMATIC' ? '#34D399' : 'var(--brand-gold, #F5C518)',
+                border: approvalMode === 'AUTOMATIC' ? '1px solid #34D399' : '1px solid var(--brand-gold, #F5C518)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}
+            >
+              Active: {approvalMode === 'AUTOMATIC' ? 'Automatic Approval' : 'Manual Verification'}
+            </span>
+          </div>
+          <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0, maxWidth: '640px', lineHeight: 1.5 }}>
+            {approvalMode === 'AUTOMATIC'
+              ? 'Automatic Approval: User UTR submissions are instantly approved and activated (simulated/gateway extensible).'
+              : 'Manual Verification: Admin reviews each user UTR against banking receipts before activating access.'}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={() => handleModeSwitch('MANUAL')}
+            disabled={modeSwitching}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '10px',
+              border: approvalMode === 'MANUAL' ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.15)',
+              backgroundColor: approvalMode === 'MANUAL' ? 'rgba(245, 197, 24, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+              color: approvalMode === 'MANUAL' ? 'var(--brand-gold, #F5C518)' : '#9CA3AF',
+              fontWeight: 800,
+              fontSize: '13px',
+              cursor: modeSwitching ? 'not-allowed' : 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            1. Manual Verification
+          </button>
+          <button
+            onClick={() => handleModeSwitch('AUTOMATIC')}
+            disabled={modeSwitching}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '10px',
+              border: approvalMode === 'AUTOMATIC' ? '2px solid #34D399' : '1px solid rgba(255, 255, 255, 0.15)',
+              backgroundColor: approvalMode === 'AUTOMATIC' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+              color: approvalMode === 'AUTOMATIC' ? '#34D399' : '#9CA3AF',
+              fontWeight: 800,
+              fontSize: '13px',
+              cursor: modeSwitching ? 'not-allowed' : 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            2. Automatic Approval
+          </button>
+        </div>
       </div>
 
       {/* Metrics Dashboard Cards */}
@@ -505,14 +607,14 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
                             gap: '4px',
                             padding: '4px 10px',
                             borderRadius: '9999px',
-                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                            color: '#10B981',
+                            backgroundColor: p.admin_id === 'SYSTEM_AUTO' ? 'rgba(52, 211, 153, 0.2)' : 'rgba(16, 185, 129, 0.15)',
+                            color: p.admin_id === 'SYSTEM_AUTO' ? '#34D399' : '#10B981',
                             fontSize: '11px',
                             fontWeight: 800
                           }}
                         >
                           <CheckCircle2 size={12} />
-                          APPROVED
+                          {p.admin_id === 'SYSTEM_AUTO' ? 'AUTO APPROVED' : 'ADMIN VERIFIED'}
                         </span>
                       )}
                       {p.status === 'REJECTED' && (

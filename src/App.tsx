@@ -33,6 +33,7 @@ import { RechargeModal } from './components/wallet/RechargeModal';
 import { SubscriptionModal } from './components/subscription/SubscriptionModal';
 import { WatchPassModal } from './components/watchpass/WatchPassModal';
 import { AuthModal } from './components/auth/AuthModal';
+import { PlanSelectionModal } from './components/plans/PlanSelectionModal';
 import { MediaPlayer } from './components/player/MediaPlayer';
 import { ContentItem } from './types/content';
 import { CheckCircle2, AlertCircle, Info, Crown } from 'lucide-react';
@@ -440,6 +441,7 @@ const AppContent: React.FC = () => {
       <BottomNav currentTab={selectedItem ? '' : currentTab} onNavigate={handleNavigate} />
 
       {/* Overlays & Modals */}
+      <PlanSelectionModal />
       <PurchaseModal />
       <RechargeModal />
       <SubscriptionModal />

@@ -109,6 +109,7 @@ export const WatchPassModal: React.FC = () => {
     activeModal,
     watchPassTarget,
     watchPassInitialPlan,
+    watchPassInitialStep,
     closeWatchPassModal,
     isAuthenticated,
     openAuthModal,
@@ -118,7 +119,7 @@ export const WatchPassModal: React.FC = () => {
 
   const [plans, setPlans] = useState<WatchPassPlanTemplate[]>(DEFAULT_PLANS);
   const [selectedPlanId, setSelectedPlanId] = useState<'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D'>('PASS_7D');
-  const [step, setStep] = useState<'choose' | 'pay'>('choose');
+  const [step, setStep] = useState<'choose' | 'pay'>(watchPassInitialStep || 'choose');
   const [utr, setUtr] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -155,11 +156,11 @@ export const WatchPassModal: React.FC = () => {
         })
         .catch(() => {});
 
-      setStep('choose');
+      setStep(watchPassInitialStep || 'choose');
       setUtr('');
       setErrorMessage(null);
     }
-  }, [activeModal, watchPassInitialPlan]);
+  }, [activeModal, watchPassInitialPlan, watchPassInitialStep]);
 
   // Dynamically generate UPI QR code when reaching 'pay' step with selected pass amount
   useEffect(() => {

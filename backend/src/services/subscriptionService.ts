@@ -168,7 +168,7 @@ export const subscriptionService = {
     const subId = `sub_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const now = new Date().toISOString();
 
-    return subscriptionRepository.createSubscription({
+    const createdSub = await subscriptionRepository.createSubscription({
       id: subId,
       userId,
       plan: data.plan,
@@ -178,6 +178,22 @@ export const subscriptionService = {
       paymentReference: cleanUtr,
       submittedAt: now,
     });
+
+    // Check if AUTOMATIC APPROVAL mode is active
+    const settings = await adminService.getSettings();
+    if (settings.payment_approval_mode === 'AUTOMATIC') {
+      try {
+        return await this.approveSubscription(
+          'SYSTEM_AUTO',
+          createdSub.id,
+          'Auto-approved via Automatic Approval mode'
+        );
+      } catch (autoErr) {
+        console.error('[Automatic Approval] Error auto-approving subscription:', autoErr);
+      }
+    }
+
+    return createdSub;
   },
 
   // ==========================================================================

@@ -260,7 +260,7 @@ export const watchPassService = {
     const passId = `wpass_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const now = new Date().toISOString();
 
-    return watchPassRepository.createPass({
+    const createdPass = await watchPassRepository.createPass({
       id: passId,
       userId,
       contentId: finalContentId,
@@ -272,6 +272,22 @@ export const watchPassService = {
       paymentReference: cleanUtr,
       submittedAt: now,
     });
+
+    // Check if AUTOMATIC APPROVAL mode is active
+    const settings = await adminService.getSettings();
+    if (settings.payment_approval_mode === 'AUTOMATIC') {
+      try {
+        return await this.approvePass(
+          'SYSTEM_AUTO',
+          createdPass.id,
+          'Auto-approved via Automatic Approval mode'
+        );
+      } catch (autoErr) {
+        console.error('[Automatic Approval] Error auto-approving watch pass:', autoErr);
+      }
+    }
+
+    return createdPass;
   },
 
   /**

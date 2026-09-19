@@ -61,9 +61,12 @@ interface AppContextType {
   saveWatchProgress: (progress: Omit<WatchProgress, 'updatedAt'>) => void;
 
   // Modals & UI Triggers
-  activeModal: 'purchase' | 'recharge' | 'auth' | 'subscription' | 'watchpass' | null;
+  activeModal: 'purchase' | 'recharge' | 'auth' | 'subscription' | 'watchpass' | 'plan_selector' | null;
   purchaseTarget: ContentItem | null;
   watchPassTarget: ContentItem | null;
+  planSelectorTarget: ContentItem | null;
+  openPlanSelector: (item: ContentItem) => void;
+  closePlanSelector: () => void;
   openPurchaseModal: (item: ContentItem) => void;
   closePurchaseModal: () => void;
   openRechargeModal: () => void;
@@ -72,9 +75,10 @@ interface AppContextType {
   closeAuthModal: () => void;
   openSubscriptionModal: (planId?: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', initialStep?: 'choose' | 'pay') => void;
   closeSubscriptionModal: () => void;
-  openWatchPassModal: (item?: ContentItem | null, defaultPlan?: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D') => void;
+  openWatchPassModal: (item?: ContentItem | null, defaultPlan?: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D', initialStep?: 'choose' | 'pay') => void;
   closeWatchPassModal: () => void;
   watchPassInitialPlan: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D';
+  watchPassInitialStep: 'choose' | 'pay';
   subscriptionTargetPlan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY';
   subscriptionTargetStep: 'choose' | 'pay';
 
@@ -201,20 +205,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [catalog, setCatalog] = useState<ContentItem[]>([]);
 
   // Modal states
-  const [activeModal, setActiveModal] = useState<'purchase' | 'recharge' | 'auth' | 'subscription' | 'watchpass' | null>(null);
+  const [activeModal, setActiveModal] = useState<'purchase' | 'recharge' | 'auth' | 'subscription' | 'watchpass' | 'plan_selector' | null>(null);
   const [purchaseTarget, setPurchaseTarget] = useState<ContentItem | null>(null);
   const [watchPassTarget, setWatchPassTarget] = useState<ContentItem | null>(null);
   const [watchPassInitialPlan, setWatchPassInitialPlan] = useState<'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D'>('PASS_7D');
+  const [watchPassInitialStep, setWatchPassInitialStep] = useState<'choose' | 'pay'>('choose');
+  const [planSelectorTarget, setPlanSelectorTarget] = useState<ContentItem | null>(null);
 
-  const openWatchPassModal = (item?: ContentItem | null, defaultPlan?: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D') => {
+  const openPlanSelector = (item: ContentItem) => {
+    setPlanSelectorTarget(item);
+    setActiveModal('plan_selector');
+  };
+
+  const closePlanSelector = () => {
+    setActiveModal(null);
+    setPlanSelectorTarget(null);
+  };
+
+  const openWatchPassModal = (item?: ContentItem | null, defaultPlan?: 'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D', initialStep: 'choose' | 'pay' = 'choose') => {
     setWatchPassTarget(item || null);
     if (defaultPlan) setWatchPassInitialPlan(defaultPlan);
+    setWatchPassInitialStep(initialStep);
     setActiveModal('watchpass');
   };
 
   const closeWatchPassModal = () => {
     setActiveModal(null);
     setWatchPassTarget(null);
+    setWatchPassInitialStep('choose');
   };
 
   // Player state
@@ -1163,6 +1181,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         activeModal,
         purchaseTarget,
         watchPassTarget,
+        planSelectorTarget,
+        openPlanSelector,
+        closePlanSelector,
         openPurchaseModal,
         closePurchaseModal,
         openRechargeModal,
@@ -1174,6 +1195,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         openWatchPassModal,
         closeWatchPassModal,
         watchPassInitialPlan,
+        watchPassInitialStep,
         subscriptionTargetPlan,
         subscriptionTargetStep,
         monetizationMode,

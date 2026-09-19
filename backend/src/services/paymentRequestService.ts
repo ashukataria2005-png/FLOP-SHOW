@@ -12,6 +12,7 @@ export interface PublicPaymentConfig {
   upiId: string;
   upiEnabled: boolean;
   merchantName: string;
+  approvalMode: 'MANUAL' | 'AUTOMATIC';
 }
 
 export const paymentRequestService = {
@@ -24,11 +25,13 @@ export const paymentRequestService = {
     const upiId = settings.payment_upi_id || 'flopshow@upi';
     const upiEnabled = settings.payment_upi_enabled !== 'false';
     const merchantName = settings.payment_upi_merchant_name || 'FLOPSHOW';
+    const approvalMode = settings.payment_approval_mode === 'AUTOMATIC' ? 'AUTOMATIC' : 'MANUAL';
 
     return {
       upiId,
       upiEnabled,
       merchantName,
+      approvalMode,
     };
   },
 
@@ -36,27 +39,43 @@ export const paymentRequestService = {
    * Admin-only configuration update for UPI settings.
    */
   async updatePaymentConfig(data: {
-    upiId: string;
-    enabled: boolean;
+    upiId?: string;
+    enabled?: boolean;
     merchantName?: string;
+    approvalMode?: 'MANUAL' | 'AUTOMATIC';
   }): Promise<PublicPaymentConfig> {
-    const cleanUpiId = (data.upiId || '').trim();
-    if (!cleanUpiId || !cleanUpiId.includes('@')) {
-      const err = new Error('A valid UPI ID is required (e.g. name@upi).');
-      (err as any).statusCode = 400;
-      throw err;
+    const updates: Record<string, string> = {};
+
+    if (data.upiId !== undefined) {
+      const cleanUpiId = (data.upiId || '').trim();
+      if (!cleanUpiId || !cleanUpiId.includes('@')) {
+        const err = new Error('A valid UPI ID is required (e.g. name@upi).');
+        (err as any).statusCode = 400;
+        throw err;
+      }
+      updates.payment_upi_id = cleanUpiId;
     }
 
-    const updates: Record<string, string> = {
-      payment_upi_id: cleanUpiId,
-      payment_upi_enabled: data.enabled ? 'true' : 'false',
-    };
+    if (data.enabled !== undefined) {
+      updates.payment_upi_enabled = data.enabled ? 'true' : 'false';
+    }
 
-    if (data.merchantName && data.merchantName.trim()) {
+    if (data.merchantName !== undefined && data.merchantName.trim()) {
       updates.payment_upi_merchant_name = data.merchantName.trim();
     }
 
-    await adminService.updateSettings(updates);
+    if (data.approvalMode !== undefined) {
+      if (!['MANUAL', 'AUTOMATIC'].includes(data.approvalMode)) {
+        const err = new Error('Invalid approval mode. Choose MANUAL or AUTOMATIC.');
+        (err as any).statusCode = 400;
+        throw err;
+      }
+      updates.payment_approval_mode = data.approvalMode;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await adminService.updateSettings(updates);
+    }
     return this.getPublicPaymentConfig();
   },
 
@@ -135,6 +154,21 @@ export const paymentRequestService = {
     const created = await paymentRequestRepository.getById(requestId);
     if (!created) {
       throw new Error('Failed to record payment request.');
+    }
+
+    // AUTOMATIC APPROVAL MODE: Auto-approve immediately and credit wallet
+    const { approvalMode } = await this.getPublicPaymentConfig();
+    if (approvalMode === 'AUTOMATIC') {
+      try {
+        const approvedRes = await this.approvePayment(
+          'SYSTEM_AUTO',
+          created.id,
+          'Auto-approved via Automatic Approval mode'
+        );
+        return approvedRes.payment;
+      } catch (autoErr) {
+        console.error('[Automatic Approval] Error auto-approving payment request:', autoErr);
+      }
     }
 
     return created;

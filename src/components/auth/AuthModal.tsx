@@ -18,7 +18,9 @@ export const AuthModal: React.FC = () => {
 
   // Signup fields
   const [name, setName] = useState('');
+  const [signupMethod, setSignupMethod] = useState<'email' | 'mobile'>('email');
   const [signupEmail, setSignupEmail] = useState('');
+  const [signupMobile, setSignupMobile] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [signupStep, setSignupStep] = useState<SignupStep>('details');
   const [otpValue, setOtpValue] = useState('');
@@ -36,7 +38,7 @@ export const AuthModal: React.FC = () => {
 
   const resetForm = () => {
     setName(''); setEmail(''); setPassword('');
-    setSignupEmail(''); setSignupPassword(''); setOtpValue('');
+    setSignupEmail(''); setSignupMobile(''); setSignupPassword(''); setOtpValue('');
     setSignupStep('details');
     setPendingUserId(''); setPendingName(''); setPendingEmail(''); setPendingBalance(0);
     setError(null);
@@ -52,11 +54,12 @@ export const AuthModal: React.FC = () => {
     e.preventDefault();
     const form = e.currentTarget as HTMLFormElement;
     setError(null);
-    if (!email.trim() || !email.includes('@')) { setError('Please enter a valid email address.'); return; }
+    const cleanId = email.trim();
+    if (!cleanId) { setError('Please enter your email or mobile number.'); return; }
     if (!password.trim() || password.length < 4) { setError('Password must be at least 4 characters.'); return; }
     setIsSubmitting(true);
     try {
-      const data = await api.auth.login(email.trim(), password.trim());
+      const data = await api.auth.login(cleanId, password.trim());
 
       // W3C Credential Management API: prompt browser to store credentials natively
       if (typeof window !== 'undefined' && 'PasswordCredential' in window && (navigator as any).credentials?.store) {
@@ -86,11 +89,26 @@ export const AuthModal: React.FC = () => {
     const form = e.currentTarget as HTMLFormElement;
     setError(null);
     if (!name.trim()) { setError('Please enter your full name.'); return; }
-    if (!signupEmail.trim() || !signupEmail.includes('@')) { setError('Please enter a valid email address.'); return; }
+
+    if (signupMethod === 'email') {
+      if (!signupEmail.trim() || !signupEmail.includes('@')) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+    } else {
+      const cleanMob = signupMobile.trim().replace(/[^0-9]/g, '');
+      if (cleanMob.length < 10) {
+        setError('Please enter a valid 10-digit mobile number.');
+        return;
+      }
+    }
+
     if (!signupPassword.trim() || signupPassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setIsSubmitting(true);
     try {
-      const data = await api.auth.register(name.trim(), signupEmail.trim(), signupPassword.trim());
+      const data = signupMethod === 'email'
+        ? await api.auth.register(name.trim(), signupEmail.trim(), signupPassword.trim())
+        : await api.auth.register(name.trim(), undefined, signupPassword.trim(), signupMobile.trim().replace(/[^0-9]/g, ''));
 
       // Store in browser credential manager upon successful account registration
       if (typeof window !== 'undefined' && 'PasswordCredential' in window && (navigator as any).credentials?.store) {
@@ -114,16 +132,11 @@ export const AuthModal: React.FC = () => {
     }
   };
 
-  // ── Signup Step 2: OTP Placeholder → complete signup ──────────────────────
-  const handleOtpVerify = (e: React.FormEvent) => {
-    e.preventDefault();
+  // ── Signup Step 2: OTP (Optional / Bypassable) → complete signup ────────────
+  const handleOtpVerify = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setError(null);
-    if (!otpValue.trim()) {
-      setError('Please enter any 6-digit code to continue.');
-      return;
-    }
-    // OTP verification is a UI placeholder. The account already exists in the backend.
-    // A real OTP provider will be integrated in a future milestone.
+    // OTP verification is optional/bypassable per requirements. Account is already created on backend.
     signup(pendingUserId, pendingName, pendingEmail, pendingBalance);
   };
 
@@ -195,12 +208,12 @@ export const AuthModal: React.FC = () => {
           >
             {errorBox}
             <div style={fieldStyle}>
-              <label htmlFor="user-signin-email" style={labelStyle}>Email Address</label>
+              <label htmlFor="user-signin-email" style={labelStyle}>Email or Mobile Number</label>
               <input
                 id="user-signin-email"
                 name="username"
-                type="email"
-                placeholder="e.g. user@example.com"
+                type="text"
+                placeholder="e.g. user@example.com or 9876543210"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 disabled={isSubmitting}
@@ -266,7 +279,48 @@ export const AuthModal: React.FC = () => {
             onSubmit={handleSignupDetails}
             className="modal-body"
           >
+            {/* Signup Method Switcher (Email vs Mobile) */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', backgroundColor: 'rgba(255, 255, 255, 0.04)', padding: '4px', borderRadius: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setSignupMethod('email')}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontSize: '13px',
+                  fontWeight: signupMethod === 'email' ? 700 : 500,
+                  backgroundColor: signupMethod === 'email' ? 'var(--brand-gold, #F5C518)' : 'transparent',
+                  color: signupMethod === 'email' ? '#000000' : '#9CA3AF',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Sign up with Email
+              </button>
+              <button
+                type="button"
+                onClick={() => setSignupMethod('mobile')}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontSize: '13px',
+                  fontWeight: signupMethod === 'mobile' ? 700 : 500,
+                  backgroundColor: signupMethod === 'mobile' ? 'var(--brand-gold, #F5C518)' : 'transparent',
+                  color: signupMethod === 'mobile' ? '#000000' : '#9CA3AF',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Sign up with Mobile Number
+              </button>
+            </div>
+
             {errorBox}
+
             <div style={fieldStyle}>
               <label htmlFor="signup-name" style={labelStyle}>Full Name</label>
               <input
@@ -282,21 +336,64 @@ export const AuthModal: React.FC = () => {
                 style={inputStyle}
               />
             </div>
-            <div style={fieldStyle}>
-              <label htmlFor="signup-email" style={labelStyle}>Email Address</label>
-              <input
-                id="signup-email"
-                name="username"
-                type="email"
-                placeholder="e.g. user@example.com"
-                value={signupEmail}
-                onChange={e => setSignupEmail(e.target.value)}
-                disabled={isSubmitting}
-                autoComplete="username"
-                required
-                style={inputStyle}
-              />
-            </div>
+
+            {/* OPTION A: Sign up with Email */}
+            {signupMethod === 'email' && (
+              <div style={fieldStyle}>
+                <label htmlFor="signup-email" style={labelStyle}>Email Address</label>
+                <input
+                  id="signup-email"
+                  name="username"
+                  type="email"
+                  placeholder="e.g. user@example.com"
+                  value={signupEmail}
+                  onChange={e => setSignupEmail(e.target.value)}
+                  disabled={isSubmitting}
+                  autoComplete="username"
+                  required
+                  style={inputStyle}
+                />
+              </div>
+            )}
+
+            {/* OPTION B: Sign up with Mobile Number */}
+            {signupMethod === 'mobile' && (
+              <div style={fieldStyle}>
+                <label htmlFor="signup-mobile" style={labelStyle}>Mobile Number</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    +91
+                  </div>
+                  <input
+                    id="signup-mobile"
+                    name="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="9876543210"
+                    value={signupMobile}
+                    onChange={e => setSignupMobile(e.target.value.replace(/\D/g, ''))}
+                    disabled={isSubmitting}
+                    autoComplete="tel"
+                    required
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                </div>
+              </div>
+            )}
+
             <div style={{ ...fieldStyle, marginBottom: '22px' }}>
               <label htmlFor="signup-password" style={labelStyle}>Password</label>
               <input
@@ -312,48 +409,59 @@ export const AuthModal: React.FC = () => {
                 style={inputStyle}
               />
             </div>
+
             <button type="submit" name="register" disabled={isSubmitting} className="btn btn-primary btn-block btn-lg">
               {isSubmitting ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <UserCheck size={18} />}
-              <span>{isSubmitting ? 'Creating Account...' : 'Continue'}</span>
+              <span>{isSubmitting ? 'Creating Account...' : 'Continue to Verification'}</span>
             </button>
           </form>
         )}
 
-        {/* ── Signup Step 2: OTP Placeholder ── */}
+        {/* ── Signup Step 2: OTP (Optional / Bypassable) ── */}
         {mode === 'signup' && signupStep === 'otp' && (
-          <form onSubmit={handleOtpVerify} className="modal-body">
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <ShieldCheck size={40} color="var(--brand-gold)" style={{ marginBottom: '12px' }} />
-              <p style={{ fontSize: '15px', fontWeight: 600, color: '#FFFFFF', marginBottom: '6px' }}>Verify Your Account</p>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                OTP verification is coming soon. Enter any code and click Verify to continue.
+          <form onSubmit={e => handleOtpVerify(e)} className="modal-body">
+            <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+              <ShieldCheck size={40} color="var(--brand-gold)" style={{ marginBottom: '10px' }} />
+              <p style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', marginBottom: '4px' }}>Verify Your Account</p>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                Enter the 6-digit OTP or continue directly. Verification is currently optional during account setup.
               </p>
-              <div style={{
-                marginTop: '10px', padding: '8px 12px', borderRadius: '8px',
-                backgroundColor: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)',
-                fontSize: '12px', color: 'var(--brand-gold)'
-              }}>
-                ⚠️ No real OTP is sent — this is a UI placeholder only
-              </div>
             </div>
             {errorBox}
-            <div style={{ ...fieldStyle, marginBottom: '22px' }}>
-              <label style={labelStyle}>OTP Code</label>
+            <div style={{ ...fieldStyle, marginBottom: '18px' }}>
+              <label style={labelStyle}>OTP Code (Optional)</label>
               <input
                 id="otp-input"
                 type="text"
                 inputMode="numeric"
                 maxLength={6}
-                placeholder="000000"
+                placeholder="••••••"
                 value={otpValue}
                 onChange={e => setOtpValue(e.target.value.replace(/\D/g, ''))}
                 style={{ ...inputStyle, fontSize: '22px', textAlign: 'center', letterSpacing: '8px', fontFamily: 'monospace' }}
               />
             </div>
-            <button type="submit" className="btn btn-primary btn-block btn-lg">
+            <button type="submit" className="btn btn-primary btn-block btn-lg" style={{ marginBottom: '10px' }}>
               <ShieldCheck size={18} />
               <span>Verify &amp; Complete Signup</span>
             </button>
+            <div style={{ textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={() => handleOtpVerify()}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#9CA3AF',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  padding: '6px'
+                }}
+              >
+                Skip verification for now →
+              </button>
+            </div>
           </form>
         )}
       </div>

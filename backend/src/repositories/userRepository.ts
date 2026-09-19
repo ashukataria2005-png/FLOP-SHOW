@@ -4,6 +4,7 @@ export interface UserRecord {
   id: string;
   name: string;
   email: string;
+  phone?: string | null;
   password_hash: string;
   role: 'USER' | 'ADMIN';
   status: 'ACTIVE' | 'SUSPENDED' | 'PENDING';
@@ -16,6 +17,7 @@ export const userRepository = {
     id: string;
     name: string;
     email: string;
+    phone?: string | null;
     passwordHash: string;
     role?: 'USER' | 'ADMIN';
     status?: 'ACTIVE' | 'SUSPENDED' | 'PENDING';
@@ -23,12 +25,13 @@ export const userRepository = {
   }): Promise<void> {
     const db = getAdapter();
     await db.run(
-      `INSERT INTO users (id, name, email, password_hash, role, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO users (id, name, email, phone, password_hash, role, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         user.id,
         user.name,
         user.email.toLowerCase().trim(),
+        user.phone ? user.phone.trim() : null,
         user.passwordHash,
         user.role || 'USER',
         user.status || 'ACTIVE',
@@ -40,12 +43,36 @@ export const userRepository = {
 
   async findByEmail(email: string): Promise<UserRecord | null> {
     const db = getAdapter();
-    // COLLATE NOCASE is SQLite-specific; on PostgreSQL, email is CITEXT (case-insensitive already)
     const { rows } = await db.query(
       `SELECT * FROM users WHERE email = ?;`,
       [email.toLowerCase().trim()]
     );
     return (rows[0] as UserRecord) || null;
+  },
+
+  async findByPhone(phone: string): Promise<UserRecord | null> {
+    const db = getAdapter();
+    const clean = phone.replace(/[^0-9]/g, '');
+    const { rows } = await db.query(
+      `SELECT * FROM users WHERE phone = ? OR phone = ?;`,
+      [clean, `+91${clean}`]
+    );
+    return (rows[0] as UserRecord) || null;
+  },
+
+  async findByEmailOrPhone(identifier: string): Promise<UserRecord | null> {
+    const trimmed = identifier.trim();
+    if (trimmed.includes('@')) {
+      return this.findByEmail(trimmed);
+    }
+    const cleanPhone = trimmed.replace(/[^0-9]/g, '');
+    if (cleanPhone.length >= 10) {
+      const byPhone = await this.findByPhone(cleanPhone);
+      if (byPhone) return byPhone;
+      // also check synthetic email for mobile signup
+      return this.findByEmail(`${cleanPhone}@flopshow.user`);
+    }
+    return this.findByEmail(trimmed);
   },
 
   async findById(id: string): Promise<UserRecord | null> {

@@ -327,6 +327,7 @@ CREATE TABLE IF NOT EXISTS upi_payment_requests (
   admin_note TEXT,
   submitted_at TEXT NOT NULL,
   processed_at TEXT,
+  content_id TEXT REFERENCES content(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -335,6 +336,7 @@ CREATE TABLE IF NOT EXISTS upi_payment_requests (
 CREATE INDEX IF NOT EXISTS idx_upi_payment_status ON upi_payment_requests(status);
 CREATE INDEX IF NOT EXISTS idx_upi_payment_user ON upi_payment_requests(user_id);
 CREATE INDEX IF NOT EXISTS idx_upi_payment_utr ON upi_payment_requests(utr);
+CREATE INDEX IF NOT EXISTS idx_upi_payment_requests_content_id ON upi_payment_requests(content_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_upi_approved_utr ON upi_payment_requests(utr) WHERE status = 'APPROVED';
 
 INSERT INTO app_settings (key, value, updated_at)

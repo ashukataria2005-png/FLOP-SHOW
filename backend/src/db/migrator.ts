@@ -445,7 +445,30 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 8 };
+    // Apply incremental 013_add_content_id_to_upi_requests for PostgreSQL if not already applied
+    const contentIdMigrationVersion = '013_add_content_id_to_upi_requests';
+    if (!appliedSet.has(contentIdMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 013_add_content_id_to_upi_requests...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          ALTER TABLE upi_payment_requests ADD COLUMN IF NOT EXISTS content_id TEXT DEFAULT NULL REFERENCES content(id) ON DELETE SET NULL;
+          CREATE INDEX IF NOT EXISTS idx_upi_payment_requests_content_id ON upi_payment_requests(content_id);
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${contentIdMigrationVersion}', '013_add_content_id_to_upi_requests.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('013_add_content_id_to_upi_requests.sql');
+        console.log('✓ [PostgreSQL] Migration 013_add_content_id_to_upi_requests applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 9 };
   } finally {
     client.release();
     await pool.end();

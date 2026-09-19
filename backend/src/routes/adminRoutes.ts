@@ -42,6 +42,29 @@ adminRouter.get('/today-details', async (req, res, next) => {
   }
 });
 
+
+// Unified analytics: all-time breakdown across all hybrid categories
+adminRouter.get('/analytics', async (req, res, next) => {
+  try {
+    const filter = ((req.query.filter as string) || 'ALL').toUpperCase() as any;
+    const data = await adminService.getUnifiedAnalytics(filter);
+    res.json({ success: true, ...data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Daily analytics: today figures for each hybrid category
+adminRouter.get('/daily-analytics', async (req, res, next) => {
+  try {
+    const filter = ((req.query.filter as string) || 'ALL').toUpperCase() as any;
+    const tzOffset = req.query.tzOffset ? parseInt(req.query.tzOffset as string, 10) : undefined;
+    const data = await adminService.getDailyAnalytics(filter, tzOffset);
+    res.json({ success: true, ...data });
+  } catch (err) {
+    next(err);
+  }
+});
 adminRouter.get('/users', async (_req, res, next) => {
   try {
     const users = await adminService.getAllUsers();

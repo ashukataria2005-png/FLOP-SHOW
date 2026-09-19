@@ -49,6 +49,7 @@ interface AppContextType {
   purchases: PurchaseRecord[];
   isOwned: (contentId: string) => boolean;
   buyContent: (item: ContentItem) => Promise<{ success: boolean; message: string }>;
+  syncPurchases: () => Promise<void>;
 
   // My List
   myList: string[];
@@ -1172,6 +1173,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         purchases,
         isOwned,
         buyContent,
+        syncPurchases,
         myList,
         inMyList,
         toggleMyList,

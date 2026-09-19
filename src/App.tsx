@@ -28,6 +28,7 @@ import { AdminFreeContentPage } from './pages/admin/AdminFreeContentPage';
 import { AdminResetPage } from './pages/admin/AdminResetPage';
 import { AdminMonetizationPage } from './pages/admin/AdminMonetizationPage';
 import { AdminWatchPassPage } from './pages/admin/AdminWatchPassPage';
+import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage';
 import { PurchaseModal } from './components/purchase/PurchaseModal';
 import { RechargeModal } from './components/wallet/RechargeModal';
 import { SubscriptionModal } from './components/subscription/SubscriptionModal';
@@ -87,6 +88,9 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   }
   if (cleanPath === '/admin/monetization') {
     return { tab: 'admin-monetization' };
+  }
+  if (cleanPath === '/admin/analytics') {
+    return { tab: 'admin-analytics' };
   }
   if (cleanPath === '/admin/watch-pass' || cleanPath === '/admin/watch-passes') {
     return { tab: 'admin-watch-pass' };
@@ -163,6 +167,8 @@ export function tabToPath(tab: string, param?: string): string {
       return '/admin/upi-settings';
     case 'admin-monetization':
       return '/admin/monetization';
+    case 'admin-analytics':
+      return '/admin/analytics';
     case 'admin-watch-pass':
       return '/admin/watch-pass';
     case 'admin-finance':
@@ -324,6 +330,7 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-payments' && <AdminPaymentsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-upi-settings' && <AdminUpiSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-monetization' && <AdminMonetizationPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-analytics' && <AdminAnalyticsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-watch-pass' && <AdminWatchPassPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-finance' && <AdminFinancePage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-transactions' && <AdminTransactionsPage onNavigateTab={handleNavigate} />}
@@ -332,7 +339,7 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-reset' && <AdminResetPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-monetization', 'admin-watch-pass', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings', 'admin-reset'].includes(currentTab) && (
+          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-monetization', 'admin-analytics', 'admin-watch-pass', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings', 'admin-reset'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>

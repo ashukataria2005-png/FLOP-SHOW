@@ -497,14 +497,14 @@ export const api = {
       return request<{ upiId: string; upiEnabled: boolean; merchantName: string; approvalMode?: 'MANUAL' | 'AUTOMATIC' }>('/payments/config');
     },
 
-    async submitRequest(amountRupees: number, utr: string, userName?: string, userEmail?: string) {
+    async submitRequest(amountRupees: number, utr: string, userName?: string, userEmail?: string, contentId?: string | null) {
       return request<{
         success: boolean;
         message: string;
         payment: any;
       }>('/payments/submit-request', {
         method: 'POST',
-        body: JSON.stringify({ amount: amountRupees, utr, userName, userEmail })
+        body: JSON.stringify({ amount: amountRupees, utr, userName, userEmail, contentId: contentId || null })
       });
     },
 
@@ -726,6 +726,15 @@ export const api = {
     async getTodayDetails(type: string, tzOffset?: number) {
       const offset = tzOffset !== undefined ? tzOffset : new Date().getTimezoneOffset();
       return request<any>(`/admin/today-details?type=${encodeURIComponent(type)}&tzOffset=${offset}`);
+    },
+
+    async getUnifiedAnalytics(filter: 'ALL' | 'MOVIE_SERIES' | 'WATCH_PASS' | 'VIP_PLANS' = 'ALL') {
+      return request<any>(`/admin/analytics?filter=${encodeURIComponent(filter)}`);
+    },
+
+    async getDailyAnalytics(filter: 'ALL' | 'ONE_TITLE' | 'PASS' | 'VIP_PLANS' = 'ALL', tzOffset?: number) {
+      const offset = tzOffset !== undefined ? tzOffset : new Date().getTimezoneOffset();
+      return request<any>(`/admin/daily-analytics?filter=${encodeURIComponent(filter)}&tzOffset=${offset}`);
     },
 
     async listContent(filters: {

@@ -7,6 +7,7 @@ import {
   PaymentMetrics,
 } from '../repositories/paymentRequestRepository.js';
 import { walletRepository } from '../repositories/walletRepository.js';
+import { purchaseRepository } from '../repositories/purchaseRepository.js';
 
 export interface PublicPaymentConfig {
   upiId: string;
@@ -89,6 +90,7 @@ export const paymentRequestService = {
       utr: string;
       userName?: string;
       userEmail?: string;
+      contentId?: string | null;
     }
   ): Promise<PaymentRequestRecord> {
     const { upiId, upiEnabled } = await this.getPublicPaymentConfig();
@@ -149,6 +151,7 @@ export const paymentRequestService = {
       upiIdSnapshot: upiId,
       utr: cleanUtr,
       submittedAt: now,
+      contentId: data.contentId || null,
     });
 
     const created = await paymentRequestRepository.getById(requestId);
@@ -257,7 +260,36 @@ export const paymentRequestService = {
         txAdapter
       );
 
-      // 3. Atomically credit user wallet balance
+      // 3a. Per-title payment: grant ownership entitlement directly in purchases table
+      if (payment.content_id) {
+        const purchaseId = `pur_upi_${crypto.randomUUID()}`;
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        await purchaseRepository.createPurchase(
+          {
+            id: purchaseId,
+            userId: payment.user_id,
+            contentId: payment.content_id,
+            amountPaid: payment.amount,
+            status: 'COMPLETED',
+            purchasedAt: now,
+            expiresAt,
+          },
+          txAdapter
+        );
+
+        const updatedPaymentTitle = (await paymentRequestRepository.getById(
+          payment.id,
+          txAdapter
+        )) as PaymentRequestRecord;
+
+        return {
+          payment: updatedPaymentTitle,
+          newBalanceRupees: (await walletRepository.getBalance(payment.user_id, txAdapter)) / 100,
+          message: `Successfully approved per-title payment and granted 30-day ownership for content.`,
+        };
+      }
+
+      // 3b. Wallet recharge: atomically credit user wallet balance
       const currentBalancePaise = await walletRepository.getBalance(payment.user_id, txAdapter);
       const newBalancePaise = currentBalancePaise + payment.amount;
       await walletRepository.updateBalance(payment.user_id, newBalancePaise, now, txAdapter);

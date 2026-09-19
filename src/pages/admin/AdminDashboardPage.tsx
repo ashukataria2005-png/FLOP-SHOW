@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
-import { useApp } from '../../context/AppContext';
 import {
   Users,
   Film,
@@ -71,29 +70,16 @@ interface AdminDashboardPageProps {
 }
 
 export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNavigateTab }) => {
-  const { monetizationMode, refreshMonetizationConfig, showToast } = useApp();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Active Monetization Mode & Subscription Admin Config
-  const [currentMode, setCurrentMode] = useState<'PER_CONTENT' | 'SUBSCRIPTION'>(monetizationMode || 'PER_CONTENT');
-  const [switchingMode, setSwitchingMode] = useState(false);
-  const [subConfig, setSubConfig] = useState<{
-    mode: 'PER_CONTENT' | 'SUBSCRIPTION';
-    weeklyPrice?: number;
-    monthlyPrice: number;
-    threeMonthsPrice?: number;
-    yearlyPrice: number;
-    currencySymbol: string;
-    metrics: {
-      totalSubscriptions: number;
-      activeCount: number;
-      pendingCount: number;
-      totalRevenueRupees: number;
-    };
-  } | null>(null);
-
+  // Hybrid mode is permanent - currentMode is always PER_CONTENT for backward compatibility
+  const currentMode = 'PER_CONTENT' as const;
+  const [subConfig] = useState<any>(null);
+  // Daily Analytics Widget State
+  const [dailyFilter, setDailyFilter] = useState<'ALL' | 'ONE_TITLE' | 'PASS' | 'VIP_PLANS'>('ALL');
+  const [dailyStats, setDailyStats] = useState<any>(null);
   // Clickable Today Analytics Modal State
   const [activeModal, setActiveModal] = useState<'revenue' | 'members' | 'purchases' | 'upi' | 'profit' | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -114,43 +100,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     }
   };
 
-  const fetchMonetizationSettings = async () => {
-    try {
-      const res = await api.monetization.getAdminConfig();
-      if (res?.config) {
-        setSubConfig(res.config);
-        setCurrentMode(res.config.mode);
-      }
-    } catch (err) {
-      console.error('Failed to load monetization configuration in dashboard:', err);
-    }
-  };
-
-  const handleSwitchMode = async (targetMode: 'PER_CONTENT' | 'SUBSCRIPTION') => {
-    if (targetMode === currentMode || switchingMode) return;
-    try {
-      setSwitchingMode(true);
-      const res = await api.monetization.updateAdminConfig({ mode: targetMode });
-      setCurrentMode(targetMode);
-      if (res?.config) {
-        setSubConfig(res.config);
-      }
-      await refreshMonetizationConfig();
-      await fetchStats();
-      showToast(
-        `Monetization mode switched to ${targetMode === 'PER_CONTENT' ? 'Per Movie/Series (PER_CONTENT)' : 'Subscription Plans (SUBSCRIPTION)'}.`,
-        'success'
-      );
-    } catch (err: any) {
-      showToast(err.message || 'Failed to update monetization mode.', 'error');
-    } finally {
-      setSwitchingMode(false);
-    }
-  };
 
   useEffect(() => {
     fetchStats();
-    fetchMonetizationSettings();
+    api.admin.getDailyAnalytics('ALL', new Date().getTimezoneOffset()).then(d => setDailyStats(d)).catch(() => {});
   }, []);
 
   // CRITICAL DAILY TIMER / DATA RULE:
@@ -262,6 +215,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       color: '#8B5CF6'
     },
     {
+      label: 'Analytics',
+      desc: 'Unified revenue, passes, and VIP sales',
+      action: () => onNavigateTab('admin-analytics'),
+      icon: TrendingUp,
+      color: '#10B981'
+    },
+    {
       label: 'Quick Add',
       desc: 'One-click auto-fill movie or series via ID',
       action: () => onNavigateTab('admin-quick-add'),
@@ -271,7 +231,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
     {
       label: 'Trending #1',
       desc: stats.currentTrending1
-        ? `#1: ${stats.currentTrending1.title} (${stats.currentTrending1.type}) • Manage in Catalog`
+        ? `#1: ${stats.currentTrending1.title} (${stats.currentTrending1.type}) â€¢ Manage in Catalog`
         : 'Catalog Trending #1 showcase title',
       action: () => onNavigateTab('admin-trending'),
       icon: TrendingUp,
@@ -344,325 +304,65 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
           </p>
         </div>
 
-        {/* Monetization Mode Switch Buttons (Replacing Add Movie & Add Series at this exact dashboard top) */}
-        <div className="admin-dashboard-mode-switch" style={{ display: 'flex', gap: '12px' }}>
-          <button
-            onClick={() => handleSwitchMode('PER_CONTENT')}
-            disabled={switchingMode}
-            className="admin-dashboard-mode-btn"
-            title="Switch monetization system to Per Movie/Series pay-per-view"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
-              backgroundColor: currentMode === 'PER_CONTENT' ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.08)',
-              color: currentMode === 'PER_CONTENT' ? '#0E0E12' : '#FFFFFF',
-              fontWeight: currentMode === 'PER_CONTENT' ? 800 : 700,
-              fontSize: '13px',
-              borderRadius: '10px',
-              border: currentMode === 'PER_CONTENT' ? 'none' : '1px solid rgba(255, 255, 255, 0.15)',
-              cursor: switchingMode ? 'wait' : 'pointer',
-              boxShadow: currentMode === 'PER_CONTENT' ? '0 4px 14px rgba(245, 197, 24, 0.25)' : 'none',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {switchingMode && currentMode !== 'PER_CONTENT' ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Film size={16} />
-            )}
-            <span>Per Movie/Series</span>
-          </button>
-          <button
-            onClick={() => handleSwitchMode('SUBSCRIPTION')}
-            disabled={switchingMode}
-            className="admin-dashboard-mode-btn"
-            title="Switch monetization system to Weekly/Monthly/Yearly subscriptions"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
-              backgroundColor: currentMode === 'SUBSCRIPTION' ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.08)',
-              color: currentMode === 'SUBSCRIPTION' ? '#0E0E12' : '#FFFFFF',
-              fontWeight: currentMode === 'SUBSCRIPTION' ? 800 : 700,
-              fontSize: '13px',
-              borderRadius: '10px',
-              border: currentMode === 'SUBSCRIPTION' ? 'none' : '1px solid rgba(255, 255, 255, 0.15)',
-              cursor: switchingMode ? 'wait' : 'pointer',
-              boxShadow: currentMode === 'SUBSCRIPTION' ? '0 4px 14px rgba(245, 197, 24, 0.25)' : 'none',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {switchingMode && currentMode !== 'SUBSCRIPTION' ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Crown size={16} />
-            )}
-            <span>Subscription Plans</span>
+        {/* ===== DAILY ANALYTICS WIDGET ===== */}
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {(['ALL', 'ONE_TITLE', 'PASS', 'VIP_PLANS'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => {
+                setDailyFilter(f);
+                api.admin.getDailyAnalytics(f, new Date().getTimezoneOffset()).then(d => setDailyStats(d)).catch(() => {});
+              }}
+              style={{
+                padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: 'none',
+                backgroundColor: dailyFilter === f ? 'var(--brand-gold, #F5C518)' : 'rgba(255,255,255,0.08)',
+                color: dailyFilter === f ? '#0E0E12' : '#FFFFFF',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {f === 'ALL' ? 'ALL' : f === 'ONE_TITLE' ? 'ONE-TITLE' : f === 'PASS' ? 'PASS' : 'VIP PLANS'}
+            </button>
+          ))}
+          <button onClick={() => onNavigateTab('admin-analytics')} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(245,197,24,0.4)', backgroundColor: 'rgba(245,197,24,0.08)', color: 'var(--brand-gold, #F5C518)' }}>
+            <TrendingUp size={14} /> Full Analytics
           </button>
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* MONETIZATION ADMIN ANALYTICS PANEL (Dedicated Mode View)                  */}
-      {/* ========================================================================= */}
-      <div style={{ marginBottom: '32px' }}>
-        {currentMode === 'PER_CONTENT' ? (
-          /* MODE A: PER MOVIE / SERIES ANALYTICS VIEW (Only per-content metrics) */
-          <div
-            style={{
-              padding: '20px 22px',
-              borderRadius: '16px',
-              backgroundColor: 'rgba(245, 197, 24, 0.05)',
-              border: '1px solid rgba(245, 197, 24, 0.25)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(245, 197, 24, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-gold, #F5C518)' }}>
-                  <Film size={18} />
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
-                      Per Movie/Series Monetization Overview
-                    </h3>
-                    <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', backgroundColor: 'var(--brand-gold, #F5C518)', color: '#0E0E12', letterSpacing: '0.04em' }}>
-                      MODE ACTIVE
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px', display: 'block' }}>
-                    Users purchase individual movies &amp; series with wallet/UPI. Titles remain permanently owned.
-                  </span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => onNavigateTab('admin-content')}
-                  className="btn btn-secondary btn-sm"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
-                >
-                  <Tag size={13} />
-                  <span>Manage Catalog Pricing</span>
-                </button>
-              </div>
+      {/* Daily Hybrid Analytics Summary */}
+
+        {/* Daily stats summary */}
+        {dailyStats && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginTop: '16px', marginBottom: '24px' }}>
+            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(245,197,24,0.06)', border: '1px solid rgba(245,197,24,0.2)' }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Today's Revenue</div>
+              <div style={{ fontSize: '22px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)', margin: '4px 0' }}>₹{dailyStats.totalRevenueRupees || 0}</div>
+              <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.totalSales || 0} sales</div>
             </div>
-
-            <div className="admin-monetization-grid">
-              <div className="admin-stat-card" style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px' }}>
-                <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-title" style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
-                    Content Purchases
-                  </span>
-                  <Film size={16} color="var(--brand-gold, #F5C518)" />
-                </div>
-                <div className="stat-value" style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', margin: '4px 0' }}>
-                  {stats.totalPurchases}
-                </div>
-                <div className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  Individual title purchases all-time
-                </div>
+            {(dailyFilter === 'ALL' || dailyFilter === 'ONE_TITLE') && dailyStats.oneTitle && (
+              <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Movie/Series</div>
+                <div style={{ fontSize: '22px', fontWeight: 900, color: '#60A5FA', margin: '4px 0' }}>₹{dailyStats.oneTitle.revenueRupees}</div>
+                <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.oneTitle.sales} purchases</div>
               </div>
-
-              <div className="admin-stat-card" style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px' }}>
-                <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-title" style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
-                    Today's Content Revenue
-                  </span>
-                  <DollarSign size={16} color="#34D399" />
-                </div>
-                <div className="stat-value" style={{ fontSize: '24px', fontWeight: 900, color: '#34D399', margin: '4px 0' }}>
-                  ₹{today.todayPurchasesRevenueRupees}
-                </div>
-                <div className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  Direct content purchase intake
-                </div>
+            )}
+            {(dailyFilter === 'ALL' || dailyFilter === 'PASS') && dailyStats.pass && (
+              <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Watch Pass</div>
+                <div style={{ fontSize: '22px', fontWeight: 900, color: '#C084FC', margin: '4px 0' }}>₹{dailyStats.pass.revenueRupees}</div>
+                <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.pass.sales} passes · {dailyStats.pass.pending} pending</div>
               </div>
-
-              <div className="admin-stat-card" style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px' }}>
-                <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-title" style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
-                    Today's Content Sales
-                  </span>
-                  <Check size={16} color="#60A5FA" />
-                </div>
-                <div className="stat-value" style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', margin: '4px 0' }}>
-                  {today.todayPurchasesCount}
-                </div>
-                <div className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  Movies &amp; series purchased today
-                </div>
+            )}
+            {(dailyFilter === 'ALL' || dailyFilter === 'VIP_PLANS') && dailyStats.vip && (
+              <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>VIP Plans</div>
+                <div style={{ fontSize: '22px', fontWeight: 900, color: '#34D399', margin: '4px 0' }}>₹{dailyStats.vip.revenueRupees}</div>
+                <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.vip.sales} subs · {dailyStats.vip.pending} pending</div>
               </div>
-
-              <div className="admin-stat-card" style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px' }}>
-                <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-title" style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
-                    Wallet Recharges
-                  </span>
-                  <Wallet size={16} color="#C084FC" />
-                </div>
-                <div className="stat-value" style={{ fontSize: '24px', fontWeight: 900, color: '#C084FC', margin: '4px 0' }}>
-                  ₹{stats.walletActivity.totalRechargeRupees}
-                </div>
-                <div className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  {stats.walletActivity.totalTransactions} wallet transactions ledgered
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* MODE B: SUBSCRIPTION PLANS ANALYTICS VIEW (Only subscription metrics) */
-          <div
-            style={{
-              padding: '20px 22px',
-              borderRadius: '16px',
-              backgroundColor: 'rgba(245, 197, 24, 0.05)',
-              border: '1px solid rgba(245, 197, 24, 0.25)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: 'rgba(245, 197, 24, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-gold, #F5C518)' }}>
-                  <Crown size={18} />
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
-                      Subscription Plans Monetization Overview
-                    </h3>
-                    <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', backgroundColor: 'var(--brand-gold, #F5C518)', color: '#0E0E12', letterSpacing: '0.04em' }}>
-                      MODE ACTIVE
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px', display: 'block' }}>
-                    All-Access Pass active. Users pay via manual UPI QR &amp; UTR. Admin verifies before activation.
-                  </span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => onNavigateTab('admin-monetization')}
-                  className="btn btn-secondary btn-sm"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
-                >
-                  <Crown size={13} />
-                  <span>Configure Passes &amp; Pricing</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="admin-monetization-grid">
-              {/* Weekly Plan */}
-              <div className="admin-stat-card" style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px' }}>
-                <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-title" style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
-                    Weekly Pass
-                  </span>
-                  <Clock size={16} color="var(--brand-gold, #F5C518)" />
-                </div>
-                <div className="stat-value" style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', margin: '4px 0' }}>
-                  ₹{subConfig?.weeklyPrice || 49}
-                </div>
-                <div className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  7 Days uninterrupted access
-                </div>
-              </div>
-
-              {/* Monthly Plan */}
-              <div className="admin-stat-card" style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(245, 197, 24, 0.3)', padding: '16px' }}>
-                <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-title" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase' }}>
-                    Monthly Pass (Popular)
-                  </span>
-                  <Crown size={16} color="var(--brand-gold, #F5C518)" />
-                </div>
-                <div className="stat-value" style={{ fontSize: '24px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)', margin: '4px 0' }}>
-                  ₹{subConfig?.monthlyPrice || 149}
-                </div>
-                <div className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  30 Days full catalog HD/4K
-                </div>
-              </div>
-
-              {/* Yearly Plan */}
-              <div className="admin-stat-card" style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px' }}>
-                <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-title" style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
-                    Yearly Pass (Best Value)
-                  </span>
-                  <Sparkles size={16} color="#EC4899" />
-                </div>
-                <div className="stat-value" style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', margin: '4px 0' }}>
-                  ₹{subConfig?.yearlyPrice || 999}
-                </div>
-                <div className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  365 Days all-access pass
-                </div>
-              </div>
-
-              {/* Active Subscriptions */}
-              <div className="admin-stat-card" style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px' }}>
-                <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-title" style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
-                    Active Subscriptions
-                  </span>
-                  <ShieldCheck size={16} color="#10B981" />
-                </div>
-                <div className="stat-value" style={{ fontSize: '24px', fontWeight: 900, color: '#10B981', margin: '4px 0' }}>
-                  {subConfig?.metrics?.activeCount || 0}
-                </div>
-                <div className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  Subscribers currently active
-                </div>
-              </div>
-
-              {/* Pending Verification */}
-              <div
-                onClick={() => onNavigateTab('admin-monetization')}
-                className="admin-stat-card"
-                style={{
-                  backgroundColor: (subConfig?.metrics?.pendingCount || 0) > 0 ? 'rgba(245, 197, 24, 0.1)' : 'var(--bg-surface, #12121A)',
-                  borderRadius: '14px',
-                  border: (subConfig?.metrics?.pendingCount || 0) > 0 ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.08)',
-                  padding: '16px',
-                  cursor: 'pointer'
-                }}
-              >
-                <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-title" style={{ fontSize: '11px', fontWeight: 700, color: (subConfig?.metrics?.pendingCount || 0) > 0 ? 'var(--brand-gold, #F5C518)' : '#9CA3AF', textTransform: 'uppercase' }}>
-                    Pending UTR Approvals
-                  </span>
-                  <Clock size={16} color="var(--brand-gold, #F5C518)" />
-                </div>
-                <div className="stat-value" style={{ fontSize: '24px', fontWeight: 900, color: (subConfig?.metrics?.pendingCount || 0) > 0 ? 'var(--brand-gold, #F5C518)' : '#FFFFFF', margin: '4px 0' }}>
-                  {subConfig?.metrics?.pendingCount || 0}
-                </div>
-                <div className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  Awaiting administrator verification
-                </div>
-              </div>
-
-              {/* Total Subscription Revenue */}
-              <div className="admin-stat-card" style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '16px' }}>
-                <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span className="stat-title" style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
-                    Subscription Revenue
-                  </span>
-                  <DollarSign size={16} color="#34D399" />
-                </div>
-                <div className="stat-value" style={{ fontSize: '24px', fontWeight: 900, color: '#34D399', margin: '4px 0' }}>
-                  ₹{subConfig?.metrics?.totalRevenueRupees || 0}
-                </div>
-                <div className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  Gross subscription earnings
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
-      </div>
+
 
       {/* ========================================================================= */}
       {/* MILESTONE 3: TODAY ANALYTICS (00:00:00 -> 23:59:59 Automatic Rollover)   */}
@@ -699,7 +399,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                 Today's Performance
               </h2>
               <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                Active window: <strong>12:00:00 AM → 11:59:59 PM</strong> ({formattedTodayDate}) • Auto-rolls over at midnight
+                Active window: <strong>12:00:00 AM â†’ 11:59:59 PM</strong> ({formattedTodayDate}) â€¢ Auto-rolls over at midnight
               </span>
             </div>
           </div>
@@ -856,10 +556,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                       Today's Revenue / Gross Intake
                     </div>
                     <div style={{ fontSize: '28px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                      ₹{today.todayRevenueRupees}
+                      â‚¹{today.todayRevenueRupees}
                     </div>
                     <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                      ₹{today.todayPurchasesRevenueRupees} content sales + ₹{today.todayUpiRevenueRupees} UPI recharges
+                      â‚¹{today.todayPurchasesRevenueRupees} content sales + â‚¹{today.todayUpiRevenueRupees} UPI recharges
                     </div>
                   </div>
 
@@ -878,7 +578,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                       Today's Profit / Net Margin
                     </div>
                     <div style={{ fontSize: '28px', fontWeight: 900, color: '#34D399', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                      ₹{today.todayProfitRupees}
+                      â‚¹{today.todayProfitRupees}
                     </div>
                     <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
                       Gross 100% margin (Zero server hosting deduction)
@@ -902,7 +602,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                       Total Subscription Revenue
                     </div>
                     <div style={{ fontSize: '28px', fontWeight: 900, color: '#34D399', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                      ₹{subConfig?.metrics?.totalRevenueRupees || 0}
+                      â‚¹{subConfig?.metrics?.totalRevenueRupees || 0}
                     </div>
                     <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
                       Approved subscription gross intake
@@ -957,10 +657,10 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                 </div>
               </div>
               <div className="stat-value" style={{ fontSize: '26px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                ₹{currentMode === 'PER_CONTENT' ? today.todayRevenueRupees : (subConfig?.metrics?.totalRevenueRupees || 0)}
+                â‚¹{currentMode === 'PER_CONTENT' ? today.todayRevenueRupees : (subConfig?.metrics?.totalRevenueRupees || 0)}
               </div>
               <p className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF', margin: '0 0 8px' }}>
-                {currentMode === 'PER_CONTENT' ? `₹${today.todayPurchasesRevenueRupees} sales` : 'Approved passes'}
+                {currentMode === 'PER_CONTENT' ? `â‚¹${today.todayPurchasesRevenueRupees} sales` : 'Approved passes'}
               </p>
             </div>
             <div className="stat-action" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
@@ -991,7 +691,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                 </div>
               </div>
               <div className="stat-value" style={{ fontSize: '26px', fontWeight: 900, color: '#34D399', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                {currentMode === 'PER_CONTENT' ? `₹${today.todayProfitRupees}` : (subConfig?.metrics?.activeCount || 0)}
+                {currentMode === 'PER_CONTENT' ? `â‚¹${today.todayProfitRupees}` : (subConfig?.metrics?.activeCount || 0)}
               </div>
               <p className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF', margin: '0 0 8px' }}>
                 {currentMode === 'PER_CONTENT' ? '100% net margin' : 'Active users'}
@@ -1067,7 +767,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   {today.todayPurchasesCount}
                 </div>
                 <p className="stat-desc" style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
-                  ₹{today.todayPurchasesRevenueRupees} content revenue
+                  â‚¹{today.todayPurchasesRevenueRupees} content revenue
                 </p>
               </div>
               <div className="stat-action" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#34D399' }}>
@@ -1137,7 +837,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   </div>
                 </div>
                 <div className="stat-value" style={{ fontSize: '30px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '6px' }}>
-                  ₹{today.todayUpiRevenueRupees}
+                  â‚¹{today.todayUpiRevenueRupees}
                 </div>
                 <p className="stat-desc" style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
                   {today.todayUpiApprovedCount} approved UPI recharges
@@ -1213,7 +913,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   {today.pendingPaymentRequestsCount}
                 </div>
                 <p className="stat-desc" style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px' }}>
-                  ₹{today.pendingPaymentAmountRupees} awaiting approval
+                  â‚¹{today.pendingPaymentAmountRupees} awaiting approval
                 </p>
               </div>
               <div className="stat-action" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)' }}>
@@ -1245,7 +945,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   </div>
                 </div>
                 <div className="stat-value" style={{ fontSize: '20px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)', letterSpacing: '-0.01em', lineHeight: 1.2, margin: '6px 0' }}>
-                  ₹{subConfig?.weeklyPrice || 49} / ₹{subConfig?.monthlyPrice || 149} / ₹{subConfig?.yearlyPrice || 999}
+                  â‚¹{subConfig?.weeklyPrice || 49} / â‚¹{subConfig?.monthlyPrice || 149} / â‚¹{subConfig?.yearlyPrice || 999}
                 </div>
                 <p className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF', margin: '0 0 10px' }}>
                   Weekly / Monthly / Yearly passes
@@ -1354,7 +1054,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               {stats.totalUsers}
             </div>
             <span style={{ fontSize: '11px', color: 'var(--brand-gold, #F5C518)', marginTop: '4px' }}>
-              Manage users →
+              Manage users â†’
             </span>
           </div>
 
@@ -1375,7 +1075,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               Total Revenue
             </span>
             <div style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', marginTop: '6px' }}>
-              ₹{stats.totalRevenueRupees}
+              â‚¹{stats.totalRevenueRupees}
             </div>
             <span style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
               All-time platform gross
@@ -1410,7 +1110,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               {stats.totalMovies}
             </div>
             <span style={{ fontSize: '11px', color: 'var(--brand-gold, #F5C518)', marginTop: '4px' }}>
-              View Movies catalog →
+              View Movies catalog â†’
             </span>
           </div>
 
@@ -1442,7 +1142,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               {stats.totalSeries}
             </div>
             <span style={{ fontSize: '11px', color: 'var(--brand-gold, #F5C518)', marginTop: '4px' }}>
-              View Series catalog →
+              View Series catalog â†’
             </span>
           </div>
         </div>
@@ -1516,7 +1216,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                   </span>
                 </div>
                 <span style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px', display: 'block' }}>
-                  Records strictly within <strong>00:00:00 AM → 11:59:59 PM</strong> calendar day
+                  Records strictly within <strong>00:00:00 AM â†’ 11:59:59 PM</strong> calendar day
                 </span>
               </div>
 
@@ -1563,15 +1263,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
                         <span>Content Purchases Revenue (Paise to INR):</span>
-                        <strong style={{ color: '#10B981' }}>+₹{today.todayPurchasesRevenueRupees}</strong>
+                        <strong style={{ color: '#10B981' }}>+â‚¹{today.todayPurchasesRevenueRupees}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
                         <span>Approved UPI Wallet Recharge Deposits:</span>
-                        <strong style={{ color: '#10B981' }}>+₹{today.todayUpiRevenueRupees}</strong>
+                        <strong style={{ color: '#10B981' }}>+â‚¹{today.todayUpiRevenueRupees}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
                         <span>External Bandwidth / Hosting / CDN Expenses:</span>
-                        <strong style={{ color: '#9CA3AF' }}>₹0.00 (Unconfigured in platform)</strong>
+                        <strong style={{ color: '#9CA3AF' }}>â‚¹0.00 (Unconfigured in platform)</strong>
                       </div>
                       <div
                         style={{
@@ -1585,7 +1285,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                         }}
                       >
                         <span>Net Calculated Operating Profit:</span>
-                        <span style={{ color: 'var(--brand-gold, #F5C518)' }}>₹{today.todayProfitRupees}</span>
+                        <span style={{ color: 'var(--brand-gold, #F5C518)' }}>â‚¹{today.todayProfitRupees}</span>
                       </div>
                     </div>
                   </div>
@@ -1682,7 +1382,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                               </div>
                               <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
                                 {record.email || record.userEmail || ''}
-                                {record.contentType ? ` • ${record.contentType}` : ''}
+                                {record.contentType ? ` â€¢ ${record.contentType}` : ''}
                                 {record.utr && (
                                   <button
                                     type="button"
@@ -1720,7 +1420,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                             <div style={{ textAlign: 'right' }}>
                               {record.amountRupees !== undefined && (
                                 <div style={{ fontSize: '15px', fontWeight: 800, color: '#10B981' }}>
-                                  ₹{record.amountRupees}
+                                  â‚¹{record.amountRupees}
                                 </div>
                               )}
                               {record.status && (
@@ -1773,7 +1473,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               }}
             >
               <span style={{ fontSize: '12px', color: '#6B7280' }}>
-                Window: 00:00:00 AM → 11:59:59 PM ({today.calendarDate})
+                Window: 00:00:00 AM â†’ 11:59:59 PM ({today.calendarDate})
               </span>
 
               <div style={{ display: 'flex', gap: '10px' }}>

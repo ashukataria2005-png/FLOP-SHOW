@@ -105,13 +105,13 @@ const navGroups: NavGroup[] = [
       { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck }
     ]
   },
-  // 5. Monetization & Access Passes
+  // 5. Analytics & Access Passes
   {
-    id: 'group-monetization',
-    title: 'SUBSCRIPTION / MONETIZATION',
-    icon: Crown,
+    id: 'group-analytics',
+    title: 'ANALYTICS & PASSES',
+    icon: TrendingUp,
     items: [
-      { id: 'admin-monetization', label: 'Subscription / Monetization', icon: Crown },
+      { id: 'admin-analytics', label: 'Analytics', icon: TrendingUp },
       { id: 'admin-watch-pass', label: 'Watch Passes', icon: Zap }
     ]
   },
@@ -177,7 +177,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Quick Login state (device-bound persistent admin session token — NEVER plaintext password)
+  // Quick Login state (device-bound persistent admin session token â€” NEVER plaintext password)
   const [quickLoginData, setQuickLoginData] = useState<AdminQuickLoginData | null>(() => {
     try {
       const raw = localStorage.getItem(ADMIN_QUICK_LOGIN_KEY);
@@ -382,7 +382,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 marginBottom: '14px'
               }}
             >
-              <span>⚡ Remembered Device • Quick Login</span>
+              <span>âš¡ Remembered Device â€¢ Quick Login</span>
             </div>
 
             <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF', marginBottom: '8px' }}>
@@ -866,7 +866,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               color: '#D1D5DB'
             }}
           >
-            <span style={{ color: 'var(--brand-gold, #F5C518)', fontWeight: 800 }}>•</span>
+            <span style={{ color: 'var(--brand-gold, #F5C518)', fontWeight: 800 }}>â€¢</span>
             <span>{currentSectionLabel}</span>
           </div>
         </div>

@@ -24,12 +24,13 @@ paymentRouter.get('/config', async (_req, res, next) => {
 // Submit a new manual UPI payment request with UTR
 paymentRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
-    const { amount, utr, userName, userEmail } = req.body;
+    const { amount, utr, userName, userEmail, contentId } = req.body;
     const request = await paymentRequestService.submitPaymentRequest(req.user!.id, {
       amountRupees: Number(amount),
       utr,
       userName: userName || (req.user as any)?.name,
       userEmail: userEmail || req.user!.email,
+      contentId: contentId || null,
     });
 
     res.status(201).json({
@@ -92,11 +93,14 @@ paymentRouter.get('/admin/settings', requireAuth, requireAdmin, async (_req, res
 // Admin update payment configuration
 paymentRouter.post('/admin/settings', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const { upiId, enabled, merchantName } = req.body;
+    const { upiId, merchantName, approvalMode } = req.body;
+    // Only pass 'enabled' when it is explicitly provided; otherwise undefined preserves existing value.
+    const enabled = 'enabled' in req.body ? Boolean(req.body.enabled) : undefined;
     const updated = await paymentRequestService.updatePaymentConfig({
       upiId,
-      enabled: Boolean(enabled),
+      enabled,
       merchantName,
+      approvalMode,
     });
     res.json({
       success: true,

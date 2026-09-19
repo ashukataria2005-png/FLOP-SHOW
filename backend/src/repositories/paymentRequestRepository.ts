@@ -15,6 +15,7 @@ export interface PaymentRequestRecord {
   processed_at: string | null;
   created_at: string;
   updated_at: string;
+  content_id: string | null; // tracks per-title payments (movie/series)
 }
 
 export interface PaymentMetrics {
@@ -37,6 +38,7 @@ export const paymentRequestRepository = {
       upiIdSnapshot: string;
       utr: string;
       submittedAt: string;
+      contentId?: string | null;
     },
     adapter?: DbAdapter
   ): Promise<void> {
@@ -45,8 +47,8 @@ export const paymentRequestRepository = {
     await db.run(
       `INSERT INTO upi_payment_requests (
         id, user_id, user_name, user_email, amount, upi_id_snapshot,
-        utr, status, admin_id, admin_note, submitted_at, processed_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', NULL, NULL, ?, NULL, ?, ?);`,
+        utr, status, admin_id, admin_note, submitted_at, processed_at, content_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', NULL, NULL, ?, NULL, ?, ?, ?);`,
       [
         data.id,
         data.userId,
@@ -56,6 +58,7 @@ export const paymentRequestRepository = {
         data.upiIdSnapshot,
         data.utr.trim(),
         data.submittedAt,
+        data.contentId || null,
         now,
         now,
       ]

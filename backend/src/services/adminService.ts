@@ -1074,5 +1074,257 @@ export const adminService = {
       message: `Successfully deleted ${validTargetIds.length} user(s).`
     };
   },
-};
 
+  async getUnifiedAnalytics(filter = 'ALL') {
+    const db = getAdapter();
+    const now = new Date().toISOString();
+
+    let movieSeries = { total: 0, revenueRupees: 0, successful: 0, active: 0, expired: 0, pending: 0, rejected: 0, byPlan: {} as Record<string, number> };
+    if (filter === 'ALL' || filter === 'MOVIE_SERIES') {
+      const [{ rows: [t] }, { rows: [r] }, { rows: [a] }, { rows: [e] }, { rows: [p] }, { rows: [rj] }, { rows: contentTypes }] = await Promise.all([
+        db.query("SELECT COUNT(*) as c FROM purchases WHERE status = 'COMPLETED'"),
+        db.query("SELECT COALESCE(SUM(amount_paid), 0) as s FROM purchases WHERE status = 'COMPLETED'"),
+        db.query("SELECT COUNT(*) as c FROM purchases WHERE status = 'COMPLETED' AND (expires_at IS NULL OR expires_at > ?)", [now]),
+        db.query("SELECT COUNT(*) as c FROM purchases WHERE status = 'COMPLETED' AND expires_at IS NOT NULL AND expires_at <= ?", [now]),
+        db.query("SELECT COUNT(*) as c FROM upi_payment_requests WHERE content_id IS NOT NULL AND status = 'PENDING'"),
+        db.query("SELECT COUNT(*) as c FROM upi_payment_requests WHERE content_id IS NOT NULL AND status = 'REJECTED'"),
+        db.query("SELECT c.type, COUNT(*) as cnt, COALESCE(SUM(p.amount_paid), 0) as rev FROM purchases p JOIN content c ON p.content_id = c.id WHERE p.status = 'COMPLETED' GROUP BY c.type"),
+      ]);
+      const byPlan: Record<string, number> = {};
+      for (const row of (contentTypes || []) as any[]) {
+        if (row.type) {
+          byPlan[row.type] = Math.round(Number(row.rev || 0) / 100);
+        }
+      }
+      movieSeries = {
+        total: Number((t as any)?.c || 0),
+        revenueRupees: Math.round(Number((r as any)?.s || 0) / 100),
+        successful: Number((t as any)?.c || 0),
+        active: Number((a as any)?.c || 0),
+        expired: Number((e as any)?.c || 0),
+        pending: Number((p as any)?.c || 0),
+        rejected: Number((rj as any)?.c || 0),
+        byPlan,
+      };
+    }
+
+    let watchPass = { total: 0, revenueRupees: 0, successful: 0, active: 0, expired: 0, pending: 0, rejected: 0, byPlan: {} as Record<string, number> };
+    if (filter === 'ALL' || filter === 'WATCH_PASS') {
+      const [{ rows: [t] }, { rows: [r] }, { rows: [a] }, { rows: [ex] }, { rows: [p] }, { rows: [rj] }, { rows: plans }] = await Promise.all([
+        db.query("SELECT COUNT(*) as c FROM watch_passes"),
+        db.query("SELECT COALESCE(SUM(amount_paid), 0) as s FROM watch_passes WHERE status IN ('ACTIVE', 'EXPIRED')"),
+        db.query("SELECT COUNT(*) as c FROM watch_passes WHERE status = 'ACTIVE' AND (expires_at IS NULL OR expires_at > ?)", [now]),
+        db.query("SELECT COUNT(*) as c FROM watch_passes WHERE status = 'EXPIRED' OR (status = 'ACTIVE' AND expires_at IS NOT NULL AND expires_at <= ?)", [now]),
+        db.query("SELECT COUNT(*) as c FROM watch_passes WHERE status = 'PENDING'"),
+        db.query("SELECT COUNT(*) as c FROM watch_passes WHERE status = 'REJECTED'"),
+        db.query("SELECT plan, COALESCE(SUM(amount_paid), 0) as rev FROM watch_passes WHERE status IN ('ACTIVE', 'EXPIRED') GROUP BY plan"),
+      ]);
+      const byPlan: Record<string, number> = {};
+      for (const row of (plans || []) as any[]) {
+        if (row.plan) {
+          byPlan[row.plan] = Math.round(Number(row.rev || 0) / 100);
+        }
+      }
+      watchPass = {
+        total: Number((t as any)?.c || 0),
+        revenueRupees: Math.round(Number((r as any)?.s || 0) / 100),
+        successful: Number((a as any)?.c || 0) + Number((ex as any)?.c || 0),
+        active: Number((a as any)?.c || 0),
+        expired: Number((ex as any)?.c || 0),
+        pending: Number((p as any)?.c || 0),
+        rejected: Number((rj as any)?.c || 0),
+        byPlan,
+      };
+    }
+
+    let vipPlans = { total: 0, revenueRupees: 0, successful: 0, active: 0, expired: 0, pending: 0, rejected: 0, byPlan: {} as Record<string, number> };
+    if (filter === 'ALL' || filter === 'VIP_PLANS') {
+      const [{ rows: [t] }, { rows: [r] }, { rows: [a] }, { rows: [ex] }, { rows: [p] }, { rows: [rj] }, { rows: plans }] = await Promise.all([
+        db.query("SELECT COUNT(*) as c FROM subscriptions"),
+        db.query("SELECT COALESCE(SUM(amount_paid), 0) as s FROM subscriptions WHERE status IN ('ACTIVE', 'EXPIRED')"),
+        db.query("SELECT COUNT(*) as c FROM subscriptions WHERE status = 'ACTIVE' AND (end_date IS NULL OR end_date > ?)", [now]),
+        db.query("SELECT COUNT(*) as c FROM subscriptions WHERE status = 'EXPIRED' OR (status = 'ACTIVE' AND end_date IS NOT NULL AND end_date <= ?)", [now]),
+        db.query("SELECT COUNT(*) as c FROM subscriptions WHERE status = 'PENDING'"),
+        db.query("SELECT COUNT(*) as c FROM subscriptions WHERE status IN ('REJECTED', 'CANCELLED')"),
+        db.query("SELECT plan, COALESCE(SUM(amount_paid), 0) as rev FROM subscriptions WHERE status IN ('ACTIVE', 'EXPIRED') GROUP BY plan"),
+      ]);
+      const byPlan: Record<string, number> = {};
+      for (const row of (plans || []) as any[]) {
+        if (row.plan) {
+          byPlan[row.plan] = Math.round(Number(row.rev || 0) / 100);
+        }
+      }
+      vipPlans = {
+        total: Number((t as any)?.c || 0),
+        revenueRupees: Math.round(Number((r as any)?.s || 0) / 100),
+        successful: Number((a as any)?.c || 0) + Number((ex as any)?.c || 0),
+        active: Number((a as any)?.c || 0),
+        expired: Number((ex as any)?.c || 0),
+        pending: Number((p as any)?.c || 0),
+        rejected: Number((rj as any)?.c || 0),
+        byPlan,
+      };
+    }
+
+    let recentTransactions: any[] = [];
+    if (filter === 'ALL' || filter === 'MOVIE_SERIES') {
+      const { rows } = await db.query(
+        `SELECT p.id, u.name as user_name, c.title as content_title, c.type as content_type, p.amount_paid as amount, p.purchased_at as ts
+         FROM purchases p
+         JOIN users u ON p.user_id = u.id
+         JOIN content c ON p.content_id = c.id
+         WHERE p.status = 'COMPLETED'
+         ORDER BY p.purchased_at DESC LIMIT 20`
+      );
+      recentTransactions.push(
+        ...(rows as any[]).map(r => ({
+          id: r.id,
+          category: 'MOVIE_SERIES',
+          userName: r.user_name,
+          title: `${r.content_title} (${r.content_type})`,
+          amountRupees: Math.round(Number(r.amount) / 100),
+          timestamp: r.ts,
+        }))
+      );
+    }
+
+    if (filter === 'ALL' || filter === 'WATCH_PASS') {
+      const { rows } = await db.query(
+        `SELECT wp.id, u.name as user_name, wp.plan, wp.amount_paid as amount, wp.submitted_at as ts
+         FROM watch_passes wp
+         JOIN users u ON wp.user_id = u.id
+         WHERE wp.status IN ('ACTIVE', 'EXPIRED')
+         ORDER BY wp.submitted_at DESC LIMIT 20`
+      );
+      recentTransactions.push(
+        ...(rows as any[]).map(r => ({
+          id: r.id,
+          category: 'WATCH_PASS',
+          userName: r.user_name,
+          title: `Watch Pass (${r.plan})`,
+          amountRupees: Math.round(Number(r.amount) / 100),
+          timestamp: r.ts,
+        }))
+      );
+    }
+
+    if (filter === 'ALL' || filter === 'VIP_PLANS') {
+      const { rows } = await db.query(
+        `SELECT s.id, u.name as user_name, s.plan, s.amount_paid as amount, s.submitted_at as ts
+         FROM subscriptions s
+         JOIN users u ON s.user_id = u.id
+         WHERE s.status IN ('ACTIVE', 'EXPIRED')
+         ORDER BY s.submitted_at DESC LIMIT 20`
+      );
+      recentTransactions.push(
+        ...(rows as any[]).map(r => ({
+          id: r.id,
+          category: 'VIP_PLANS',
+          userName: r.user_name,
+          title: `VIP ${r.plan}`,
+          amountRupees: Math.round(Number(r.amount) / 100),
+          timestamp: r.ts,
+        }))
+      );
+    }
+
+    recentTransactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    const totalRevenueRupees =
+      filter === 'MOVIE_SERIES'
+        ? movieSeries.revenueRupees
+        : filter === 'WATCH_PASS'
+        ? watchPass.revenueRupees
+        : filter === 'VIP_PLANS'
+        ? vipPlans.revenueRupees
+        : movieSeries.revenueRupees + watchPass.revenueRupees + vipPlans.revenueRupees;
+
+    const totalSales =
+      filter === 'MOVIE_SERIES'
+        ? movieSeries.successful
+        : filter === 'WATCH_PASS'
+        ? watchPass.successful
+        : filter === 'VIP_PLANS'
+        ? vipPlans.successful
+        : movieSeries.successful + watchPass.successful + vipPlans.successful;
+
+    const successful = totalSales;
+    const pending =
+      filter === 'MOVIE_SERIES'
+        ? movieSeries.pending
+        : filter === 'WATCH_PASS'
+        ? watchPass.pending
+        : filter === 'VIP_PLANS'
+        ? vipPlans.pending
+        : movieSeries.pending + watchPass.pending + vipPlans.pending;
+
+    const rejected =
+      filter === 'MOVIE_SERIES'
+        ? movieSeries.rejected
+        : filter === 'WATCH_PASS'
+        ? watchPass.rejected
+        : filter === 'VIP_PLANS'
+        ? vipPlans.rejected
+        : movieSeries.rejected + watchPass.rejected + vipPlans.rejected;
+
+    const active =
+      filter === 'MOVIE_SERIES'
+        ? movieSeries.active
+        : filter === 'WATCH_PASS'
+        ? watchPass.active
+        : filter === 'VIP_PLANS'
+        ? vipPlans.active
+        : movieSeries.active + watchPass.active + vipPlans.active;
+
+    const expired =
+      filter === 'MOVIE_SERIES'
+        ? movieSeries.expired
+        : filter === 'WATCH_PASS'
+        ? watchPass.expired
+        : filter === 'VIP_PLANS'
+        ? vipPlans.expired
+        : movieSeries.expired + watchPass.expired + vipPlans.expired;
+
+    return {
+      filter,
+      totalRevenueRupees,
+      totalSales,
+      successful,
+      pending,
+      rejected,
+      active,
+      expired,
+      movieSeries,
+      watchPass,
+      vipPlans,
+      recentTransactions: recentTransactions.slice(0, 30),
+    };
+  },
+
+  async getDailyAnalytics(filter = 'ALL', tzOffsetMinutes?: number) {
+    const db = getAdapter();
+    const { startISO, endISO, calendarDate } = getDayBounds(tzOffsetMinutes);
+    let oneTitle = { sales: 0, revenueRupees: 0 };
+    let pass = { sales: 0, revenueRupees: 0, pending: 0 };
+    let vip = { sales: 0, revenueRupees: 0, pending: 0 };
+    if (filter === 'ALL' || filter === 'ONE_TITLE') {
+      const { rows: [r] } = await db.query(`SELECT COUNT(*) as c, COALESCE(SUM(amount_paid),0) as s FROM purchases WHERE status='COMPLETED' AND purchased_at >= ? AND purchased_at <= ?`, [startISO, endISO]);
+      oneTitle = { sales: Number((r as any)?.c||0), revenueRupees: Math.round(Number((r as any)?.s||0)/100) };
+    }
+    if (filter === 'ALL' || filter === 'PASS') {
+      const [{ rows: [r] }, { rows: [p] }] = await Promise.all([
+        db.query(`SELECT COUNT(*) as c, COALESCE(SUM(amount_paid),0) as s FROM watch_passes WHERE status IN ('ACTIVE','EXPIRED') AND activated_at >= ? AND activated_at <= ?`, [startISO, endISO]),
+        db.query("SELECT COUNT(*) as c FROM watch_passes WHERE status = 'PENDING'"),
+      ]);
+      pass = { sales: Number((r as any)?.c||0), revenueRupees: Math.round(Number((r as any)?.s||0)/100), pending: Number((p as any)?.c||0) };
+    }
+    if (filter === 'ALL' || filter === 'VIP_PLANS') {
+      const [{ rows: [r] }, { rows: [p] }] = await Promise.all([
+        db.query(`SELECT COUNT(*) as c, COALESCE(SUM(amount_paid),0) as s FROM subscriptions WHERE status IN ('ACTIVE','EXPIRED') AND activated_at >= ? AND activated_at <= ?`, [startISO, endISO]),
+        db.query("SELECT COUNT(*) as c FROM subscriptions WHERE status = 'PENDING'"),
+      ]);
+      vip = { sales: Number((r as any)?.c||0), revenueRupees: Math.round(Number((r as any)?.s||0)/100), pending: Number((p as any)?.c||0) };
+    }
+    return { filter, calendarDate, windowStart: startISO, windowEnd: endISO, totalSales: oneTitle.sales + pass.sales + vip.sales, totalRevenueRupees: oneTitle.revenueRupees + pass.revenueRupees + vip.revenueRupees, oneTitle, pass, vip };
+  },
+};

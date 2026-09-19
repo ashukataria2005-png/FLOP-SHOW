@@ -24,6 +24,7 @@ export const PurchaseModal: React.FC = () => {
     closePurchaseModal,
     walletBalance,
     buyContent,
+    syncPurchases,
     openAuthModal,
     startPlaying,
     isAuthenticated,
@@ -175,15 +176,11 @@ export const PurchaseModal: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const res = await api.payments.submitRequest(price, cleanUtr, user?.name, user?.email);
+      const res = await api.payments.submitRequest(price, cleanUtr, user?.name, user?.email, purchaseTarget.id);
       if (res?.payment?.status === 'APPROVED') {
-        // Automatic Approval mode: immediately execute title purchase
-        const buyRes = await buyContent(purchaseTarget);
-        if (buyRes.success) {
-          setPurchasedSuccess(true);
-        } else {
-          setSubmittedPending(true);
-        }
+        // Automatic Approval mode: title entitlement is active in backend
+        await syncPurchases();
+        setPurchasedSuccess(true);
       } else {
         // Manual verification mode: pending review
         setSubmittedPending(true);

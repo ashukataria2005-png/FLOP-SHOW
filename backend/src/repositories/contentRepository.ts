@@ -226,12 +226,12 @@ export const contentRepository = {
 
     if (query.trim() !== '') {
       whereConditions.push(`(
-        c.title LIKE ? OR
-        c.description LIKE ? OR
-        c.director LIKE ? OR
-        c.cast_json LIKE ?
+        LOWER(c.title) LIKE ? OR
+        LOWER(c.description) LIKE ? OR
+        LOWER(c.director) LIKE ? OR
+        LOWER(c.cast_json) LIKE ?
       )`);
-      const term = `%${query.trim()}%`;
+      const term = `%${query.trim().toLowerCase()}%`;
       whereParams.push(term, term, term, term);
     }
 

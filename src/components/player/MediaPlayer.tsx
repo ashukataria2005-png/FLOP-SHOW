@@ -34,6 +34,8 @@ export interface MediaPlayerSource {
   vcdnStatus?: string;
   maxResolution?: '720p' | '1080p';
   downloadAllowed?: boolean;
+  mimeType?: string;
+  format?: 'hls' | 'mp4' | 'embed' | 'dash';
   subtitles?: Array<{
     id?: string;
     label: string;
@@ -300,7 +302,12 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
-    const isHls = source.url.includes('.m3u8') || source.url.includes('stream.vcdn.me') || source.url.includes('/master.m3u8');
+    const isHls = source.url.includes('.m3u8') ||
+                  source.url.includes('m3u8') ||
+                  source.url.includes('stream.vcdn.me') ||
+                  source.url.includes('/master.m3u8') ||
+                  Boolean(source.mimeType && (source.mimeType.includes('mpegurl') || source.mimeType.includes('m3u8'))) ||
+                  source.format === 'hls';
 
     // Clean up any existing Hls instance
     if (hlsRef.current) {

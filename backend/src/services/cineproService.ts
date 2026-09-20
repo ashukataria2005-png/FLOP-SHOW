@@ -327,12 +327,18 @@ export class CineproService {
     const chosen = sortedSources[0];
     if (!chosen || !chosen.url) return null;
 
-    // Resolve URL: If CinePro returned a relative proxy URL (e.g. /v1/proxy?data=...),
-    // make it absolute using the configured CinePro base URL.
-    const targetBase = (extra?.baseUrlOverride || this.baseUrl).replace(/\/+$/, '');
+    // Resolve URL: If CinePro returned a proxy path (/v1/proxy?data=...), route via FLOPSHOW's backend proxy
     let fullStreamUrl = chosen.url.trim();
-    if (fullStreamUrl.startsWith('/')) {
-      fullStreamUrl = `${targetBase}${fullStreamUrl}`;
+    if (fullStreamUrl.includes('/v1/proxy?')) {
+      const queryPart = fullStreamUrl.substring(fullStreamUrl.indexOf('/v1/proxy?'));
+      fullStreamUrl = `/api/streaming/cinepro/proxy${queryPart.substring('/v1/proxy'.length)}`;
+    } else if (fullStreamUrl.startsWith('/v1/proxy') || fullStreamUrl.startsWith('v1/proxy')) {
+      const queryPart = fullStreamUrl.includes('?') ? fullStreamUrl.substring(fullStreamUrl.indexOf('?')) : '';
+      fullStreamUrl = `/api/streaming/cinepro/proxy${queryPart}`;
+    } else if (fullStreamUrl.startsWith('/')) {
+      const targetBase = (extra?.baseUrlOverride || this.baseUrl).replace(/\/+$/, '');
+      const resolvedTarget = `${targetBase}${fullStreamUrl}`;
+      fullStreamUrl = `/api/streaming/cinepro/proxy?data=${encodeURIComponent(JSON.stringify({ url: resolvedTarget }))}`;
     }
 
     // Determine playback format
@@ -357,8 +363,15 @@ export class CineproService {
           .filter((sub: any) => sub && (sub.url || sub.file))
           .map((sub: any, idx: number) => {
             let subUrl = (sub.url || sub.file).trim();
-            if (subUrl.startsWith('/')) {
-              subUrl = `${targetBase}${subUrl}`;
+            if (subUrl.includes('/v1/proxy?')) {
+              const queryPart = subUrl.substring(subUrl.indexOf('/v1/proxy?'));
+              subUrl = `/api/streaming/cinepro/proxy${queryPart.substring('/v1/proxy'.length)}`;
+            } else if (subUrl.startsWith('/v1/proxy') || subUrl.startsWith('v1/proxy')) {
+              const queryPart = subUrl.includes('?') ? subUrl.substring(subUrl.indexOf('?')) : '';
+              subUrl = `/api/streaming/cinepro/proxy${queryPart}`;
+            } else if (subUrl.startsWith('/')) {
+              const targetBase = (extra?.baseUrlOverride || this.baseUrl).replace(/\/+$/, '');
+              subUrl = `/api/streaming/cinepro/proxy?data=${encodeURIComponent(JSON.stringify({ url: `${targetBase}${subUrl}` }))}`;
             }
             return {
               id: sub.id || `sub-${idx}`,
@@ -440,51 +453,6 @@ export class CineproService {
     } finally {
       clearTimeout(timeout);
     }
-  }
-
-  /**
-   * Explicit Legal Benchmark Stream Generator (used ONLY in offline test suites)
-   */
-  getLegalTestMovieStream(contentId: string, title?: string): NormalizedStreamingSource {
-    return {
-      title: title || 'Licensed Test Stream (Adaptive Multi-Bitrate HLS)',
-      type: 'movie',
-      source: 'TEST_STREAM',
-      streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      format: 'hls',
-      quality: '1080p',
-      contentId,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    };
-  }
-
-  /**
-   * Explicit Legal Benchmark Stream Generator for Episodes (used ONLY in offline test suites)
-   */
-  getLegalTestEpisodeStream(
-    contentId: string,
-    episodeId: string,
-    options: {
-      title?: string;
-      seasonNumber?: number;
-      episodeNumber?: number;
-    } = {}
-  ): NormalizedStreamingSource {
-    const s = options.seasonNumber || 1;
-    const e = options.episodeNumber || 1;
-    return {
-      title: options.title ? `S${s} E${e}: ${options.title}` : `Episode Streaming Feed (S${s} E${e})`,
-      type: 'series',
-      source: 'TEST_STREAM',
-      streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      format: 'hls',
-      quality: '1080p',
-      contentId,
-      episodeId,
-      seasonNumber: s,
-      episodeNumber: e,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    };
   }
 }
 

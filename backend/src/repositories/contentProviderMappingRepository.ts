@@ -50,7 +50,9 @@ const CANONICAL_CATALOG_MAPPINGS: Record<string, { externalId: string; mediaType
   'taaza-khabar': { externalId: '216262', mediaType: 'tv' },
   'the-family-man': { externalId: '93741', mediaType: 'tv' },
   'scam-1992-the-harshad-mehta-story-2020': { externalId: '110972', mediaType: 'tv' },
-  'scam-1992': { externalId: '110972', mediaType: 'tv' }
+  'scam-1992': { externalId: '110972', mediaType: 'tv' },
+  'panchayat': { externalId: '119243', mediaType: 'tv' },
+  'panchayat-2020': { externalId: '119243', mediaType: 'tv' }
 };
 
 export const contentProviderMappingRepository = {

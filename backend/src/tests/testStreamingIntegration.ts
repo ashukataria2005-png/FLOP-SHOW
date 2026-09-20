@@ -179,28 +179,9 @@ async function runAllTests() {
     assert(epStream?.type === 'series', 'Normalized type is "series"');
     assert(epStream?.seasonNumber === 1 && epStream?.episodeNumber === 1, 'Season & episode numbers preserved');
     assert(epStream?.episodeId === 'ep-test-viking-1', 'Episode ID properly mapped');
-    assert(Boolean(epStream?.streamUrl.includes('s1-e1') || epStream?.streamUrl.includes('1/1')), 'Episode-specific stream URL returned (not series-level)');
+    assert(Boolean(decodeURIComponent(epStream?.streamUrl || '').includes('1/1') || epStream?.streamUrl.includes('s1-e1') || epStream?.streamUrl.includes('1/1')), 'Episode-specific stream URL returned (not series-level)');
 
-    // C. Stream availability & byte transmission
-    console.log('\n--- Step 5: Actual Playback Media Accessibility ---');
-    if (movieStream?.streamUrl) {
-      const mediaRes = await fetch(movieStream.streamUrl);
-      assert(mediaRes.status === 200, 'Stream URL returns HTTP 200 playable data');
-      const text = await mediaRes.text();
-      assert(text.includes('#EXTM3U'), 'Stream URL delivers valid HLS playlist content');
-    }
-
-    // D. Database Content Provider Mapping
-    console.log('\n--- Step 6: Database Content Mapping (FLOPSHOW ID -> TMDB External ID) ---');
-    // Test mapping lookup
-    const canonicalMovieId = await contentProviderMappingRepository.resolveExternalId('the-dark-knight', 'movie', 'The Dark Knight');
-    assert(canonicalMovieId === '155', 'Content mapping cleanly resolves "The Dark Knight" to TMDB ID 155');
-
-    const canonicalSeriesId = await contentProviderMappingRepository.resolveExternalId('vikings-series', 'tv', 'Vikings');
-    assert(canonicalSeriesId === '44217', 'Content mapping cleanly resolves "Vikings" to TMDB ID 44217');
-
-    // E. Express Server Endpoints & Entitlement Security
-    console.log('\n--- Step 7: Express API & Entitlement Security Enforcement ---');
+    // Start Express server for API, Entitlement, & Proxy testing
     const app = createServer();
     const server: Server = await new Promise((resolve) => {
       const s = app.listen(0, '127.0.0.1', () => resolve(s));
@@ -209,6 +190,29 @@ async function runAllTests() {
     const expressBaseUrl = `http://127.0.0.1:${addr.port}`;
 
     try {
+      // C. Stream availability & byte transmission via CinePro Proxy
+      console.log('\n--- Step 5: Actual Playback Media Accessibility via Proxy ---');
+      if (movieStream?.streamUrl) {
+        const fullMediaUrl = movieStream.streamUrl.startsWith('http')
+          ? movieStream.streamUrl
+          : `${expressBaseUrl}${movieStream.streamUrl}`;
+        const mediaRes = await fetch(fullMediaUrl);
+        assert(mediaRes.status === 200, 'Stream URL returns HTTP 200 playable data via proxy');
+        const text = await mediaRes.text();
+        assert(text.includes('#EXTM3U'), 'Stream URL delivers valid HLS playlist content');
+      }
+
+      // D. Database Content Provider Mapping
+      console.log('\n--- Step 6: Database Content Mapping (FLOPSHOW ID -> TMDB External ID) ---');
+      // Test mapping lookup
+      const canonicalMovieId = await contentProviderMappingRepository.resolveExternalId('the-dark-knight', 'movie', 'The Dark Knight');
+      assert(canonicalMovieId === '155', 'Content mapping cleanly resolves "The Dark Knight" to TMDB ID 155');
+
+      const canonicalSeriesId = await contentProviderMappingRepository.resolveExternalId('vikings-series', 'tv', 'Vikings');
+      assert(canonicalSeriesId === '44217', 'Content mapping cleanly resolves "Vikings" to TMDB ID 44217');
+
+      // E. Express Server Endpoints & Entitlement Security
+      console.log('\n--- Step 7: Express API & Entitlement Security Enforcement ---');
       // 7a: Status endpoint
       const statusRes = await fetch(`${expressBaseUrl}/api/streaming/status`);
       assert(statusRes.status === 200, 'GET /api/streaming/status returns 200');

@@ -320,8 +320,8 @@ export const mediaService = {
       mainVideoUrl = null;
     }
 
-    // Google Cloud gtv-videos-bucket has been locked down (returns 403 Forbidden). Route to streaming adapter.
-    if (mainVideoUrl && mainVideoUrl.includes('commondatastorage.googleapis.com')) {
+    // Filter out temporary demo streams immediately
+    if (mainVideoUrl && (mainVideoUrl.includes('commondatastorage.googleapis.com') || mainVideoUrl.includes('test-streams.mux.dev') || mainVideoUrl.includes('vjs.zencdn.net'))) {
       mainVideoUrl = null;
     }
 
@@ -405,7 +405,7 @@ export const mediaService = {
   ): Promise<MediaPlayableResponse> {
     const db = getAdapter();
     const { rows } = await db.query(
-      `SELECT e.*, s.content_id, c.title as series_title, c.price,
+      `SELECT e.*, s.content_id, s.content_id as series_id, s.season_number, c.title as series_title, c.price,
               c.poster as series_poster, c.backdrop as series_backdrop,
               c.trailer_url as series_trailer_url
        FROM episodes e
@@ -494,18 +494,22 @@ export const mediaService = {
       videoUrl = null;
     }
 
-    // Google Cloud gtv-videos-bucket has been locked down (returns 403 Forbidden). Route to streaming adapter.
-    if (videoUrl && videoUrl.includes('commondatastorage.googleapis.com')) {
+    // Filter out temporary demo streams immediately
+    if (videoUrl && (videoUrl.includes('commondatastorage.googleapis.com') || videoUrl.includes('test-streams.mux.dev') || videoUrl.includes('vjs.zencdn.net'))) {
       videoUrl = null;
     }
 
     // CinePro Resolution for Episodes:
     if (mediaProvider === 'CINEPRO' || (!videoUrl && isCineproConfigured())) {
       try {
-        const streamSource = await cineproService.getEpisodeStream(episode.series_id, episode.id, {
-          title: episode.title,
-          seasonNumber: episode.season_number,
-          episodeNumber: episode.episode_number
+        const seriesContentId = episode.series_id || episode.content_id;
+        const seasonNum = episode.season_number ?? 1;
+        const episodeNum = episode.episode_number ?? 1;
+
+        const streamSource = await cineproService.getEpisodeStream(seriesContentId, episode.id, {
+          title: episode.series_title || episode.title,
+          seasonNumber: seasonNum,
+          episodeNumber: episodeNum
         });
         if (streamSource?.streamUrl) {
           videoUrl = streamSource.streamUrl;

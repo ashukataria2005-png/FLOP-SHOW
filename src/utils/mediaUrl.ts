@@ -78,8 +78,13 @@ export function resolveMediaUrl(rawUrl?: string | null, apiBaseUrl?: string): st
     return trimmed;
   }
 
-  // Relative upload path: resolve to absolute
-  if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
+  // Relative upload or backend proxy path: resolve to absolute
+  if (
+    trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/') ||
+    trimmed.startsWith('/api/') || trimmed.startsWith('api/') ||
+    trimmed.startsWith('/streaming/') || trimmed.startsWith('streaming/') ||
+    trimmed.startsWith('/v1/') || trimmed.startsWith('v1/')
+  ) {
     const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 
     // If apiBaseUrl is absolute (production Render backend URL), use its origin
@@ -102,7 +107,7 @@ export function resolveMediaUrl(rawUrl?: string | null, apiBaseUrl?: string): st
     }
 
     // For relative apiBaseUrl (local dev with Vite proxy), use current page origin
-    // so browser requests /uploads/... through the Vite proxy → backend
+    // so browser requests /uploads/... or /api/... through the Vite proxy → backend
     if (typeof window !== 'undefined' && window.location?.origin) {
       return `${window.location.origin}${cleanPath}`;
     }

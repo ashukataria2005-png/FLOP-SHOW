@@ -14,6 +14,15 @@ import { MediaPlayerSource } from '../components/player/MediaPlayer';
 import { api, tokenStorage, adminTokenStorage, API_BASE_URL } from '../services/api';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 
+function isDemoStreamUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  return (
+    url.includes('commondatastorage.googleapis.com') ||
+    url.includes('test-streams.mux.dev') ||
+    url.includes('vjs.zencdn.net')
+  );
+}
+
 interface Toast {
   id: string;
   message: string;
@@ -1000,15 +1009,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       }
 
-      // Safeguard: Ensure episode media never uses series trailer
+      // Safeguard: Ensure episode media never uses series trailer or demo streams
       if (content.trailerUrl && sourceUrl === content.trailerUrl) {
         sourceUrl = '';
       }
+      if (isDemoStreamUrl(sourceUrl)) {
+        sourceUrl = '';
+      }
 
-      if (!sourceUrl || sourceUrl.trim() === '' || sourceUrl.includes('commondatastorage.googleapis.com')) {
+      if (!sourceUrl || sourceUrl.trim() === '') {
         try {
           const streamRes = await api.streaming.getEpisodeStream(content.id, ep.id);
-          if (streamRes?.source?.streamUrl) {
+          if (streamRes?.source?.streamUrl && !isDemoStreamUrl(streamRes.source.streamUrl)) {
             sourceUrl = streamRes.source.streamUrl;
             if (streamRes.source.subtitles) {
               activeSubtitles = streamRes.source.subtitles;
@@ -1019,7 +1031,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       }
 
-      if (!sourceUrl || sourceUrl.trim() === '' || sourceUrl.includes('commondatastorage.googleapis.com')) {
+      if (!sourceUrl || sourceUrl.trim() === '' || isDemoStreamUrl(sourceUrl)) {
         showToast(`No playable video is currently configured for Episode ${ep.episodeNumber}: "${ep.title}".`, 'info');
         return;
       }
@@ -1067,11 +1079,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (content.trailerUrl && sourceUrl === content.trailerUrl) {
         sourceUrl = '';
       }
+      if (isDemoStreamUrl(sourceUrl)) {
+        sourceUrl = '';
+      }
 
-      if (!sourceUrl || sourceUrl.trim() === '' || sourceUrl.includes('commondatastorage.googleapis.com')) {
+      if (!sourceUrl || sourceUrl.trim() === '') {
         try {
           const streamRes = await api.streaming.getMovieStream(content.id);
-          if (streamRes?.source?.streamUrl) {
+          if (streamRes?.source?.streamUrl && !isDemoStreamUrl(streamRes.source.streamUrl)) {
             sourceUrl = streamRes.source.streamUrl;
             if (streamRes.source.subtitles) {
               activeSubtitles = streamRes.source.subtitles;
@@ -1082,7 +1097,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       }
 
-      if (!sourceUrl || sourceUrl.trim() === '' || sourceUrl.includes('commondatastorage.googleapis.com')) {
+      if (!sourceUrl || sourceUrl.trim() === '' || isDemoStreamUrl(sourceUrl)) {
         showToast(`No playable video is currently configured for "${content.title}".`, 'info');
         return;
       }

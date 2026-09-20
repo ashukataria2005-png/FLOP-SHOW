@@ -34,6 +34,13 @@ export interface MediaPlayerSource {
   vcdnStatus?: string;
   maxResolution?: '720p' | '1080p';
   downloadAllowed?: boolean;
+  subtitles?: Array<{
+    id?: string;
+    label: string;
+    language: string;
+    url: string;
+    format?: string;
+  }>;
 }
 
 export interface MediaPlayerProps {
@@ -787,7 +794,18 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
                 onNextEpisode();
               }
             }}
-          />
+          >
+            {source.subtitles && source.subtitles.map((sub, idx) => (
+              <track
+                key={sub.id || idx}
+                kind="subtitles"
+                src={sub.url}
+                srcLang={sub.language || 'en'}
+                label={sub.label || 'Subtitles'}
+                default={idx === 0}
+              />
+            ))}
+          </video>
 
           {/* Large Center Play Trigger — only when NOT playing, NOT loading, NO error */}
           {!isPlaying && !isLoading && !errorMessage && (

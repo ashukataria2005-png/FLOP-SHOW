@@ -922,6 +922,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let activeVcdnStatus: string | undefined = undefined;
     let activeMaxResolution: '720p' | '1080p' | undefined = undefined;
     let activeDownloadAllowed: boolean | undefined = undefined;
+    let activeSubtitles: Array<{ id?: string; label: string; language: string; url: string; format?: string }> | undefined = undefined;
 
     if (content.type === 'series') {
       // If no specific episode was provided, try to find from progress or first season episode
@@ -969,6 +970,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (mediaRes?.url && mediaRes.url.trim() !== '') {
           sourceUrl = mediaRes.url;
         }
+        if ((mediaRes as any)?.subtitles) {
+          activeSubtitles = (mediaRes as any).subtitles;
+        }
         if ((mediaRes as any)?.vcdnStatus) {
           activeVcdnStatus = (mediaRes as any).vcdnStatus;
         }
@@ -1006,6 +1010,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const streamRes = await api.streaming.getEpisodeStream(content.id, ep.id);
           if (streamRes?.source?.streamUrl) {
             sourceUrl = streamRes.source.streamUrl;
+            if (streamRes.source.subtitles) {
+              activeSubtitles = streamRes.source.subtitles;
+            }
           }
         } catch {
           // Keep empty
@@ -1025,6 +1032,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const mediaRes = await api.media.getContentMedia(content.id, 'MAIN');
         if (mediaRes?.url && mediaRes.url.trim() !== '') {
           sourceUrl = mediaRes.url;
+        }
+        if ((mediaRes as any)?.subtitles) {
+          activeSubtitles = (mediaRes as any).subtitles;
         }
         if ((mediaRes as any)?.vcdnStatus) {
           activeVcdnStatus = (mediaRes as any).vcdnStatus;
@@ -1063,6 +1073,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const streamRes = await api.streaming.getMovieStream(content.id);
           if (streamRes?.source?.streamUrl) {
             sourceUrl = streamRes.source.streamUrl;
+            if (streamRes.source.subtitles) {
+              activeSubtitles = streamRes.source.subtitles;
+            }
           }
         } catch {
           // Keep empty
@@ -1092,7 +1105,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       initialTimeSeconds: resumeTime,
       vcdnStatus: activeVcdnStatus || (content as any)?.vcdnStatus,
       maxResolution: activeMaxResolution,
-      downloadAllowed: activeDownloadAllowed
+      downloadAllowed: activeDownloadAllowed,
+      subtitles: activeSubtitles
     });
   };
 

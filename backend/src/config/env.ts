@@ -79,8 +79,8 @@ export const config = {
   // VCDN Media Storage & Video Streaming Provider
   vcdnApiKey: process.env.VCDN_API_KEY?.trim() || '',
   vcdnWebhookSecret: process.env.VCDN_WEBHOOK_SECRET?.trim() || '',
-  // CinePro / Licensed Streaming Provider Integration
-  cineproBaseUrl: process.env.CINEPRO_BASE_URL?.trim() || 'https://api.cinepro.stream',
+  // CinePro / Licensed Streaming Provider Integration (OMSS Compliant)
+  cineproBaseUrl: process.env.CINEPRO_BASE_URL?.trim() || 'http://localhost:3000',
   cineproApiKey: process.env.CINEPRO_API_KEY?.trim() || '',
   cineproTimeoutMs: process.env.CINEPRO_TIMEOUT_MS ? parseInt(process.env.CINEPRO_TIMEOUT_MS, 10) : 6000,
 };
@@ -90,8 +90,12 @@ export function isVcdnConfigured(): boolean {
 }
 
 export function isCineproConfigured(): boolean {
-  return Boolean(config.cineproApiKey && config.cineproApiKey.length > 0);
+  return Boolean(
+    (config.cineproApiKey && config.cineproApiKey.length > 0) ||
+    Boolean(process.env.CINEPRO_BASE_URL && process.env.CINEPRO_BASE_URL.trim().length > 0)
+  );
 }
+
 
 
 

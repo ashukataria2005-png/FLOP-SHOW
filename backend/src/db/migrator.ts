@@ -537,7 +537,42 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 11 };
+    // Apply incremental 016_content_provider_mappings for PostgreSQL if not already applied
+    const providerMappingMigrationVersion = '016_content_provider_mappings';
+    if (!appliedSet.has(providerMappingMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 016_content_provider_mappings...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS content_provider_mappings (
+            id TEXT PRIMARY KEY,
+            content_id TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            external_id TEXT NOT NULL,
+            media_type TEXT NOT NULL DEFAULT 'movie',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (content_id) REFERENCES content(id) ON DELETE CASCADE,
+            CONSTRAINT uq_content_provider UNIQUE (content_id, provider)
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_cpm_content ON content_provider_mappings(content_id);
+          CREATE INDEX IF NOT EXISTS idx_cpm_provider_ext ON content_provider_mappings(provider, external_id);
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${providerMappingMigrationVersion}', '016_content_provider_mappings.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('016_content_provider_mappings.sql');
+        console.log('✓ [PostgreSQL] Migration 016_content_provider_mappings applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 12 };
   } finally {
     client.release();
     await pool.end();

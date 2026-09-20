@@ -418,13 +418,32 @@ VALUES
 ON CONFLICT (key) DO NOTHING;
 
 -- ==============================================================================
--- 18. MIGRATION TRACKING TABLE
+-- 18. CONTENT PROVIDER MAPPINGS (CinePro / OMSS and External Metadata Mapping)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS content_provider_mappings (
+  id TEXT PRIMARY KEY,
+  content_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  media_type TEXT NOT NULL DEFAULT 'movie',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (content_id) REFERENCES content(id) ON DELETE CASCADE,
+  CONSTRAINT uq_content_provider UNIQUE (content_id, provider)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cpm_content ON content_provider_mappings(content_id);
+CREATE INDEX IF NOT EXISTS idx_cpm_provider_ext ON content_provider_mappings(provider, external_id);
+
+-- ==============================================================================
+-- 19. MIGRATION TRACKING TABLE
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   applied_at TEXT NOT NULL
 );
+
 
 
 

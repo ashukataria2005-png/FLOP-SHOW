@@ -8,6 +8,8 @@ import { watchPassService } from './watchPassService.js';
 import { getAdapter } from '../db/adapter.js';
 import { parseYouTubeUrl, isValidMediaUrl } from '../utils/mediaUrl.js';
 import { cineproService } from './cineproService.js';
+import { isCineproConfigured } from '../config/env.js';
+
 
 export interface MediaPlayableResponse {
   mediaId?: string;
@@ -27,6 +29,14 @@ export interface MediaPlayableResponse {
   mediaProvider?: string | null;
   maxResolution?: '720p' | '1080p';
   downloadAllowed?: boolean;
+  quality?: string;
+  subtitles?: Array<{
+    id?: string;
+    label: string;
+    language: string;
+    url: string;
+    format?: string;
+  }>;
 }
 
 export const mediaService = {
@@ -315,15 +325,29 @@ export const mediaService = {
       mainVideoUrl = null;
     }
 
-    if (!mainVideoUrl) {
-      // Attempt to resolve from CinePro / Streaming Adapter
+    let resolvedSubtitles: Array<{ id?: string; label: string; language: string; url: string; format?: string }> | undefined = undefined;
+    let resolvedQuality: string | undefined = undefined;
+    let mediaProvider = mainMedia?.media_provider || content.media_provider || 'LOCAL';
+
+    // CinePro Resolution:
+    // If title is marked CINEPRO, or CinePro is configured & title needs provider resolution:
+    if (mediaProvider === 'CINEPRO' || (!mainVideoUrl && isCineproConfigured())) {
       try {
         const streamSource = await cineproService.getMovieStream(content.id, content.title);
         if (streamSource?.streamUrl) {
           mainVideoUrl = streamSource.streamUrl;
+          resolvedSubtitles = streamSource.subtitles;
+          resolvedQuality = streamSource.quality;
+          mediaProvider = 'CINEPRO';
         }
       } catch (err: any) {
-        console.warn('[MediaService] CinePro stream resolution fallback:', err?.message || err);
+        if (mediaProvider === 'CINEPRO') {
+          const streamErr = new Error(err.message || 'Streaming source is currently unavailable from provider.');
+          (streamErr as any).statusCode = err.statusCode || 404;
+          (streamErr as any).code = err.code || 'STREAM_UNAVAILABLE';
+          throw streamErr;
+        }
+        console.warn('[MediaService] CinePro stream resolution attempt:', err?.message || err);
       }
     }
 
@@ -337,7 +361,9 @@ export const mediaService = {
     const vcdnVideoId = mainMedia?.vcdn_video_id || content.vcdn_video_id || null;
     const vcdnStatus = mainMedia?.vcdn_status || content.vcdn_status || null;
     const vcdnPlaybackUrl = mainMedia?.vcdn_playback_url || content.vcdn_playback_url || null;
-    const mediaProvider = mainMedia?.media_provider || content.media_provider || (vcdnVideoId ? 'VCDN' : 'LOCAL');
+    if (mediaProvider !== 'CINEPRO') {
+      mediaProvider = (vcdnVideoId ? 'VCDN' : 'LOCAL');
+    }
 
     // Prefer HLS playback URL if available from VCDN
     if (vcdnPlaybackUrl && (!mainVideoUrl || vcdnStatus === 'READY' || mainVideoUrl.includes('vcdn.me'))) {
@@ -346,7 +372,7 @@ export const mediaService = {
 
     const yt = parseYouTubeUrl(mainVideoUrl);
     return {
-      mediaId: mainMedia?.id,
+      mediaId: mainMedia?.id || (mediaProvider === 'CINEPRO' ? `cinepro-${content.id}` : undefined),
       mediaType: 'MAIN',
       sourceType: yt.isYouTube ? 'YOUTUBE' : (mainMedia?.source_type || 'DIRECT_URL'),
       url: mainVideoUrl,
@@ -363,6 +389,8 @@ export const mediaService = {
       mediaProvider,
       maxResolution,
       downloadAllowed,
+      quality: resolvedQuality,
+      subtitles: resolvedSubtitles
     };
   },
 
@@ -457,6 +485,9 @@ export const mediaService = {
 
     const mainMedia = await mediaRepository.getActiveMediaForEpisode(episode.id, 'MAIN');
     let videoUrl = mainMedia ? mainMedia.url : episode.video_url;
+    let resolvedSubtitles: Array<{ id?: string; label: string; language: string; url: string; format?: string }> | undefined = undefined;
+    let resolvedQuality: string | undefined = undefined;
+    let mediaProvider = mainMedia?.media_provider || episode.media_provider || 'LOCAL';
 
     // Ensure episode never accidentally uses the series trailer
     if (!mainMedia && episode.series_trailer_url && videoUrl === episode.series_trailer_url) {
@@ -468,8 +499,8 @@ export const mediaService = {
       videoUrl = null;
     }
 
-    if (!videoUrl) {
-      // Attempt to resolve from CinePro / Streaming Adapter
+    // CinePro Resolution for Episodes:
+    if (mediaProvider === 'CINEPRO' || (!videoUrl && isCineproConfigured())) {
       try {
         const streamSource = await cineproService.getEpisodeStream(episode.series_id, episode.id, {
           title: episode.title,
@@ -478,9 +509,18 @@ export const mediaService = {
         });
         if (streamSource?.streamUrl) {
           videoUrl = streamSource.streamUrl;
+          resolvedSubtitles = streamSource.subtitles;
+          resolvedQuality = streamSource.quality;
+          mediaProvider = 'CINEPRO';
         }
       } catch (err: any) {
-        console.warn('[MediaService] CinePro episode stream resolution fallback:', err?.message || err);
+        if (mediaProvider === 'CINEPRO') {
+          const streamErr = new Error(err.message || 'Episode streaming source is currently unavailable from provider.');
+          (streamErr as any).statusCode = err.statusCode || 404;
+          (streamErr as any).code = err.code || 'STREAM_UNAVAILABLE';
+          throw streamErr;
+        }
+        console.warn('[MediaService] CinePro episode stream resolution attempt:', err?.message || err);
       }
     }
 
@@ -494,7 +534,9 @@ export const mediaService = {
     const vcdnVideoId = mainMedia?.vcdn_video_id || episode.vcdn_video_id || null;
     const vcdnStatus = mainMedia?.vcdn_status || episode.vcdn_status || null;
     const vcdnPlaybackUrl = mainMedia?.vcdn_playback_url || episode.vcdn_playback_url || null;
-    const mediaProvider = mainMedia?.media_provider || episode.media_provider || (vcdnVideoId ? 'VCDN' : 'LOCAL');
+    if (mediaProvider !== 'CINEPRO') {
+      mediaProvider = (vcdnVideoId ? 'VCDN' : 'LOCAL');
+    }
 
     if (vcdnPlaybackUrl && (!videoUrl || vcdnStatus === 'READY' || videoUrl.includes('vcdn.me'))) {
       videoUrl = vcdnPlaybackUrl;
@@ -502,7 +544,7 @@ export const mediaService = {
 
     const yt = parseYouTubeUrl(videoUrl);
     return {
-      mediaId: mainMedia?.id,
+      mediaId: mainMedia?.id || (mediaProvider === 'CINEPRO' ? `cinepro-ep-${episode.id}` : undefined),
       mediaType: 'MAIN',
       sourceType: yt.isYouTube ? 'YOUTUBE' : (mainMedia?.source_type || 'DIRECT_URL'),
       url: videoUrl,
@@ -519,6 +561,8 @@ export const mediaService = {
       mediaProvider,
       maxResolution,
       downloadAllowed,
+      quality: resolvedQuality,
+      subtitles: resolvedSubtitles
     };
   },
 

@@ -128,7 +128,7 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   if (cleanPath === '/wallet' || cleanPath === '/profile/wallet') {
     return { tab: 'profile', param: 'wallet' };
   }
-  if (cleanPath === '/player' || (typeof window !== 'undefined' && window.location.search.includes('id='))) {
+  if (cleanPath === '/player') {
     return { tab: 'player' };
   }
   if (cleanPath === '/profile') {

@@ -310,6 +310,11 @@ export const mediaService = {
       mainVideoUrl = null;
     }
 
+    // Google Cloud gtv-videos-bucket has been locked down (returns 403 Forbidden). Route to streaming adapter.
+    if (mainVideoUrl && mainVideoUrl.includes('commondatastorage.googleapis.com')) {
+      mainVideoUrl = null;
+    }
+
     if (!mainVideoUrl) {
       // Attempt to resolve from CinePro / Streaming Adapter
       try {
@@ -455,6 +460,11 @@ export const mediaService = {
 
     // Ensure episode never accidentally uses the series trailer
     if (!mainMedia && episode.series_trailer_url && videoUrl === episode.series_trailer_url) {
+      videoUrl = null;
+    }
+
+    // Google Cloud gtv-videos-bucket has been locked down (returns 403 Forbidden). Route to streaming adapter.
+    if (videoUrl && videoUrl.includes('commondatastorage.googleapis.com')) {
       videoUrl = null;
     }
 

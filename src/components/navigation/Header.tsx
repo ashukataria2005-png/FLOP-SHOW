@@ -1,7 +1,7 @@
 import React from 'react';
 import { Logo } from '../common/Logo';
 import { useApp } from '../../context/AppContext';
-import { Search, Compass, Bookmark, Crown, Zap, Tv } from 'lucide-react';
+import { Search, Compass, Bookmark, Crown, Zap } from 'lucide-react';
 
 interface HeaderProps {
   currentTab: string;
@@ -118,22 +118,6 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
         >
           <Bookmark size={18} />
           My Library
-        </button>
-
-        <button
-          onClick={() => onNavigate('player')}
-          style={{
-            color: currentTab === 'player' ? 'var(--brand-gold)' : 'var(--text-secondary)',
-            fontWeight: currentTab === 'player' ? 700 : 500,
-            fontSize: '15px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'color var(--transition-fast)'
-          }}
-        >
-          <Tv size={18} />
-          Player
         </button>
       </nav>
 

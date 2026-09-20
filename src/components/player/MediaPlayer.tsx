@@ -500,7 +500,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       recordProgress(videoRef.current.currentTime, videoRef.current.duration);
     } else {
       videoRef.current.play().then(() => setIsPlaying(true)).catch((err) => {
-        if (err?.name === 'NotAllowedError') {
+        if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') {
           setIsPlaying(false);
         } else {
           setErrorMessage('Unable to play video: ' + (err?.message || 'playback error'));
@@ -715,7 +715,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
               vid.play()
                 .then(() => setIsPlaying(true))
                 .catch((err) => {
-                  if (err?.name !== 'NotAllowedError') {
+                  if (err?.name !== 'NotAllowedError' && err?.name !== 'AbortError') {
                     setErrorMessage('Unable to start playback: ' + (err?.message || 'unknown error'));
                   }
                   setIsPlaying(false);

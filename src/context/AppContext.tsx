@@ -1001,7 +1001,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sourceUrl = '';
       }
 
-      if (!sourceUrl || sourceUrl.trim() === '') {
+      if (!sourceUrl || sourceUrl.trim() === '' || sourceUrl.includes('commondatastorage.googleapis.com')) {
         try {
           const streamRes = await api.streaming.getEpisodeStream(content.id, ep.id);
           if (streamRes?.source?.streamUrl) {
@@ -1012,7 +1012,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       }
 
-      if (!sourceUrl || sourceUrl.trim() === '') {
+      if (!sourceUrl || sourceUrl.trim() === '' || sourceUrl.includes('commondatastorage.googleapis.com')) {
         showToast(`No playable video is currently configured for Episode ${ep.episodeNumber}: "${ep.title}".`, 'info');
         return;
       }
@@ -1058,7 +1058,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sourceUrl = '';
       }
 
-      if (!sourceUrl || sourceUrl.trim() === '') {
+      if (!sourceUrl || sourceUrl.trim() === '' || sourceUrl.includes('commondatastorage.googleapis.com')) {
         try {
           const streamRes = await api.streaming.getMovieStream(content.id);
           if (streamRes?.source?.streamUrl) {
@@ -1069,7 +1069,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       }
 
-      if (!sourceUrl || sourceUrl.trim() === '') {
+      if (!sourceUrl || sourceUrl.trim() === '' || sourceUrl.includes('commondatastorage.googleapis.com')) {
         showToast(`No playable video is currently configured for "${content.title}".`, 'info');
         return;
       }

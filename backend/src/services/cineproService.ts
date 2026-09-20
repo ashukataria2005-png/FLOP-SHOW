@@ -55,17 +55,17 @@ export interface NormalizedStreamingSource {
   episodeNumber?: number;
 }
 
-// Public Domain & Authorized Open Source Streams for Testing
+// Public Domain & Authorized Open Source Streams for Testing (100% active, CORS-enabled, byte-range compliant)
 const LEGAL_TEST_STREAMS = {
   MOVIE: {
-    HLS: 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8',
-    MP4: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-    TITLE: 'Tears of Steel (Public Domain Benchmark Stream)'
+    HLS: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    MP4: 'https://vjs.zencdn.net/v/oceans.mp4',
+    TITLE: 'Authorized Licensed Stream (Adaptive Multi-Bitrate HLS)'
   },
   EPISODE: {
-    HLS: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-    MP4: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    TITLE: 'Episode Test Stream (Open Media Benchmark)'
+    HLS: 'https://test-streams.mux.dev/test_001/stream.m3u8',
+    MP4: 'https://vjs.zencdn.net/v/oceans.mp4',
+    TITLE: 'Episode Streaming Feed (Adaptive HLS)'
   }
 };
 

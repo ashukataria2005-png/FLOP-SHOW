@@ -129,7 +129,7 @@ export const CustomPlayer: React.FC<CustomPlayerProps> = ({
           setErrorMessage(null);
         })
         .catch((err) => {
-          if (err?.name === 'NotAllowedError') {
+          if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') {
             setIsPlaying(false);
           } else {
             handlePlayerError('Unable to start playback: ' + (err?.message || 'autoplay blocked'));

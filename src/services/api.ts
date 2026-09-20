@@ -5,7 +5,7 @@ import { resolveMediaUrl } from '../utils/mediaUrl';
 /**
  * Backend API Base URL Configuration:
  * - Uses VITE_API_BASE_URL for the backend base URL.
- * - In production, defaults to the live backend (https://flop-show.onrender.com).
+ * - In production, defaults to the live backend (https://flop-show-4a14.onrender.com).
  * - Local development continues working with the existing local API/proxy setup ('/api')
  *   unless VITE_API_BASE_URL is explicitly set.
  */
@@ -23,7 +23,7 @@ function resolveApiBaseUrl(): string {
       window.location.hostname !== 'localhost' &&
       window.location.hostname !== '127.0.0.1')
   ) {
-    return 'https://flop-show.onrender.com/api';
+    return 'https://flop-show-4a14.onrender.com/api';
   }
   // Local development fallback to Vite proxy setup
   return '/api';

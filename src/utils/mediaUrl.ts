@@ -103,7 +103,7 @@ export function resolveMediaUrl(rawUrl?: string | null, apiBaseUrl?: string): st
       window.location.hostname !== '127.0.0.1';
 
     if (isRemote) {
-      return `https://flop-show.onrender.com${cleanPath}`;
+      return `https://flop-show-4a14.onrender.com${cleanPath}`;
     }
 
     // For relative apiBaseUrl (local dev with Vite proxy), use current page origin

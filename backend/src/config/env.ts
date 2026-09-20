@@ -53,7 +53,7 @@ export const config = {
   host: process.env.HOST || '0.0.0.0',
   nodeEnv,
   isProd,
-  frontendUrl: process.env.FRONTEND_URL || process.env.CLIENT_ORIGIN || 'https://flop-show.netlify.app',
+  frontendUrl: process.env.FRONTEND_URL || process.env.CLIENT_ORIGIN || 'https://flop-show-4a14.onrender.com',
   allowedOrigins,
   // Database configuration
   databaseUrl: rawDatabaseUrl,

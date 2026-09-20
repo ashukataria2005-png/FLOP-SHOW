@@ -7,6 +7,7 @@ import { subscriptionService } from './subscriptionService.js';
 import { watchPassService } from './watchPassService.js';
 import { getAdapter } from '../db/adapter.js';
 import { parseYouTubeUrl, isValidMediaUrl } from '../utils/mediaUrl.js';
+import { cineproService } from './cineproService.js';
 
 export interface MediaPlayableResponse {
   mediaId?: string;
@@ -310,6 +311,18 @@ export const mediaService = {
     }
 
     if (!mainVideoUrl) {
+      // Attempt to resolve from CinePro / Streaming Adapter
+      try {
+        const streamSource = await cineproService.getMovieStream(content.id, content.title);
+        if (streamSource?.streamUrl) {
+          mainVideoUrl = streamSource.streamUrl;
+        }
+      } catch (err: any) {
+        console.warn('[MediaService] CinePro stream resolution fallback:', err?.message || err);
+      }
+    }
+
+    if (!mainVideoUrl) {
       const err = new Error('Main video is not available yet. The administrator has not configured media for this title.');
       (err as any).statusCode = 404;
       (err as any).code = 'MEDIA_NOT_CONFIGURED';
@@ -443,6 +456,22 @@ export const mediaService = {
     // Ensure episode never accidentally uses the series trailer
     if (!mainMedia && episode.series_trailer_url && videoUrl === episode.series_trailer_url) {
       videoUrl = null;
+    }
+
+    if (!videoUrl) {
+      // Attempt to resolve from CinePro / Streaming Adapter
+      try {
+        const streamSource = await cineproService.getEpisodeStream(episode.series_id, episode.id, {
+          title: episode.title,
+          seasonNumber: episode.season_number,
+          episodeNumber: episode.episode_number
+        });
+        if (streamSource?.streamUrl) {
+          videoUrl = streamSource.streamUrl;
+        }
+      } catch (err: any) {
+        console.warn('[MediaService] CinePro episode stream resolution fallback:', err?.message || err);
+      }
     }
 
     if (!videoUrl) {

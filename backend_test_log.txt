@@ -1,0 +1,30 @@
+
+> flopshow@1.0.0 server
+> tsx watch backend/src/index.ts
+
+◇ injected env (18) from .env // tip: ⌘ enable debugging { debug: true }
+------------------------------------------------------------
+Starting FLOPSHOW Backend Services...
+Environment: development
+Database Mode: POSTGRES (PostgreSQL via DATABASE_URL)
+------------------------------------------------------------
+(node:4816) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[PostgreSQL] Full schema already applied. Checking incremental migrations...
+Migrations check: 0 applied (11 total)
+[DB] Using PostgreSQL adapter
+✓ System accounts verified (admin + demo)
+✓ FLOPSHOW API Server running at http://localhost:5000 (bound to 0.0.0.0:5000)
+  Health check: http://localhost:5000/api/health
+  Content catalog: http://localhost:5000/api/content
+------------------------------------------------------------
+[CLIENT ERROR 401] Invalid Admin ID or Admin Password.
+[CLIENT ERROR 400] Bad escaped character in JSON at position 11 (line 1 column 12)
+[CLIENT ERROR 400] Bad escaped character in JSON at position 12 (line 1 column 13)

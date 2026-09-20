@@ -14,6 +14,7 @@ import { webhookRouter } from './routes/webhookRoutes.js';
 import { monetizationRouter } from './routes/monetizationRoutes.js';
 import { subscriptionRouter } from './routes/subscriptionRoutes.js';
 import { watchPassRouter } from './routes/watchPassRoutes.js';
+import { streamingRouter } from './routes/streamingRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
 import { config } from './config/env.js';
@@ -223,6 +224,7 @@ export function createServer(): Express {
   app.use('/api/monetization', monetizationRouter);
   app.use('/api/subscriptions', subscriptionRouter);
   app.use('/api/watch-passes', watchPassRouter);
+  app.use('/api/streaming', streamingRouter);
 
   // Direct aliases for admin login
   app.post('/api/admin-login', handleAdminLogin);

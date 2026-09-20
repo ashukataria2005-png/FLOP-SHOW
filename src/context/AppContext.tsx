@@ -1002,6 +1002,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       if (!sourceUrl || sourceUrl.trim() === '') {
+        try {
+          const streamRes = await api.streaming.getEpisodeStream(content.id, ep.id);
+          if (streamRes?.source?.streamUrl) {
+            sourceUrl = streamRes.source.streamUrl;
+          }
+        } catch {
+          // Keep empty
+        }
+      }
+
+      if (!sourceUrl || sourceUrl.trim() === '') {
         showToast(`No playable video is currently configured for Episode ${ep.episodeNumber}: "${ep.title}".`, 'info');
         return;
       }
@@ -1045,6 +1056,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Safeguard: Trailer video must remain completely separate from MAIN movie video
       if (content.trailerUrl && sourceUrl === content.trailerUrl) {
         sourceUrl = '';
+      }
+
+      if (!sourceUrl || sourceUrl.trim() === '') {
+        try {
+          const streamRes = await api.streaming.getMovieStream(content.id);
+          if (streamRes?.source?.streamUrl) {
+            sourceUrl = streamRes.source.streamUrl;
+          }
+        } catch {
+          // Keep empty
+        }
       }
 
       if (!sourceUrl || sourceUrl.trim() === '') {

@@ -35,6 +35,7 @@ import { WatchPassModal } from './components/watchpass/WatchPassModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { PlanSelectionModal } from './components/plans/PlanSelectionModal';
 import { MediaPlayer } from './components/player/MediaPlayer';
+import { PlayerShowcase } from './components/player/PlayerShowcase';
 import { ContentItem } from './types/content';
 import { CheckCircle2, AlertCircle, Info, Crown } from 'lucide-react';
 
@@ -127,6 +128,9 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   if (cleanPath === '/wallet' || cleanPath === '/profile/wallet') {
     return { tab: 'profile', param: 'wallet' };
   }
+  if (cleanPath === '/player' || (typeof window !== 'undefined' && window.location.search.includes('id='))) {
+    return { tab: 'player' };
+  }
   if (cleanPath === '/profile') {
     return { tab: 'profile' };
   }
@@ -190,6 +194,8 @@ export function tabToPath(tab: string, param?: string): string {
       return '/library';
     case 'wallet':
       return '/profile/wallet';
+    case 'player':
+      return '/player';
     case 'profile':
       return param === 'wallet' ? '/profile/wallet' : '/profile';
     case 'discover':
@@ -426,6 +432,9 @@ const AppContent: React.FC = () => {
             )}
             {currentTab === 'library' && (
               <LibraryPage onSelectItem={handleSelectItem} onNavigate={handleNavigate} />
+            )}
+            {currentTab === 'player' && (
+              <PlayerShowcase onBackToApp={() => handleNavigate('discover')} />
             )}
             {(currentTab === 'wallet' || currentTab === 'settings' || currentTab === 'profile') && (
               <ProfilePage

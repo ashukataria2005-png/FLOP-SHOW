@@ -713,6 +713,57 @@ export const api = {
   },
 
   // --------------------------------------------------------------------------
+  // CINEPRO / STREAMING ADAPTER
+  // --------------------------------------------------------------------------
+  streaming: {
+    async getMovieStream(contentId: string) {
+      return request<{
+        success: boolean;
+        source: {
+          title: string;
+          type: 'movie' | 'series';
+          source: string;
+          streamUrl: string;
+          format: 'hls' | 'mp4' | 'embed' | 'dash';
+          quality?: string;
+          subtitles?: Array<{ label: string; language: string; url: string }>;
+          expiresAt?: string;
+          contentId: string;
+        };
+      }>(`/streaming/cinepro/movie/${contentId}`);
+    },
+
+    async getEpisodeStream(contentId: string, episodeId: string) {
+      return request<{
+        success: boolean;
+        source: {
+          title: string;
+          type: 'movie' | 'series';
+          source: string;
+          streamUrl: string;
+          format: 'hls' | 'mp4' | 'embed' | 'dash';
+          quality?: string;
+          subtitles?: Array<{ label: string; language: string; url: string }>;
+          expiresAt?: string;
+          contentId: string;
+          episodeId?: string;
+          seasonNumber?: number;
+          episodeNumber?: number;
+        };
+      }>(`/streaming/cinepro/series/${contentId}/episode/${episodeId}`);
+    },
+
+    async getStatus() {
+      return request<{
+        status: string;
+        provider: string;
+        supportedFormats: string[];
+        timestamp: string;
+      }>('/streaming/status');
+    }
+  },
+
+  // --------------------------------------------------------------------------
   // ADMIN MANAGEMENT
   // --------------------------------------------------------------------------
   admin: {

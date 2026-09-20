@@ -80,9 +80,9 @@ export const config = {
   vcdnApiKey: process.env.VCDN_API_KEY?.trim() || '',
   vcdnWebhookSecret: process.env.VCDN_WEBHOOK_SECRET?.trim() || '',
   // CinePro / Licensed Streaming Provider Integration (OMSS Compliant)
-  cineproBaseUrl: process.env.CINEPRO_BASE_URL?.trim() || 'http://localhost:3000',
+  cineproBaseUrl: process.env.CINEPRO_BASE_URL?.trim() || 'https://cinepro-core-lgqf.onrender.com',
   cineproApiKey: process.env.CINEPRO_API_KEY?.trim() || '',
-  cineproTimeoutMs: process.env.CINEPRO_TIMEOUT_MS ? parseInt(process.env.CINEPRO_TIMEOUT_MS, 10) : 6000,
+  cineproTimeoutMs: process.env.CINEPRO_TIMEOUT_MS ? parseInt(process.env.CINEPRO_TIMEOUT_MS, 10) : 20000,
 };
 
 export function isVcdnConfigured(): boolean {
@@ -92,7 +92,7 @@ export function isVcdnConfigured(): boolean {
 export function isCineproConfigured(): boolean {
   return Boolean(
     (config.cineproApiKey && config.cineproApiKey.length > 0) ||
-    Boolean(process.env.CINEPRO_BASE_URL && process.env.CINEPRO_BASE_URL.trim().length > 0)
+    Boolean(config.cineproBaseUrl && config.cineproBaseUrl.trim().length > 0)
   );
 }
 

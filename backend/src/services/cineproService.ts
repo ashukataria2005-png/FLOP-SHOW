@@ -327,18 +327,17 @@ export class CineproService {
     const chosen = sortedSources[0];
     if (!chosen || !chosen.url) return null;
 
-    // Resolve URL: If CinePro returned a proxy path (/v1/proxy?data=...), route via FLOPSHOW's backend proxy
+    // Resolve URL: Ensure proxy URLs use CinePro instance (https://cinepro-core-lgqf.onrender.com/v1/proxy) and NOT localhost:3000
+    const targetBase = (extra?.baseUrlOverride || this.baseUrl).replace(/\/+$/, '');
     let fullStreamUrl = chosen.url.trim();
-    if (fullStreamUrl.includes('/v1/proxy?')) {
-      const queryPart = fullStreamUrl.substring(fullStreamUrl.indexOf('/v1/proxy?'));
-      fullStreamUrl = `/api/streaming/cinepro/proxy${queryPart.substring('/v1/proxy'.length)}`;
+
+    if (fullStreamUrl.startsWith('http://localhost:3000') || fullStreamUrl.startsWith('https://localhost:3000') || fullStreamUrl.startsWith('http://127.0.0.1:3000')) {
+      fullStreamUrl = fullStreamUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1):3000/, targetBase);
     } else if (fullStreamUrl.startsWith('/v1/proxy') || fullStreamUrl.startsWith('v1/proxy')) {
-      const queryPart = fullStreamUrl.includes('?') ? fullStreamUrl.substring(fullStreamUrl.indexOf('?')) : '';
-      fullStreamUrl = `/api/streaming/cinepro/proxy${queryPart}`;
+      const cleanPath = fullStreamUrl.startsWith('/') ? fullStreamUrl : `/${fullStreamUrl}`;
+      fullStreamUrl = `${targetBase}${cleanPath}`;
     } else if (fullStreamUrl.startsWith('/')) {
-      const targetBase = (extra?.baseUrlOverride || this.baseUrl).replace(/\/+$/, '');
-      const resolvedTarget = `${targetBase}${fullStreamUrl}`;
-      fullStreamUrl = `/api/streaming/cinepro/proxy?data=${encodeURIComponent(JSON.stringify({ url: resolvedTarget }))}`;
+      fullStreamUrl = `${targetBase}${fullStreamUrl}`;
     }
 
     // Determine playback format
@@ -363,15 +362,13 @@ export class CineproService {
           .filter((sub: any) => sub && (sub.url || sub.file))
           .map((sub: any, idx: number) => {
             let subUrl = (sub.url || sub.file).trim();
-            if (subUrl.includes('/v1/proxy?')) {
-              const queryPart = subUrl.substring(subUrl.indexOf('/v1/proxy?'));
-              subUrl = `/api/streaming/cinepro/proxy${queryPart.substring('/v1/proxy'.length)}`;
+            if (subUrl.startsWith('http://localhost:3000') || subUrl.startsWith('https://localhost:3000') || subUrl.startsWith('http://127.0.0.1:3000')) {
+              subUrl = subUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1):3000/, targetBase);
             } else if (subUrl.startsWith('/v1/proxy') || subUrl.startsWith('v1/proxy')) {
-              const queryPart = subUrl.includes('?') ? subUrl.substring(subUrl.indexOf('?')) : '';
-              subUrl = `/api/streaming/cinepro/proxy${queryPart}`;
+              const cleanPath = subUrl.startsWith('/') ? subUrl : `/${subUrl}`;
+              subUrl = `${targetBase}${cleanPath}`;
             } else if (subUrl.startsWith('/')) {
-              const targetBase = (extra?.baseUrlOverride || this.baseUrl).replace(/\/+$/, '');
-              subUrl = `/api/streaming/cinepro/proxy?data=${encodeURIComponent(JSON.stringify({ url: `${targetBase}${subUrl}` }))}`;
+              subUrl = `${targetBase}${subUrl}`;
             }
             return {
               id: sub.id || `sub-${idx}`,

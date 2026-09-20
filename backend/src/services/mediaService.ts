@@ -507,7 +507,7 @@ export const mediaService = {
         const episodeNum = episode.episode_number ?? 1;
 
         const streamSource = await cineproService.getEpisodeStream(seriesContentId, episode.id, {
-          title: episode.series_title || episode.title,
+          seriesTitle: episode.series_title,
           seasonNumber: seasonNum,
           episodeNumber: episodeNum
         });
@@ -556,7 +556,7 @@ export const mediaService = {
       isYouTube: yt.isYouTube,
       mimeType: mainMedia?.mime_type || (videoUrl.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4'),
       duration: episode.duration,
-      title: `${episode.series_title}: ${episode.title}`,
+      title: `${episode.series_title}: ${(episode.title || '').replace(/^Episode\s*\d+\s*[:\-]\s*/i, '').trim() || episode.title}`,
       poster: episode.thumbnail || episode.series_backdrop,
       authorized: true,
       vcdnVideoId,

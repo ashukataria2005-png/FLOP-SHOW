@@ -24,6 +24,12 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
   const isWatched = Boolean(progress && progress.percent >= 90);
   const hasProgress = Boolean(progress && progress.percent > 0 && progress.percent < 90);
 
+  // Clean title: Strip redundant prefix like "Episode 1: " so UI does not duplicate numbering
+  const cleanTitle = episode.title
+    ? episode.title.replace(/^Episode\s*\d+\s*[:\-]\s*/i, '').trim()
+    : '';
+  const displayTitle = cleanTitle || episode.title;
+
   return (
     <div
       onClick={() => onPlay(episode)}
@@ -56,7 +62,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
         {imgSrc && !imgError ? (
           <img
             src={imgSrc}
-            alt={episode.title}
+            alt={displayTitle}
             onError={() => {
               if (seriesPosterUrl && imgSrc !== seriesPosterUrl) {
                 setImgSrc(seriesPosterUrl);
@@ -215,7 +221,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
             textOverflow: 'ellipsis'
           }}
         >
-          {episode.title}
+          {displayTitle}
         </h4>
 
         {episode.synopsis && (

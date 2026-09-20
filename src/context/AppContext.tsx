@@ -970,7 +970,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       setActiveEpisode(ep);
-      subtitle = `S${ep.seasonNumber} E${ep.episodeNumber}: ${ep.title}`;
+      const cleanEpTitle = ep.title ? ep.title.replace(/^Episode\s*\d+\s*[:\-]\s*/i, '').trim() : '';
+      subtitle = `S${ep.seasonNumber} E${ep.episodeNumber}: ${cleanEpTitle || ep.title}`;
       episodeId = ep.id;
 
       // Attempt to resolve real episode media from backend database

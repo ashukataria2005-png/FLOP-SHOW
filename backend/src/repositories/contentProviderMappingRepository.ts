@@ -35,7 +35,7 @@ const CANONICAL_CATALOG_MAPPINGS: Record<string, { externalId: string; mediaType
   'harry-potter-and-the-sorcerer-s-stone-2001': { externalId: '671', mediaType: 'movie' },
   "you-don-t-know-jack-2010": { externalId: '38167', mediaType: 'movie' },
 
-  // Series
+  // Series (Verified Authoritative TMDB TV Show IDs)
   'sacred-games': { externalId: '79352', mediaType: 'tv' },
   'sacred-games-2018': { externalId: '79352', mediaType: 'tv' },
   'vikings-2013': { externalId: '44217', mediaType: 'tv' },
@@ -46,13 +46,14 @@ const CANONICAL_CATALOG_MAPPINGS: Record<string, { externalId: string; mediaType
   'succession-2018': { externalId: '76331', mediaType: 'tv' },
   'the-office-2005': { externalId: '2316', mediaType: 'tv' },
   'the-office': { externalId: '2316', mediaType: 'tv' },
-  'taaza-khabar-2023': { externalId: '216262', mediaType: 'tv' },
-  'taaza-khabar': { externalId: '216262', mediaType: 'tv' },
-  'the-family-man': { externalId: '93741', mediaType: 'tv' },
-  'scam-1992-the-harshad-mehta-story-2020': { externalId: '110972', mediaType: 'tv' },
-  'scam-1992': { externalId: '110972', mediaType: 'tv' },
-  'panchayat': { externalId: '119243', mediaType: 'tv' },
-  'panchayat-2020': { externalId: '119243', mediaType: 'tv' }
+  'taaza-khabar-2023': { externalId: '203832', mediaType: 'tv' },
+  'taaza-khabar': { externalId: '203832', mediaType: 'tv' },
+  'the-family-man': { externalId: '93352', mediaType: 'tv' },
+  'the-family-man-2019': { externalId: '93352', mediaType: 'tv' },
+  'scam-1992-the-harshad-mehta-story-2020': { externalId: '111188', mediaType: 'tv' },
+  'scam-1992': { externalId: '111188', mediaType: 'tv' },
+  'panchayat': { externalId: '101352', mediaType: 'tv' },
+  'panchayat-2020': { externalId: '101352', mediaType: 'tv' }
 };
 
 export const contentProviderMappingRepository = {
@@ -169,7 +170,7 @@ export const contentProviderMappingRepository = {
   async resolveExternalId(
     contentId: string,
     mediaType: 'movie' | 'tv' = 'movie',
-    title?: string,
+    seriesOrContentTitle?: string,
     provider: string = 'CINEPRO'
   ): Promise<string | null> {
     const mapping = await this.getMapping(contentId, provider);
@@ -177,10 +178,18 @@ export const contentProviderMappingRepository = {
       return mapping.external_id;
     }
 
-    if (title) {
-      const normalizedTitle = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    // Direct slug/id check in canonical catalog mappings
+    const cleanId = contentId.trim().toLowerCase();
+    const byId = CANONICAL_CATALOG_MAPPINGS[cleanId];
+    if (byId && byId.mediaType === mediaType) {
+      return byId.externalId;
+    }
+
+    // Check by clean series title (ignoring episode titles)
+    if (seriesOrContentTitle) {
+      const normalizedTitle = seriesOrContentTitle.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const byTitle = CANONICAL_CATALOG_MAPPINGS[normalizedTitle];
-      if (byTitle) {
+      if (byTitle && byTitle.mediaType === mediaType) {
         return byTitle.externalId;
       }
     }

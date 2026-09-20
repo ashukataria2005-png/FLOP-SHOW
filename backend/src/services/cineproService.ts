@@ -235,6 +235,7 @@ export class CineproService {
     seriesId: string,
     episodeId: string,
     options: {
+      seriesTitle?: string;
       title?: string;
       seasonNumber?: number;
       episodeNumber?: number;
@@ -245,8 +246,12 @@ export class CineproService {
       throw new CineproInvalidIdError('Both series ID and episode ID are required to fetch episode streaming source.');
     }
 
-    // 1. Resolve TMDB Series ID
-    const tmdbId = await contentProviderMappingRepository.resolveExternalId(seriesId, 'tv', options.title);
+    // 1. Resolve TMDB Series ID (strictly using series identifier or series title)
+    const tmdbId = await contentProviderMappingRepository.resolveExternalId(
+      seriesId,
+      'tv',
+      options.seriesTitle || options.title
+    );
 
     if (!tmdbId) {
       throw new CineproNotFoundError(

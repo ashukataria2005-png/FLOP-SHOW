@@ -16,7 +16,8 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminTransactionsPage } from './pages/admin/AdminTransactionsPage';
 import { AdminGenresPage } from './pages/admin/AdminGenresPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
-import { AdminDesignPage } from './pages/admin/AdminDesignPage';
+import { AdminPromoCodesPage } from './pages/admin/AdminPromoCodesPage';
+import { BonusHubPage } from './pages/BonusHubPage';
 import { AdminQuickAddPage } from './pages/admin/AdminQuickAddPage';
 import { AdminHeroPage } from './pages/admin/AdminHeroPage';
 import { AdminSpotlightPage } from './pages/admin/AdminSpotlightPage';
@@ -114,8 +115,11 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   if (cleanPath === '/admin/genres') {
     return { tab: 'admin-genres' };
   }
+  if (cleanPath === '/admin/promos' || cleanPath === '/admin/promo-codes' || cleanPath === '/admin/bonus') {
+    return { tab: 'admin-promos' };
+  }
   if (cleanPath === '/admin/design') {
-    return { tab: 'admin-design' };
+    return { tab: 'admin-settings' };
   }
   if (cleanPath === '/admin/settings') {
     return { tab: 'admin-settings' };
@@ -125,6 +129,9 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   }
   if (cleanPath.startsWith('/admin')) {
     return { tab: 'admin' };
+  }
+  if (cleanPath === '/bonus' || cleanPath === '/rewards') {
+    return { tab: 'bonus' };
   }
   if (cleanPath === '/search') {
     return { tab: 'search' };
@@ -196,12 +203,14 @@ export function tabToPath(tab: string, param?: string): string {
       return '/admin/transactions';
     case 'admin-genres':
       return '/admin/genres';
-    case 'admin-design':
-      return '/admin/design';
+    case 'admin-promos':
+      return '/admin/promos';
     case 'admin-settings':
       return '/admin/settings';
     case 'admin-reset':
       return '/admin/reset';
+    case 'bonus':
+      return '/bonus';
     case 'search':
       return '/search';
     case 'plans':
@@ -368,11 +377,11 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-finance' && <AdminFinancePage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-transactions' && <AdminTransactionsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-genres' && <AdminGenresPage onNavigateTab={handleNavigate} />}
-          {currentTab === 'admin-design' && <AdminDesignPage onNavigateTab={handleNavigate} />}
+          {currentTab === 'admin-promos' && <AdminPromoCodesPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-reset' && <AdminResetPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-pricing', 'admin-monetization', 'admin-analytics', 'admin-analytics-movie', 'admin-analytics-vip', 'admin-watch-pass', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-design', 'admin-settings', 'admin-reset'].includes(currentTab) && (
+          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-pricing', 'admin-promos', 'admin-monetization', 'admin-analytics', 'admin-analytics-movie', 'admin-analytics-vip', 'admin-watch-pass', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-settings', 'admin-reset'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>
@@ -457,6 +466,9 @@ const AppContent: React.FC = () => {
             )}
             {currentTab === 'plans' && (
               <PlansPage onNavigate={handleNavigate} onSelectItem={handleSelectItem} />
+            )}
+            {currentTab === 'bonus' && (
+              <BonusHubPage onNavigate={handleNavigate} onPlayContent={handleSelectItem} />
             )}
             {currentTab === 'library' && (
               <LibraryPage onSelectItem={handleSelectItem} onNavigate={handleNavigate} />

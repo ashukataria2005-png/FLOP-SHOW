@@ -1258,6 +1258,13 @@ export const api = {
       });
     },
 
+    async resetCompleteFinancials(confirmation: string) {
+      return request<{ success: boolean; resetAt: string; message: string }>('/admin/reset-financials', {
+        method: 'POST',
+        body: JSON.stringify({ confirmation })
+      });
+    },
+
     async createSeason(contentId: string, seasonNumber: number, title: string) {
       return request<{ success: boolean; seasonId: string }>(`/admin/content/${contentId}/seasons`, {
         method: 'POST',
@@ -1750,6 +1757,76 @@ export const api = {
         revenueByPlan: Record<string, number>;
         activeByPlan: Record<string, number>;
       }>('/watch-passes/admin/analytics');
+    }
+  },
+
+  promos: {
+    async getHub() {
+      return request<{
+        success: boolean;
+        canRedeem: boolean;
+        redemptionCount: number;
+        activePromos: any[];
+        expiredPromos: any[];
+        usedPromos: any[];
+      }>('/promos/hub');
+    },
+
+    async redeem(code: string, contentId: string) {
+      return request<{
+        success: boolean;
+        message: string;
+        unlockedTitle: string;
+        expiresAt: string;
+        redemption: any;
+      }>('/promos/redeem', {
+        method: 'POST',
+        body: JSON.stringify({ code, contentId })
+      });
+    },
+
+    async adminGetAll() {
+      return request<{
+        success: boolean;
+        promos: any[];
+      }>('/promos/admin/all');
+    },
+
+    async adminCreate(data: {
+      code: string;
+      description?: string;
+      validity_days?: number;
+      validity_hours?: number;
+      expires_at?: string;
+    }) {
+      return request<{
+        success: boolean;
+        message: string;
+        promo: any;
+      }>('/promos/admin/create', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async adminSetStatus(id: string, status: 'ACTIVE' | 'DISABLED') {
+      return request<{
+        success: boolean;
+        message: string;
+        promo: any;
+      }>(`/promos/admin/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status })
+      });
+    },
+
+    async adminDelete(id: string) {
+      return request<{
+        success: boolean;
+        message: string;
+      }>(`/promos/admin/${id}`, {
+        method: 'DELETE'
+      });
     }
   }
 };

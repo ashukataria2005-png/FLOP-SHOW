@@ -22,6 +22,11 @@ export const AdminResetPage: React.FC<AdminResetPageProps> = ({ onNavigateTab: _
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [understoodChecked, setUnderstoodChecked] = useState(false);
 
+  // Complete Financial Purge State
+  const [showPurgeModal, setShowPurgeModal] = useState(false);
+  const [purgeConfirmInput, setPurgeConfirmInput] = useState('');
+  const [purging, setPurging] = useState(false);
+
   const fetchCurrentStats = async () => {
     try {
       setLoading(true);
@@ -55,6 +60,26 @@ export const AdminResetPage: React.FC<AdminResetPageProps> = ({ onNavigateTab: _
       showToast(err.message || 'Failed to reset platform statistics.', 'error');
     } finally {
       setResetting(false);
+    }
+  };
+
+  const handlePurgeFinancials = async () => {
+    if (purgeConfirmInput.trim() !== 'CONFIRM') {
+      showToast('You must type CONFIRM in uppercase to authorize financial records purge.', 'error');
+      return;
+    }
+
+    try {
+      setPurging(true);
+      const res = await api.admin.resetCompleteFinancials('CONFIRM');
+      showToast(res.message || 'All platform financial and transaction records purged successfully.', 'success');
+      setShowPurgeModal(false);
+      setPurgeConfirmInput('');
+      await fetchCurrentStats();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to purge financial records.', 'error');
+    } finally {
+      setPurging(false);
     }
   };
 
@@ -232,11 +257,78 @@ export const AdminResetPage: React.FC<AdminResetPageProps> = ({ onNavigateTab: _
       </div>
 
       {/* Trigger Button Section */}
+      {/* Action 1: Complete System Financial/Transaction Purge (Task 1) */}
+      <div
+        style={{
+          backgroundColor: 'rgba(239, 68, 68, 0.08)',
+          borderRadius: '16px',
+          border: '1.5px solid rgba(239, 68, 68, 0.4)',
+          padding: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px',
+          marginBottom: '20px'
+        }}
+      >
+        <div style={{ maxWidth: '650px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                backgroundColor: '#DC2626',
+                color: '#FFFFFF'
+              }}
+            >
+              DEEP PURGE
+            </span>
+            <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+              Complete Financial Reset (Purge All Transaction Records)
+            </h3>
+          </div>
+          <p style={{ fontSize: '13px', color: '#D1D5DB', margin: 0, lineHeight: 1.5 }}>
+            Permanently clear and delete ALL records from payment requests, VIP subscriptions, watch passes, purchases, and wallet transactions. Resets wallet balances, active pass counts, and cumulative revenue to 0. <strong>Users, catalog titles (movies/series), media streams, episodes, and admin accounts are strictly preserved.</strong>
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setPurgeConfirmInput('');
+            setShowPurgeModal(true);
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '13px 24px',
+            backgroundColor: '#DC2626',
+            border: 'none',
+            borderRadius: '10px',
+            color: '#FFFFFF',
+            fontSize: '14px',
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 4px 18px rgba(220, 38, 38, 0.4)',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <RotateCcw size={18} />
+          <span>Purge All Financial Records</span>
+        </button>
+      </div>
+
+      {/* Action 2: Soft Analytics Watermark Reset */}
       <div
         style={{
           backgroundColor: 'var(--bg-surface, #12121A)',
           borderRadius: '16px',
-          border: '1px solid rgba(239, 68, 68, 0.25)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
           padding: '24px',
           display: 'flex',
           alignItems: 'center',
@@ -247,10 +339,10 @@ export const AdminResetPage: React.FC<AdminResetPageProps> = ({ onNavigateTab: _
       >
         <div>
           <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 4px' }}>
-            Initiate Financial Records Reset
+            Soft Analytics Watermark Reset
           </h3>
           <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>
-            Clicking reset starts a new accounting window. A mandatory confirmation step is required.
+            Advances the active accounting watermark date to now without purging raw database rows.
           </p>
         </div>
 
@@ -264,20 +356,19 @@ export const AdminResetPage: React.FC<AdminResetPageProps> = ({ onNavigateTab: _
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '12px 24px',
-            backgroundColor: '#DC2626',
-            border: 'none',
+            padding: '11px 20px',
+            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
             borderRadius: '10px',
             color: '#FFFFFF',
-            fontSize: '14px',
-            fontWeight: 800,
+            fontSize: '13px',
+            fontWeight: 700,
             cursor: 'pointer',
-            boxShadow: '0 4px 18px rgba(220, 38, 38, 0.35)',
             transition: 'all 0.15s ease'
           }}
         >
-          <RotateCcw size={18} />
-          <span>Reset Platform Statistics</span>
+          <RotateCcw size={16} />
+          <span>Reset Accounting Watermark Only</span>
         </button>
       </div>
 
@@ -424,6 +515,176 @@ export const AdminResetPage: React.FC<AdminResetPageProps> = ({ onNavigateTab: _
               >
                 {resetting ? <Loader2 size={16} className="spin" /> : <RotateCcw size={16} />}
                 <span>{resetting ? 'Resetting...' : 'Confirm Reset Statistics'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Safety Confirmation Modal: Complete Financial Reset (Task 1) */}
+      {showPurgeModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.88)',
+            backdropFilter: 'blur(12px)',
+            zIndex: 3100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#0F0F17',
+              border: '1.5px solid #EF4444',
+              borderRadius: '16px',
+              maxWidth: '560px',
+              width: '100%',
+              padding: '28px',
+              boxShadow: '0 25px 60px rgba(220, 38, 38, 0.25)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#EF4444'
+                  }}
+                >
+                  <AlertTriangle size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                    Complete Financial Reset
+                  </h3>
+                  <span style={{ fontSize: '12px', color: '#F87171', fontWeight: 600 }}>
+                    Purge All Platform Transaction Records
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPurgeModal(false)}
+                disabled={purging}
+                style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div
+              style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                borderRadius: '10px',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                padding: '14px 16px',
+                fontSize: '13px',
+                color: '#FCA5A5',
+                lineHeight: 1.6,
+                marginBottom: '18px'
+              }}
+            >
+              <strong>CRITICAL SYSTEM ACTION:</strong> This will completely clear and delete ALL records from:
+              <ul style={{ margin: '6px 0 0', paddingLeft: '18px' }}>
+                <li><code>upi_payment_requests</code> (All pending/approved/rejected payments)</li>
+                <li><code>subscriptions</code> (All VIP plans history)</li>
+                <li><code>watch_passes</code> (All Watch Pass purchases)</li>
+                <li><code>purchases</code> (All title purchases)</li>
+                <li><code>wallet_transactions</code> (All wallet deposit &amp; spend ledger)</li>
+              </ul>
+              All user wallet balances will be reset to <strong>₹0</strong>. Total revenue, profit metrics, total subscriptions, and active pass counts will be reset to <strong>0</strong>.
+            </div>
+
+            <div
+              style={{
+                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                borderRadius: '8px',
+                border: '1px solid rgba(16, 185, 129, 0.25)',
+                padding: '10px 14px',
+                fontSize: '12px',
+                color: '#6EE7B7',
+                marginBottom: '20px'
+              }}
+            >
+              ✓ <strong>STRICT PROTECTION GUARANTEE:</strong> User accounts, catalog titles (movies &amp; web series), media streams, episodes, and admin accounts will <strong>NEVER</strong> be deleted.
+            </div>
+
+            <div style={{ marginBottom: '22px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 800, color: '#E5E7EB', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Type CONFIRM to purge all financial records:
+              </label>
+              <input
+                type="text"
+                value={purgeConfirmInput}
+                onChange={e => setPurgeConfirmInput(e.target.value)}
+                placeholder="Type CONFIRM"
+                disabled={purging}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  border: purgeConfirmInput.trim() === 'CONFIRM' ? '1.5px solid #10B981' : '1.5px solid rgba(239, 68, 68, 0.4)',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  letterSpacing: '0.05em',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setShowPurgeModal(false)}
+                disabled={purging}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePurgeFinancials}
+                disabled={purgeConfirmInput.trim() !== 'CONFIRM' || purging}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 24px',
+                  borderRadius: '8px',
+                  backgroundColor: purgeConfirmInput.trim() === 'CONFIRM' && !purging ? '#DC2626' : 'rgba(220, 38, 38, 0.35)',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  cursor: purgeConfirmInput.trim() === 'CONFIRM' && !purging ? 'pointer' : 'not-allowed',
+                  boxShadow: purgeConfirmInput.trim() === 'CONFIRM' ? '0 4px 18px rgba(220, 38, 38, 0.5)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {purging ? <Loader2 size={16} className="spin" /> : <RotateCcw size={16} />}
+                <span>{purging ? 'Purging Records...' : 'Purge All Financial Records'}</span>
               </button>
             </div>
           </div>

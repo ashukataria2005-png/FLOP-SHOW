@@ -572,7 +572,75 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 12 };
+    // Apply incremental 017_promo_bonus_system for PostgreSQL if not already applied
+    const promoMigrationVersion = '017_promo_bonus_system';
+    if (!appliedSet.has(promoMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 017_promo_bonus_system...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS promo_codes (
+            id TEXT PRIMARY KEY,
+            code TEXT NOT NULL UNIQUE,
+            description TEXT,
+            validity_hours INTEGER NOT NULL DEFAULT 720,
+            status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+            perk_type VARCHAR(64) NOT NULL DEFAULT 'FREE_CONTENT_PASS',
+            times_used INTEGER NOT NULL DEFAULT 0,
+            expires_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_promo_codes_code ON promo_codes(code);
+          CREATE INDEX IF NOT EXISTS idx_promo_codes_status ON promo_codes(status);
+
+          CREATE TABLE IF NOT EXISTS promo_redemptions (
+            id TEXT PRIMARY KEY,
+            promo_code_id TEXT NOT NULL,
+            promo_code TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            content_id TEXT NOT NULL,
+            redeemed_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (promo_code_id) REFERENCES promo_codes(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (content_id) REFERENCES content(id) ON DELETE CASCADE
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_promo_redemptions_user ON promo_redemptions(user_id);
+          CREATE INDEX IF NOT EXISTS idx_promo_redemptions_code ON promo_redemptions(promo_code_id);
+
+          INSERT INTO promo_codes (id, code, description, validity_hours, status, perk_type, times_used, expires_at, created_at, updated_at)
+          VALUES (
+            'promo-welcome-bonus',
+            'WELCOMEBONUS',
+            'New User Welcome Bonus: Unlock any 1 Movie or Web Series completely free for 30 days!',
+            720,
+            'ACTIVE',
+            'FREE_CONTENT_PASS',
+            0,
+            NULL,
+            NOW()::TEXT,
+            NOW()::TEXT
+          )
+          ON CONFLICT (code) DO NOTHING;
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${promoMigrationVersion}', '017_promo_bonus_system.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('017_promo_bonus_system.sql');
+        console.log('✓ [PostgreSQL] Migration 017_promo_bonus_system applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 13 };
   } finally {
     client.release();
     await pool.end();

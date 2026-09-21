@@ -7,14 +7,15 @@ import {
   Save,
   Loader2,
   Shield,
-  HelpCircle
+  HelpCircle,
+  RotateCcw
 } from 'lucide-react';
 
 interface AdminSettingsPageProps {
   onNavigateTab: (tab: string, param?: string) => void;
 }
 
-export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = () => {
+export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = ({ onNavigateTab }) => {
   const { theme, setTheme, showToast } = useApp();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -328,6 +329,57 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = () => {
               />
             </label>
           </div>
+        </div>
+
+        {/* Danger Zone: Complete Financial & Transaction Records Reset */}
+        <div
+          style={{
+            backgroundColor: 'rgba(239, 68, 68, 0.05)',
+            borderRadius: '16px',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            padding: '22px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#DC2626', color: '#FFF' }}>
+                DANGER ZONE
+              </span>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                Complete Financial &amp; Transaction Reset
+              </h3>
+            </div>
+            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>
+              Purge all payment requests, subscriptions, watch passes, purchases, and wallet records. Protected by a mandatory "CONFIRM" modal.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onNavigateTab('admin-reset')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              backgroundColor: '#DC2626',
+              border: 'none',
+              color: '#FFFFFF',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(220, 38, 38, 0.3)'
+            }}
+          >
+            <RotateCcw size={15} />
+            <span>Complete Financial Reset</span>
+          </button>
         </div>
 
         {/* Save Button */}

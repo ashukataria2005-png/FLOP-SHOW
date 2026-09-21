@@ -988,6 +988,31 @@ export const adminService = {
     };
   },
 
+  async purgeAllFinancialRecords(): Promise<{ success: boolean; resetAt: string; message: string }> {
+    const db = getAdapter();
+    const now = new Date().toISOString();
+
+    // 1. Purge all records from financial / transaction tables
+    // Strictly does NOT touch users, content catalog, media, episodes, or admin accounts
+    await db.run('DELETE FROM upi_payment_requests;');
+    await db.run('DELETE FROM subscriptions;');
+    await db.run('DELETE FROM watch_passes;');
+    await db.run('DELETE FROM purchases;');
+    await db.run('DELETE FROM wallet_transactions;');
+
+    // 2. Reset user wallet balances to 0
+    await db.run('UPDATE wallets SET balance = 0, updated_at = ?;', [now]);
+
+    // 3. Reset platform financial watermark
+    await this.updateSettings({ finance_analytics_reset_at: now });
+
+    return {
+      success: true,
+      resetAt: now,
+      message: 'All platform financial records, transaction histories, subscriptions, and access passes have been completely purged. Financial metrics have been reset to 0.'
+    };
+  },
+
   async getUserDetails(userId: string): Promise<any> {
     const db = getAdapter();
     const { rows } = await db.query(

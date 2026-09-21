@@ -935,6 +935,24 @@ adminRouter.post('/reset-financial-analytics', async (_req, res, next) => {
   }
 });
 
+// ----------------------------------------------------------------------------
+// 9B. COMPLETE SYSTEM FINANCIAL/TRANSACTION PURGE & RESET
+// ----------------------------------------------------------------------------
+adminRouter.post('/reset-financials', async (req, res, next) => {
+  try {
+    const confirmation = req.body?.confirmation;
+    if (confirmation !== 'CONFIRM') {
+      return res.status(400).json({
+        error: 'Safety verification failed. You must provide confirmation: "CONFIRM" to purge all financial records.'
+      });
+    }
+    const result = await adminService.purgeAllFinancialRecords();
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 async function uploadSingleMediaFile(file: Express.Multer.File): Promise<{
   url: string;
   playbackUrl?: string;

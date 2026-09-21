@@ -1,7 +1,7 @@
 import React from 'react';
 import { Logo } from '../common/Logo';
 import { useApp } from '../../context/AppContext';
-import { Search, Compass, Bookmark, Crown, Zap } from 'lucide-react';
+import { Search, Compass, Bookmark, Crown, Zap, Gift } from 'lucide-react';
 
 interface HeaderProps {
   currentTab: string;
@@ -119,10 +119,48 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
           <Bookmark size={18} />
           My Library
         </button>
+
+        <button
+          onClick={() => onNavigate('bonus')}
+          style={{
+            color: currentTab === 'bonus' ? 'var(--brand-gold)' : 'var(--text-secondary)',
+            fontWeight: currentTab === 'bonus' ? 700 : 500,
+            fontSize: '15px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'color var(--transition-fast)'
+          }}
+        >
+          <Gift size={18} />
+          Bonus
+        </button>
       </nav>
 
       {/* Right Action Icons: Subscription pill & Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        {/* Bonus / Rewards Pill */}
+        <button
+          onClick={() => onNavigate('bonus')}
+          title="Bonus & Rewards Hub"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            borderRadius: 'var(--radius-pill)',
+            backgroundColor: currentTab === 'bonus' ? 'rgba(245, 197, 24, 0.25)' : 'rgba(245, 197, 24, 0.12)',
+            border: '1px solid rgba(245, 197, 24, 0.35)',
+            color: 'var(--brand-gold)',
+            fontSize: '13px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all var(--transition-fast)'
+          }}
+        >
+          <Gift size={14} />
+          <span>Bonus</span>
+        </button>
 
         {/* Mode B: Subscription Badge / CTA */}
         {monetizationMode === 'SUBSCRIPTION' && (

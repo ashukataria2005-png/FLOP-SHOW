@@ -100,18 +100,9 @@ export const authService = {
       now,
     });
 
-    // Create initial wallet for user (₹100 = 10,000 paise bonus for demo/testing)
-    const initialPaise = 10000;
+    // Create initial wallet for user with 0 balance (legacy ₹100 auto-bonus removed)
+    const initialPaise = 0;
     await walletRepository.createWallet(id, initialPaise, now);
-    await walletRepository.addTransaction({
-      id: `tx-${crypto.randomUUID()}`,
-      userId: id,
-      type: 'RECHARGE',
-      amount: initialPaise,
-      balanceAfter: initialPaise,
-      description: 'Welcome Bonus Credit',
-      createdAt: now,
-    });
 
     const userRecord = await userRepository.findById(id);
     const safeUser = toSafeUser(userRecord!);

@@ -18,7 +18,6 @@ import {
   ChevronDown,
   Crown,
   Megaphone,
-  Palette,
   QrCode,
   Wallet,
   Zap,
@@ -114,7 +113,16 @@ const navGroups: NavGroup[] = [
       { id: 'admin-pricing', label: 'Plans & Pricing', icon: Tag }
     ]
   },
-  // 5. Analytics & Access Passes
+  // 6. Bonus & Promo Codes (Task 3B)
+  {
+    id: 'group-promos',
+    title: 'PROMOS & REWARDS',
+    icon: Gift,
+    items: [
+      { id: 'admin-promos', label: 'Bonus & Promo Codes', icon: Gift }
+    ]
+  },
+  // 7. Analytics & Access Passes
   {
     id: 'group-analytics',
     title: 'ANALYTICS & PASSES',
@@ -126,7 +134,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-analytics-vip', label: 'VIP Plans', icon: Crown }
     ]
   },
-  // 6. Ads
+  // 8. Ads
   {
     id: 'group-ads',
     title: 'ADS',
@@ -135,7 +143,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-ads', label: 'Advertisement / Ads', icon: Megaphone }
     ]
   },
-  // 7. Users
+  // 9. Users
   {
     id: 'group-users',
     title: 'USERS',
@@ -144,7 +152,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-users', label: 'User Management', icon: Users }
     ]
   },
-  // 8. Transactions
+  // 10. Transactions
   {
     id: 'group-finance',
     title: 'TRANSACTIONS / FINANCE',
@@ -154,17 +162,16 @@ const navGroups: NavGroup[] = [
       { id: 'admin-transactions', label: 'All Transactions', icon: CreditCard }
     ]
   },
-  // 9. Settings
+  // 11. Settings (Duplicate admin-design removed - Task 2)
   {
     id: 'group-settings',
     title: 'SETTINGS',
     icon: Sliders,
     items: [
-      { id: 'admin-settings', label: 'General Settings', icon: Sliders },
-      { id: 'admin-design', label: 'App Design & Themes', icon: Palette }
+      { id: 'admin-settings', label: 'General Settings', icon: Sliders }
     ]
   },
-  // 10. Reset
+  // 12. Reset
   {
     id: 'group-reset',
     title: 'SYSTEM / RESET',

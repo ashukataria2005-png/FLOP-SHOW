@@ -10,7 +10,8 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  QrCode
+  QrCode,
+  Gift
 } from 'lucide-react';
 
 interface UserPaymentRequest {
@@ -129,6 +130,67 @@ export const WalletPage: React.FC = () => {
             <span>Add Funds / Recharge via UPI</span>
           </button>
         </div>
+      </div>
+
+      {/* Welcome Bonus & Promo Rewards Hub Banner */}
+      <div
+        onClick={() => {
+          window.history.pushState(null, '', '/bonus');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }}
+        style={{
+          background: 'rgba(245, 197, 24, 0.08)',
+          border: '1px solid rgba(245, 197, 24, 0.25)',
+          borderRadius: '16px',
+          padding: '16px 20px',
+          marginBottom: '32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(245, 197, 24, 0.18)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--brand-gold, #F5C518)',
+              flexShrink: 0
+            }}
+          >
+            <Gift size={20} />
+          </div>
+          <div>
+            <div style={{ fontSize: '14.5px', fontWeight: 800, color: '#FFFFFF' }}>
+              Have a Promo Code or Welcome Bonus?
+            </div>
+            <div style={{ fontSize: '12.5px', color: '#9CA3AF', marginTop: '2px' }}>
+              Redeem 1-time free access pass to ANY single Movie or Web Series of your choice.
+            </div>
+          </div>
+        </div>
+        <button
+          style={{
+            padding: '9px 16px',
+            borderRadius: '8px',
+            backgroundColor: 'var(--brand-gold, #F5C518)',
+            color: '#0A0A0F',
+            fontSize: '13px',
+            fontWeight: 800,
+            border: 'none',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          Open Bonus Hub
+        </button>
       </div>
 
       {/* UPI Recharge Requests Section (if user has any) */}

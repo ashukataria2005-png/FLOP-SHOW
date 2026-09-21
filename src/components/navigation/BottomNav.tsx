@@ -98,3 +98,4 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onNavigate }) 
     </nav>
   );
 };
+

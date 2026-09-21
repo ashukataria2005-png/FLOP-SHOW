@@ -350,10 +350,19 @@ export const promoService = {
       );
       usedPromos = userRedemptions as PromoRedemptionRecord[];
       redemptionCount = usedPromos.length;
+
+      // Mark whether user has already claimed each active promo
+      const claimedCodeSet = new Set(usedPromos.map(u => (u.promo_code || '').toUpperCase()));
+      const claimedIdSet = new Set(usedPromos.map(u => u.promo_code_id));
+      for (const p of activePromos) {
+        if (claimedCodeSet.has(p.code.toUpperCase()) || claimedIdSet.has(p.id)) {
+          (p as any).is_claimed = true;
+        }
+      }
     }
 
-    // Restriction: Strictly 1-time use per new user account
-    const canRedeem = redemptionCount === 0;
+    // Universal promo redemption: Users can redeem any valid active promo code they haven't claimed yet
+    const canRedeem = true;
 
     return {
       canRedeem,
@@ -367,6 +376,7 @@ export const promoService = {
   /**
    * User: Redeem Promo Code for 1 free Movie or Web Series
    * Works for both PUBLIC and PRIVATE promo codes.
+   * Enforces per-user-per-code check (users can redeem multiple different codes).
    */
   async redeemPromoCode(userId: string, codeInput: string, contentId: string): Promise<{
     success: boolean;
@@ -388,16 +398,7 @@ export const promoService = {
 
     const db = getAdapter();
 
-    // 1. Restriction check: strictly 1 redemption per user account
-    const { rows: priorRedemptions } = await db.query(
-      `SELECT id FROM promo_redemptions WHERE user_id = ? LIMIT 1;`,
-      [userId]
-    );
-    if (priorRedemptions.length > 0) {
-      throw new Error('Account Welcome Restriction: Each user account is strictly eligible for 1 free promo redemption.');
-    }
-
-    // 2. Promo code verification
+    // 1. Promo code verification
     const { rows: promoRows } = await db.query(
       `SELECT * FROM promo_codes WHERE code = ? LIMIT 1;`,
       [code]
@@ -409,6 +410,15 @@ export const promoService = {
     const promo = promoRows[0] as any;
     if (promo.status !== 'ACTIVE') {
       throw new Error(`Promo code "${code}" is no longer active.`);
+    }
+
+    // 2. Per-user-per-code check: prevent user from reusing the exact same promo code
+    const { rows: priorThisCode } = await db.query(
+      `SELECT id FROM promo_redemptions WHERE user_id = ? AND (promo_code_id = ? OR promo_code = ?) LIMIT 1;`,
+      [userId, promo.id, code]
+    );
+    if (priorThisCode.length > 0) {
+      throw new Error(`You have already redeemed promo code "${code}". Each promo code can only be claimed once per user.`);
     }
 
     // 3. Max claim limit check
@@ -501,6 +511,11 @@ export const promoService = {
     discountAmountRupees: number;
     finalAmountRupees: number;
     isFreePass: boolean;
+    discountEnabled?: boolean;
+    maxUses?: number | null;
+    timesUsed?: number;
+    isLifetime?: boolean;
+    perkType?: string;
     message: string;
   }> {
     const code = (codeInput || '').trim().toUpperCase();
@@ -510,18 +525,7 @@ export const promoService = {
 
     const db = getAdapter();
 
-    // 1. If user is logged in, check 1-time redemption rule
-    if (userId) {
-      const { rows: priorRedemptions } = await db.query(
-        `SELECT id FROM promo_redemptions WHERE user_id = ? LIMIT 1;`,
-        [userId]
-      );
-      if (priorRedemptions.length > 0) {
-        throw new Error('Account Welcome Restriction: You have already used your 1-time promo benefit.');
-      }
-    }
-
-    // 2. Fetch code
+    // 1. Fetch code
     const { rows } = await db.query(
       `SELECT * FROM promo_codes WHERE code = ? LIMIT 1;`,
       [code]
@@ -533,6 +537,17 @@ export const promoService = {
     const promo = rows[0] as any;
     if (promo.status !== 'ACTIVE') {
       throw new Error(`Promo code "${code}" is no longer active.`);
+    }
+
+    // 2. If user is logged in, check per-user-per-code check
+    if (userId) {
+      const { rows: priorThisCode } = await db.query(
+        `SELECT id FROM promo_redemptions WHERE user_id = ? AND (promo_code_id = ? OR promo_code = ?) LIMIT 1;`,
+        [userId, promo.id, code]
+      );
+      if (priorThisCode.length > 0) {
+        throw new Error(`You have already redeemed promo code "${code}". Each promo code can only be used once per user.`);
+      }
     }
 
     // 3. Claim limit
@@ -563,9 +578,43 @@ export const promoService = {
       discountAmountRupees,
       finalAmountRupees,
       isFreePass,
+      discountEnabled: isDiscount,
+      maxUses: promo.max_uses,
+      timesUsed: promo.times_used,
+      isLifetime,
+      perkType: promo.perk_type || (isDiscount ? 'DISCOUNT' : 'FREE_CONTENT_PASS'),
       message: isFreePass
         ? `Promo "${promo.code}" applied: 100% Free Access!`
         : `Promo "${promo.code}" applied: ${discountPercent}% discount! Save ₹${discountAmountRupees}.`
     };
+  },
+
+  /**
+   * Helper: Record promo redemption upon successful checkout / payment
+   */
+  async recordPromoRedemption(userId: string, promoCode: string, targetIdOrPlan?: string): Promise<void> {
+    const code = (promoCode || '').trim().toUpperCase();
+    if (!userId || !code) return;
+    const db = getAdapter();
+    const { rows } = await db.query(`SELECT * FROM promo_codes WHERE code = ? LIMIT 1;`, [code]);
+    if (rows.length === 0) return;
+    const promo = rows[0] as any;
+    const nowIso = new Date().toISOString();
+    const expiresAt = promo.is_lifetime
+      ? new Date(Date.now() + 3650 * 24 * 3600 * 1000).toISOString()
+      : new Date(Date.now() + (promo.validity_hours || 720) * 3600 * 1000).toISOString();
+
+    const redemptionId = `p_red_${Date.now()}_${crypto.randomUUID()}`;
+    await db.run(
+      `INSERT INTO promo_redemptions (
+        id, promo_code_id, promo_code, user_id, content_id,
+        redeemed_at, expires_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      [redemptionId, promo.id, promo.code, userId, targetIdOrPlan || 'plan_subscription', nowIso, expiresAt, nowIso]
+    );
+    await db.run(
+      `UPDATE promo_codes SET times_used = times_used + 1, updated_at = ? WHERE id = ?;`,
+      [nowIso, promo.id]
+    );
   }
 };

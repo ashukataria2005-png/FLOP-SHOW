@@ -19,8 +19,11 @@ import {
   ShieldCheck,
   History,
   Percent,
-  Infinity as InfinityIcon
+  Infinity as InfinityIcon,
+  Crown,
+  Tag
 } from 'lucide-react';
+import { generateUpiQrDataUrl } from '../utils/upiQr';
 
 interface PromoCodeItem {
   id: string;
@@ -40,6 +43,7 @@ interface PromoCodeItem {
   discount_percent?: number;
   max_uses?: number | null;
   is_lifetime?: boolean | number;
+  is_claimed?: boolean;
 }
 
 interface PromoRedemptionItem {
@@ -62,12 +66,24 @@ interface BonusHubPageProps {
   onPlayContent?: (content: ContentItem) => void;
 }
 
+const VIP_DISCOUNT_OPTIONS = [
+  { id: 'MONTHLY', name: 'VIP Monthly', duration: '30 Days Access', basePrice: 89, badge: 'Popular' },
+  { id: '3_MONTHS', name: 'VIP 3 Months', duration: '90 Days Access', basePrice: 189, badge: 'Best Value' },
+  { id: 'YEARLY', name: 'VIP 1 Year', duration: '365 Days Access', basePrice: 449, badge: 'Max Savings' },
+];
+
+const PASS_DISCOUNT_OPTIONS = [
+  { id: 'PASS_24H', name: '24 Hours Pass', duration: '1 Day Full Access', basePrice: 19, badge: 'Daily' },
+  { id: 'PASS_3D', name: '3 Days Pass', duration: '3 Days Full Access', basePrice: 29, badge: 'Weekend' },
+  { id: 'PASS_7D', name: '7 Days Pass', duration: '7 Days Full Access', basePrice: 49, badge: 'Popular' },
+  { id: 'PASS_15D', name: '15 Days Pass', duration: '15 Days Full Access', basePrice: 89, badge: 'Super Pass' },
+];
+
 export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayContent }) => {
-  const { isAuthenticated, openAuthModal, showToast } = useApp();
+  const { isAuthenticated, openAuthModal, showToast, user } = useApp();
   const [activeTab, setActiveTab] = useState<'active' | 'expired' | 'history'>('active');
 
   const [loading, setLoading] = useState(true);
-  const [canRedeem, setCanRedeem] = useState(true);
   const [activePromos, setActivePromos] = useState<PromoCodeItem[]>([]);
   const [expiredPromos, setExpiredPromos] = useState<PromoCodeItem[]>([]);
   const [usedPromos, setUsedPromos] = useState<PromoRedemptionItem[]>([]);
@@ -75,8 +91,9 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
   // Input & Modal State
   const [inputCode, setInputCode] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [validatingCode, setValidatingCode] = useState(false);
 
-  // Content Selection Modal
+  // Content Selection Modal (for 100% free movie/series passes)
   const [showContentModal, setShowContentModal] = useState(false);
   const [selectedCodeForRedeem, setSelectedCodeForRedeem] = useState('');
   const [catalogTitles, setCatalogTitles] = useState<ContentItem[]>([]);
@@ -84,6 +101,27 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
   const [contentSearch, setContentSearch] = useState('');
   const [selectedTitle, setSelectedTitle] = useState<ContentItem | null>(null);
   const [redeeming, setRedeeming] = useState(false);
+
+  // Discount Multi-Type Modal (for discount coupons e.g. 10%, 20%, 50%)
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [validatedDiscountPromo, setValidatedDiscountPromo] = useState<{
+    code: string;
+    discountPercent: number;
+    description?: string;
+  } | null>(null);
+  const [discountTargetType, setDiscountTargetType] = useState<'vip' | 'watch_pass' | 'single'>('vip');
+  const [selectedDiscountPlan, setSelectedDiscountPlan] = useState<string>('MONTHLY');
+  const [discountUtr, setDiscountUtr] = useState('');
+  const [discountSubmitting, setDiscountSubmitting] = useState(false);
+  const [discountError, setDiscountError] = useState<string | null>(null);
+  const [discountQrUrl, setDiscountQrUrl] = useState<string>('');
+  const [discountQrLoading, setDiscountQrLoading] = useState(false);
+
+  // UPI payment config
+  const [upiConfig, setUpiConfig] = useState<{ upiId: string; merchantName: string }>({
+    upiId: 'flopshow@upi',
+    merchantName: 'FLOPSHOW'
+  });
 
   // Success Confirmation Modal
   const [unlockedResult, setUnlockedResult] = useState<{
@@ -95,12 +133,22 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
   const fetchHubData = async () => {
     try {
       setLoading(true);
-      const res = await api.promos.getHub();
-      if (res.success) {
-        setCanRedeem(res.canRedeem ?? true);
-        setActivePromos(res.activePromos || []);
-        setExpiredPromos(res.expiredPromos || []);
-        setUsedPromos(res.usedPromos || []);
+      const [hubRes, upiCfg] = await Promise.allSettled([
+        api.promos.getHub(),
+        api.payments.getConfig()
+      ]);
+
+      if (hubRes.status === 'fulfilled' && hubRes.value.success) {
+        setActivePromos(hubRes.value.activePromos || []);
+        setExpiredPromos(hubRes.value.expiredPromos || []);
+        setUsedPromos(hubRes.value.usedPromos || []);
+      }
+
+      if (upiCfg.status === 'fulfilled' && upiCfg.value?.upiId) {
+        setUpiConfig({
+          upiId: upiCfg.value.upiId,
+          merchantName: upiCfg.value.merchantName || 'FLOPSHOW'
+        });
       }
     } catch {
       // Graceful fallback
@@ -126,15 +174,42 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
     }
   };
 
-  const handleStartRedeem = (codeToUse?: string) => {
-    if (!isAuthenticated) {
-      showToast('Please sign in to claim your welcome bonus!', 'info');
-      openAuthModal();
-      return;
-    }
+  // Pricing calculations for Multi-Type Discount Modal
+  const currentBasePrice = discountTargetType === 'vip'
+    ? (VIP_DISCOUNT_OPTIONS.find(p => p.id === selectedDiscountPlan)?.basePrice || 89)
+    : discountTargetType === 'watch_pass'
+      ? (PASS_DISCOUNT_OPTIONS.find(p => p.id === selectedDiscountPlan)?.basePrice || 49)
+      : 30;
 
-    if (!canRedeem) {
-      showToast('You have already redeemed your 1-time welcome bonus pass.', 'info');
+  const currentDiscountPercent = validatedDiscountPromo?.discountPercent || 0;
+  const currentDiscountAmount = Math.round((currentBasePrice * currentDiscountPercent) / 100);
+  const currentPayablePrice = Math.max(1, currentBasePrice - currentDiscountAmount);
+
+  // Generate dynamic QR code whenever discount modal opens or plan / payable price changes
+  useEffect(() => {
+    let isCancelled = false;
+    if (showDiscountModal && currentPayablePrice > 0) {
+      setDiscountQrLoading(true);
+      generateUpiQrDataUrl(upiConfig.upiId, currentPayablePrice, upiConfig.merchantName)
+        .then(url => {
+          if (!isCancelled) {
+            setDiscountQrUrl(url);
+            setDiscountQrLoading(false);
+          }
+        })
+        .catch(() => {
+          if (!isCancelled) setDiscountQrLoading(false);
+        });
+    }
+    return () => {
+      isCancelled = true;
+    };
+  }, [showDiscountModal, currentPayablePrice, upiConfig.upiId, upiConfig.merchantName]);
+
+  const handleStartRedeem = async (codeToUse?: string) => {
+    if (!isAuthenticated) {
+      showToast('Please sign in to redeem promo codes!', 'info');
+      openAuthModal();
       return;
     }
 
@@ -144,10 +219,38 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
       return;
     }
 
-    setSelectedCodeForRedeem(code);
-    setSelectedTitle(null);
-    setShowContentModal(true);
-    loadCatalog();
+    try {
+      setValidatingCode(true);
+      const res = await api.promos.validate(code, 0);
+      if (!res.valid) {
+        showToast(res.message || `Promo code "${code}" is invalid or expired.`, 'error');
+        return;
+      }
+
+      // If promo is a DISCOUNT code (e.g. 10%, 20%, 50%), open Multi-Type Redemption Modal
+      if (res.discountEnabled || (res.discountPercent > 0 && res.discountPercent < 100)) {
+        setValidatedDiscountPromo({
+          code: res.code,
+          discountPercent: res.discountPercent,
+          description: res.description
+        });
+        setDiscountTargetType('vip');
+        setSelectedDiscountPlan('MONTHLY');
+        setDiscountUtr('');
+        setDiscountError(null);
+        setShowDiscountModal(true);
+      } else {
+        // 100% Free movie/series access pass
+        setSelectedCodeForRedeem(res.code);
+        setSelectedTitle(null);
+        setShowContentModal(true);
+        loadCatalog();
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to validate promo code.', 'error');
+    } finally {
+      setValidatingCode(false);
+    }
   };
 
   const handleConfirmRedeem = async () => {
@@ -181,6 +284,63 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
     setInputCode(code);
     showToast(`Promo code "${code}" copied!`, 'success');
     setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const handleDiscountSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      openAuthModal();
+      return;
+    }
+
+    const cleanUtr = discountUtr.trim().replace(/[^a-zA-Z0-9]/g, '');
+    if (!cleanUtr || cleanUtr.length < 6 || cleanUtr.length > 35) {
+      setDiscountError('Please enter a valid 6-35 character alphanumeric UPI UTR / Transaction ID.');
+      return;
+    }
+
+    try {
+      setDiscountSubmitting(true);
+      setDiscountError(null);
+
+      if (discountTargetType === 'vip') {
+        const res = await api.subscriptions.submitRequest(
+          selectedDiscountPlan as any,
+          cleanUtr,
+          user?.name,
+          user?.email,
+          validatedDiscountPromo?.code
+        );
+        showToast(res.message || 'VIP Subscription payment submitted!', 'success');
+      } else if (discountTargetType === 'watch_pass') {
+        const res = await api.watchPasses.submitRequest({
+          plan: selectedDiscountPlan as any,
+          utr: cleanUtr,
+          userName: user?.name,
+          userEmail: user?.email,
+          promoCode: validatedDiscountPromo?.code
+        });
+        showToast(res.message || 'Watch Pass payment submitted!', 'success');
+      } else {
+        const res = await api.payments.submitRequest(
+          currentPayablePrice,
+          cleanUtr,
+          user?.name,
+          user?.email,
+          undefined,
+          validatedDiscountPromo?.code
+        );
+        showToast(res.message || 'Payment submitted!', 'success');
+      }
+
+      setShowDiscountModal(false);
+      setInputCode('');
+      await fetchHubData();
+    } catch (err: any) {
+      setDiscountError(err.message || 'Payment submission failed. Please verify your UTR.');
+    } finally {
+      setDiscountSubmitting(false);
+    }
   };
 
   const filteredCatalog = catalogTitles.filter(item => {
@@ -256,17 +416,17 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
               fontWeight: 700,
               padding: '6px 12px',
               borderRadius: '8px',
-              backgroundColor: canRedeem ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-              color: canRedeem ? '#34D399' : '#F87171',
-              border: canRedeem ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)'
+              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+              color: '#34D399',
+              border: '1px solid rgba(16, 185, 129, 0.3)'
             }}
           >
-            {canRedeem ? <CheckCircle2 size={14} /> : <ShieldCheck size={14} />}
-            <span>{canRedeem ? '1-Free Movie/Series Access Pass Available' : 'Welcome Bonus Already Redeemed'}</span>
+            <CheckCircle2 size={14} />
+            <span>Universal Promo Redemption Active • Apply any code for discounts or free access</span>
           </div>
 
           <span style={{ fontSize: '12px', color: '#6B7280' }}>•</span>
-          <span style={{ fontSize: '12px', color: '#9CA3AF' }}>ONLY 1-TIME USAGE FOR NEW MEMBERS</span>
+          <span style={{ fontSize: '12px', color: '#9CA3AF' }}>1-TIME PER PROMO CODE PER USER</span>
         </div>
       </div>
 
@@ -357,11 +517,14 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
               marginBottom: '28px'
             }}
           >
-            <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 6px' }}>
-              Have a Promo Code?
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <Tag size={18} color="var(--brand-gold, #F5C518)" />
+              <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                Have a Promo Code?
+              </h2>
+            </div>
             <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 16px' }}>
-              Type your coupon code below to unlock any movie or series for 30 days without spending money.
+              Enter any active coupon or promo code to unlock free access or claim instant discounts on VIP plans.
             </p>
 
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -369,7 +532,7 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
                 type="text"
                 value={inputCode}
                 onChange={e => setInputCode(e.target.value.toUpperCase())}
-                placeholder="ENTER PROMO CODE (e.g. WELCOMEBONUS)"
+                placeholder="ENTER PROMO CODE (e.g. FLOP10, WELCOMEBONUS)"
                 style={{
                   flex: 1,
                   minWidth: '240px',
@@ -387,21 +550,25 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
               <button
                 type="button"
                 onClick={() => handleStartRedeem(inputCode)}
-                disabled={!canRedeem}
+                disabled={validatingCode}
                 style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
                   padding: '12px 24px',
                   borderRadius: '10px',
-                  backgroundColor: canRedeem ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.1)',
-                  color: canRedeem ? '#0A0A0F' : '#6B7280',
+                  backgroundColor: 'var(--brand-gold, #F5C518)',
+                  color: '#0A0A0F',
                   fontSize: '14px',
                   fontWeight: 800,
                   border: 'none',
-                  cursor: canRedeem ? 'pointer' : 'not-allowed',
-                  boxShadow: canRedeem ? '0 4px 14px rgba(245, 197, 24, 0.3)' : 'none',
+                  cursor: validatingCode ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(245, 197, 24, 0.3)',
                   whiteSpace: 'nowrap'
                 }}
               >
-                Redeem for 1 Free Movie/Series
+                {validatingCode ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+                <span>{validatingCode ? 'Checking...' : 'Apply / Redeem Code'}</span>
               </button>
             </div>
           </div>
@@ -569,21 +736,25 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
 
                     <button
                       onClick={() => handleStartRedeem(item.code)}
-                      disabled={!canRedeem}
+                      disabled={Boolean(item.is_claimed) || validatingCode}
                       style={{
                         width: '100%',
                         padding: '11px',
                         borderRadius: '8px',
-                        backgroundColor: canRedeem ? 'rgba(245, 197, 24, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                        border: canRedeem ? '1px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
-                        color: canRedeem ? 'var(--brand-gold, #F5C518)' : '#6B7280',
+                        backgroundColor: item.is_claimed ? 'rgba(255, 255, 255, 0.05)' : 'rgba(245, 197, 24, 0.15)',
+                        border: item.is_claimed ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid var(--brand-gold, #F5C518)',
+                        color: item.is_claimed ? '#6B7280' : 'var(--brand-gold, #F5C518)',
                         fontSize: '13px',
                         fontWeight: 800,
-                        cursor: canRedeem ? 'pointer' : 'not-allowed',
+                        cursor: item.is_claimed || validatingCode ? 'not-allowed' : 'pointer',
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      {canRedeem ? (item.discount_enabled ? `Claim & Use ${item.code}` : 'Redeem for 1 Free Movie/Series') : 'Welcome Pass Redeemed'}
+                      {item.is_claimed
+                        ? 'Already Claimed'
+                        : item.discount_enabled
+                          ? `Apply ${item.code} (${item.discount_percent}% OFF)`
+                          : `Redeem Free Pass (${item.code})`}
                     </button>
                   </div>
                 </div>
@@ -1050,6 +1221,532 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
                   {redeeming ? <Loader2 size={16} className="spin" /> : <Gift size={16} />}
                   <span>{redeeming ? 'Unlocking...' : 'Unlock Title Free'}</span>
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MULTI-TYPE PLAN DISCOUNT REDEMPTION MODAL */}
+      {showDiscountModal && validatedDiscountPromo && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.88)',
+            backdropFilter: 'blur(12px)',
+            zIndex: 3100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#0F0F17',
+              border: '1.5px solid rgba(245, 197, 24, 0.4)',
+              borderRadius: '20px',
+              maxWidth: '640px',
+              width: '100%',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 70px rgba(0, 0, 0, 0.95), 0 0 40px rgba(245, 197, 24, 0.12)',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexShrink: 0
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      fontSize: '11.5px',
+                      fontWeight: 900,
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                      color: 'var(--brand-gold, #F5C518)',
+                      border: '1px solid rgba(245, 197, 24, 0.35)'
+                    }}
+                  >
+                    PROMO: {validatedDiscountPromo.code}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '11.5px',
+                      fontWeight: 800,
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                      color: '#34D399',
+                      border: '1px solid rgba(16, 185, 129, 0.4)'
+                    }}
+                  >
+                    {currentDiscountPercent}% DISCOUNT APPLIED
+                  </span>
+                </div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: '6px 0 0' }}>
+                  Choose Plan to Apply Discount
+                </h3>
+              </div>
+
+              <button
+                onClick={() => setShowDiscountModal(false)}
+                disabled={discountSubmitting}
+                style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: '6px' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body - Scrollable */}
+            <div style={{ padding: '20px 24px', flex: 1, overflowY: 'auto' }}>
+              {/* Target Type Selector Tabs */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                  padding: '4px',
+                  borderRadius: '12px',
+                  marginBottom: '18px'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDiscountTargetType('vip');
+                    setSelectedDiscountPlan('MONTHLY');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '9px 12px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: discountTargetType === 'vip' ? 'var(--brand-gold, #F5C518)' : 'transparent',
+                    color: discountTargetType === 'vip' ? '#0A0A0F' : '#9CA3AF',
+                    fontWeight: 800,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Crown size={14} />
+                  <span>VIP Plans</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDiscountTargetType('watch_pass');
+                    setSelectedDiscountPlan('PASS_7D');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '9px 12px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: discountTargetType === 'watch_pass' ? 'var(--brand-gold, #F5C518)' : 'transparent',
+                    color: discountTargetType === 'watch_pass' ? '#0A0A0F' : '#9CA3AF',
+                    fontWeight: 800,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Tag size={14} />
+                  <span>Watch Pass</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDiscountTargetType('single');
+                    setSelectedDiscountPlan('SINGLE');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '9px 12px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: discountTargetType === 'single' ? 'var(--brand-gold, #F5C518)' : 'transparent',
+                    color: discountTargetType === 'single' ? '#0A0A0F' : '#9CA3AF',
+                    fontWeight: 800,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Film size={14} />
+                  <span>Single Movie</span>
+                </button>
+              </div>
+
+              {/* Plans Grid */}
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                  Select Duration / Tier:
+                </div>
+
+                {discountTargetType === 'vip' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
+                    {VIP_DISCOUNT_OPTIONS.map(opt => {
+                      const isSelected = selectedDiscountPlan === opt.id;
+                      const optSaved = Math.round((opt.basePrice * currentDiscountPercent) / 100);
+                      const optFinal = Math.max(1, opt.basePrice - optSaved);
+
+                      return (
+                        <div
+                          key={opt.id}
+                          onClick={() => setSelectedDiscountPlan(opt.id)}
+                          style={{
+                            padding: '14px',
+                            borderRadius: '12px',
+                            backgroundColor: isSelected ? 'rgba(245, 197, 24, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                            border: isSelected ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.08)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            position: 'relative'
+                          }}
+                        >
+                          {opt.badge && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: '8px',
+                                right: '8px',
+                                fontSize: '10px',
+                                fontWeight: 800,
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                backgroundColor: isSelected ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.1)',
+                                color: isSelected ? '#000' : '#D1D5DB'
+                              }}
+                            >
+                              {opt.badge}
+                            </span>
+                          )}
+                          <div style={{ fontSize: '13px', fontWeight: 800, color: '#FFFFFF', marginBottom: '2px' }}>
+                            {opt.name}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '8px' }}>
+                            {opt.duration}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                            <span style={{ fontSize: '16px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)' }}>
+                              ₹{optFinal}
+                            </span>
+                            <span style={{ fontSize: '12px', color: '#6B7280', textDecoration: 'line-through' }}>
+                              ₹{opt.basePrice}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {discountTargetType === 'watch_pass' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+                    {PASS_DISCOUNT_OPTIONS.map(opt => {
+                      const isSelected = selectedDiscountPlan === opt.id;
+                      const optSaved = Math.round((opt.basePrice * currentDiscountPercent) / 100);
+                      const optFinal = Math.max(1, opt.basePrice - optSaved);
+
+                      return (
+                        <div
+                          key={opt.id}
+                          onClick={() => setSelectedDiscountPlan(opt.id)}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '12px',
+                            backgroundColor: isSelected ? 'rgba(245, 197, 24, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                            border: isSelected ? '2px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.08)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#FFFFFF', marginBottom: '2px' }}>
+                            {opt.name}
+                          </div>
+                          <div style={{ fontSize: '10.5px', color: '#9CA3AF', marginBottom: '6px' }}>
+                            {opt.duration}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                            <span style={{ fontSize: '15px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)' }}>
+                              ₹{optFinal}
+                            </span>
+                            <span style={{ fontSize: '11px', color: '#6B7280', textDecoration: 'line-through' }}>
+                              ₹{opt.basePrice}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {discountTargetType === 'single' && (
+                  <div
+                    style={{
+                      padding: '14px 18px',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(245, 197, 24, 0.08)',
+                      border: '1px solid rgba(245, 197, 24, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#FFFFFF' }}>
+                        Single Catalog Title / Movie
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#9CA3AF', marginTop: '2px' }}>
+                        Applies to any standard ₹30 movie or episode checkout
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                      <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)' }}>
+                        ₹{currentPayablePrice}
+                      </span>
+                      <span style={{ fontSize: '13px', color: '#6B7280', textDecoration: 'line-through' }}>
+                        ₹30
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Professional Pricing Breakdown Card */}
+              <div
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '14px',
+                  padding: '16px',
+                  marginBottom: '20px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', color: '#9CA3AF', marginBottom: '8px' }}>
+                  <span>Original Plan Price:</span>
+                  <span style={{ textDecoration: 'line-through', color: '#9CA3AF', fontWeight: 700 }}>
+                    ₹{currentBasePrice}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', color: '#34D399', marginBottom: '10px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Percent size={13} />
+                    <span>Coupon Discount ({currentDiscountPercent}% OFF):</span>
+                  </span>
+                  <span style={{ fontWeight: 800 }}>-₹{currentDiscountAmount}</span>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingTop: '10px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+                  }}
+                >
+                  <span style={{ fontSize: '14px', fontWeight: 800, color: '#FFFFFF' }}>
+                    Final Payable Amount:
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                    <span style={{ fontSize: '22px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)' }}>
+                      ₹{currentPayablePrice}
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#10B981', fontWeight: 700 }}>
+                      (You save ₹{currentDiscountAmount})
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic UPI Payment & QR Code Section */}
+              <div
+                style={{
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                  border: '1px solid rgba(245, 197, 24, 0.25)',
+                  borderRadius: '16px',
+                  padding: '18px',
+                  marginBottom: '16px'
+                }}
+              >
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Dynamic UPI QR Code */}
+                  <div
+                    style={{
+                      width: '140px',
+                      height: '140px',
+                      borderRadius: '12px',
+                      backgroundColor: '#FFFFFF',
+                      padding: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
+                    }}
+                  >
+                    {discountQrLoading ? (
+                      <Loader2 size={24} className="spin" color="#0A0A0F" />
+                    ) : discountQrUrl ? (
+                      <img
+                        src={discountQrUrl}
+                        alt={`Pay ₹${currentPayablePrice}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    ) : (
+                      <div style={{ fontSize: '11px', color: '#000', textAlign: 'center' }}>
+                        QR Ready: ₹{currentPayablePrice}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Payment Details & Copy UPI */}
+                  <div style={{ flex: 1, minWidth: '200px' }}>
+                    <div style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '4px' }}>
+                      Scan QR or Pay via any UPI App (GPay, PhonePe, Paytm):
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        marginBottom: '10px'
+                      }}
+                    >
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: '#FFFFFF', letterSpacing: '0.02em' }}>
+                        {upiConfig.upiId}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(upiConfig.upiId)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--brand-gold, #F5C518)',
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Copy size={12} />
+                        <span>Copy</span>
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: '11px', color: '#6B7280', lineHeight: 1.4 }}>
+                      Amount automatically encoded: <strong>₹{currentPayablePrice}</strong>. After paying, enter your 12-digit UTR below.
+                    </div>
+                  </div>
+                </div>
+
+                {/* UTR Input Form */}
+                <form onSubmit={handleDiscountSubmit} style={{ marginTop: '16px' }}>
+                  <div style={{ marginBottom: '10px' }}>
+                    <input
+                      type="text"
+                      value={discountUtr}
+                      onChange={e => setDiscountUtr(e.target.value.toUpperCase())}
+                      placeholder="Enter 12-digit UPI UTR / Transaction Ref ID"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#FFFFFF',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        letterSpacing: '0.05em',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {discountError && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#F87171', marginBottom: '10px' }}>
+                      <AlertCircle size={14} />
+                      <span>{discountError}</span>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowDiscountModal(false)}
+                      disabled={discountSubmitting}
+                      style={{
+                        padding: '12px 18px',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#FFFFFF',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={discountSubmitting}
+                      style={{
+                        flex: 1,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '12px 20px',
+                        borderRadius: '8px',
+                        backgroundColor: 'var(--brand-gold, #F5C518)',
+                        color: '#0A0A0F',
+                        fontSize: '13.5px',
+                        fontWeight: 900,
+                        border: 'none',
+                        cursor: discountSubmitting ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 4px 14px rgba(245, 197, 24, 0.4)'
+                      }}
+                    >
+                      {discountSubmitting ? <Loader2 size={16} className="spin" /> : <ShieldCheck size={16} />}
+                      <span>{discountSubmitting ? 'Verifying...' : `Submit UTR & Activate for ₹${currentPayablePrice}`}</span>
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>

@@ -77,8 +77,34 @@ export const PurchaseModal: React.FC = () => {
       setErrorMessage(null);
       setUtr('');
       setPromoInput('');
-      setAppliedPromo(null);
       setPromoMessage(null);
+
+      const storedPromo = sessionStorage.getItem('flops_applied_promo');
+      if (storedPromo) {
+        try {
+          const parsed = JSON.parse(storedPromo);
+          if (parsed?.code) {
+            setAppliedPromo({
+              code: parsed.code,
+              discountPercent: parsed.discountPercent || 0,
+              discountAmount: parsed.discountAmount || 0,
+              finalAmount: parsed.finalPrice ?? 0,
+              isFreePass: parsed.discountPercent === 100
+            });
+            setPromoInput(parsed.code);
+            setPromoMessage({
+              text: `Promo "${parsed.code}" applied! Discount: -₹${parsed.discountAmount || 0}`,
+              type: 'success'
+            });
+          } else {
+            setAppliedPromo(null);
+          }
+        } catch {
+          setAppliedPromo(null);
+        }
+      } else {
+        setAppliedPromo(null);
+      }
     }
   }, [activeModal, purchaseTarget?.id]);
 
@@ -206,7 +232,15 @@ export const PurchaseModal: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const res = await api.payments.submitRequest(finalPrice, cleanUtr, user?.name, user?.email, purchaseTarget.id);
+      const res = await api.payments.submitRequest(
+        finalPrice,
+        cleanUtr,
+        user?.name,
+        user?.email,
+        purchaseTarget.id,
+        appliedPromo?.code || null
+      );
+      sessionStorage.removeItem('flops_applied_promo');
       if (res?.payment?.status === 'APPROVED') {
         // Automatic Approval mode: title entitlement is active in backend
         await syncPurchases();

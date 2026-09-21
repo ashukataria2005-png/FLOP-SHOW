@@ -13,6 +13,7 @@ import { subscriptionRepository, SubscriptionPlan } from '../repositories/subscr
 import { watchPassRepository, WatchPassPlan } from '../repositories/watchPassRepository.js';
 import { subscriptionService } from './subscriptionService.js';
 import { watchPassService } from './watchPassService.js';
+import { promoService } from './promoService.js';
 
 export interface PublicPaymentConfig {
   upiId: string;
@@ -94,6 +95,7 @@ export const paymentRequestService = {
       productType?: 'MOVIE' | 'SERIES' | 'WATCH_PASS' | 'SUBSCRIPTION';
       planId?: string | null;
       planName?: string | null;
+      promoCode?: string | null;
     }
   ): Promise<PaymentRequestRecord> {
     const { upiId, upiEnabled } = await this.getPublicPaymentConfig();
@@ -153,6 +155,23 @@ export const paymentRequestService = {
         numRupees = resolvedPrice;
       } else {
         numRupees = Math.round(Number(data.amountRupees) || 30);
+      }
+    }
+
+    // Apply promo code discount if provided and valid
+    if (data.promoCode && typeof data.promoCode === 'string' && data.promoCode.trim()) {
+      try {
+        const promoRes = await promoService.validatePromoForCheckout(userId, data.promoCode.trim(), numRupees);
+        if (promoRes.valid && promoRes.discountAmountRupees > 0) {
+          numRupees = promoRes.finalAmountRupees;
+          await promoService.recordPromoRedemption(
+            userId,
+            promoRes.code,
+            finalContentId || planId || undefined
+          );
+        }
+      } catch (e) {
+        console.warn('[PaymentRequestService] Promo code checkout discount notice:', e);
       }
     }
 

@@ -11,7 +11,10 @@ import {
   Crown,
   Sparkles,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Tag,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 
 export const PlanSelectionModal: React.FC = () => {
@@ -31,6 +34,17 @@ export const PlanSelectionModal: React.FC = () => {
   // Backend configured live plans
   const [backendPassPlans, setBackendPassPlans] = useState<any[]>([]);
   const [backendVipPlans, setBackendVipPlans] = useState<any[]>([]);
+
+  // Promo code application state (Requirement 3)
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [validatingPromo, setValidatingPromo] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState<{
+    code: string;
+    discountPercent: number;
+    discountAmount: number;
+    finalAmount: number;
+  } | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
 
   // Background Movie Screen Scroll Lock when modal is open
   useEffect(() => {
@@ -181,23 +195,97 @@ export const PlanSelectionModal: React.FC = () => {
     }
   };
 
+  const currentPass = passConfig[selectedPassPlan];
+  const currentVip = vipConfig[selectedVipPlan];
+
+  const rawBasePrice = activeTier === 'single'
+    ? ownPrice
+    : activeTier === 'watch_pass'
+      ? currentPass.price
+      : currentVip.price;
+
+  const discountAmount = appliedPromo
+    ? Math.round((rawBasePrice * appliedPromo.discountPercent) / 100)
+    : 0;
+  const payablePrice = appliedPromo
+    ? Math.max(0, rawBasePrice - discountAmount)
+    : rawBasePrice;
+
+  const handleApplyPromo = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanCode = promoCodeInput.trim().toUpperCase();
+    if (!cleanCode) {
+      setPromoError('Please enter a promo code.');
+      return;
+    }
+
+    try {
+      setValidatingPromo(true);
+      setPromoError(null);
+      const res = await api.promos.validate(cleanCode, rawBasePrice);
+      if (res.valid) {
+        setAppliedPromo({
+          code: res.code,
+          discountPercent: res.discountPercent,
+          discountAmount: res.discountAmountRupees,
+          finalAmount: res.finalAmountRupees
+        });
+        setPromoError(null);
+      } else {
+        setPromoError(res.message || 'Invalid promo code.');
+      }
+    } catch (err: any) {
+      setPromoError(err.message || 'Failed to validate promo code.');
+    } finally {
+      setValidatingPromo(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoCodeInput('');
+    setPromoError(null);
+    sessionStorage.removeItem('flops_applied_promo');
+  };
+
   const handlePayOwn = () => {
+    if (appliedPromo) {
+      sessionStorage.setItem('flops_applied_promo', JSON.stringify({
+        code: appliedPromo.code,
+        discountPercent: appliedPromo.discountPercent,
+        discountAmount: discountAmount,
+        finalPrice: payablePrice
+      }));
+    }
     closePlanSelector();
     openPurchaseModal(item);
   };
 
   const handlePayWatchPass = () => {
+    if (appliedPromo) {
+      sessionStorage.setItem('flops_applied_promo', JSON.stringify({
+        code: appliedPromo.code,
+        discountPercent: appliedPromo.discountPercent,
+        discountAmount: discountAmount,
+        finalPrice: payablePrice
+      }));
+    }
     closePlanSelector();
     openWatchPassModal(item, selectedPassPlan, 'pay');
   };
 
   const handlePayVip = () => {
+    if (appliedPromo) {
+      sessionStorage.setItem('flops_applied_promo', JSON.stringify({
+        code: appliedPromo.code,
+        discountPercent: appliedPromo.discountPercent,
+        discountAmount: discountAmount,
+        finalPrice: payablePrice
+      }));
+    }
     closePlanSelector();
     openSubscriptionModal(selectedVipPlan, 'pay');
   };
-
-  const currentPass = passConfig[selectedPassPlan];
-  const currentVip = vipConfig[selectedVipPlan];
 
   const currentAction = activeTier === 'single'
     ? handlePayOwn
@@ -205,11 +293,13 @@ export const PlanSelectionModal: React.FC = () => {
       ? handlePayWatchPass
       : handlePayVip;
 
-  const currentLabel = activeTier === 'single'
-    ? `Continue to Pay ₹${ownPrice}`
-    : activeTier === 'watch_pass'
-      ? `Pay ₹${currentPass.price} (${currentPass.name})`
-      : `Pay ₹${currentVip.price} (${currentVip.name})`;
+  const currentLabel = appliedPromo
+    ? `Pay ₹${payablePrice} (${activeTier === 'single' ? 'Single Title' : activeTier === 'watch_pass' ? currentPass.name : currentVip.name})`
+    : activeTier === 'single'
+      ? `Continue to Pay ₹${ownPrice}`
+      : activeTier === 'watch_pass'
+        ? `Pay ₹${currentPass.price} (${currentPass.name})`
+        : `Pay ₹${currentVip.price} (${currentVip.name})`;
 
   const currentAccentColor = activeTier === 'single'
     ? 'var(--brand-gold, #F5C518)'
@@ -990,6 +1080,114 @@ export const PlanSelectionModal: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Interactive Promo Code Input / Accordion (Requirement 3) */}
+        <div
+          style={{
+            padding: '10px 16px',
+            backgroundColor: 'rgba(255, 255, 255, 0.02)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+            flexShrink: 0
+          }}
+        >
+          {appliedPromo ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <CheckCircle2 size={15} color="#34D399" />
+                <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#34D399' }}>
+                  {appliedPromo.code} applied! You save ₹{discountAmount} ({appliedPromo.discountPercent}% OFF)
+                </span>
+                <span style={{ fontSize: '11.5px', color: '#9CA3AF' }}>
+                  Original: <span style={{ textDecoration: 'line-through' }}>₹{rawBasePrice}</span> • Final: <strong style={{ color: 'var(--brand-gold, #F5C518)' }}>₹{payablePrice}</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemovePromo}
+                title="Remove promo"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#F87171',
+                  cursor: 'pointer',
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px'
+                }}
+              >
+                <X size={14} />
+                <span>Remove</span>
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <Tag size={13} color="#9CA3AF" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input
+                    type="text"
+                    value={promoCodeInput}
+                    onChange={e => setPromoCodeInput(e.target.value.toUpperCase())}
+                    placeholder="Have a Promo Code?"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px 8px 30px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      border: promoError ? '1px solid #EF4444' : '1px solid rgba(255, 255, 255, 0.12)',
+                      color: '#FFFFFF',
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleApplyPromo}
+                  disabled={validatingPromo}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--brand-gold, #F5C518)',
+                    color: '#0A0A0F',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    border: 'none',
+                    cursor: validatingPromo ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {validatingPromo ? <Loader2 size={12} className="spin" /> : null}
+                  <span>{validatingPromo ? 'Checking...' : 'Apply'}</span>
+                </button>
+              </div>
+              {promoError && (
+                <div style={{ fontSize: '11px', color: '#F87171', marginTop: '4px' }}>
+                  {promoError}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Modal Bottom Bar */}

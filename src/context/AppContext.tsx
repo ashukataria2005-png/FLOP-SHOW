@@ -122,7 +122,7 @@ interface AppContextType {
   hasActiveSubscription: boolean;
   refreshMonetizationConfig: () => Promise<void>;
   refreshSubscriptionStatus: () => Promise<void>;
-  submitSubscriptionRequest: (plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', utr: string, userName?: string, userEmail?: string) => Promise<{ success: boolean; message: string }>;
+  submitSubscriptionRequest: (plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', utr: string, userName?: string, userEmail?: string, promoCode?: string) => Promise<{ success: boolean; message: string }>;
 
   // Player State
   activePlayerContent: ContentItem | null;
@@ -350,13 +350,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const submitSubscriptionRequest = async (plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', utr: string, userName?: string, userEmail?: string) => {
+  const submitSubscriptionRequest = async (plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', utr: string, userName?: string, userEmail?: string, promoCode?: string) => {
     try {
       const finalName = userName || user.name || 'FLOPSHOW Subscriber';
       const finalEmail = userEmail || user.email || 'subscriber@flopshow.in';
-      const res = await api.subscriptions.submitRequest(plan, utr, finalName, finalEmail);
+      const res = await api.subscriptions.submitRequest(plan, utr, finalName, finalEmail, promoCode);
       await refreshSubscriptionStatus();
-      showToast(res.message || 'Subscription request submitted! Awaiting administrator verification.', 'success');
+      showToast(res.message || 'Subscription payment submitted! Awaiting administrator verification.', 'success');
       return { success: true, message: res.message };
     } catch (err: any) {
       showToast(err.message || 'Failed to submit subscription request.', 'error');

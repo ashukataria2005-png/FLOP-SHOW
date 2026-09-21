@@ -24,7 +24,7 @@ paymentRouter.get('/config', async (_req, res, next) => {
 // Submit a new manual UPI payment request with UTR
 paymentRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
-    const { amount, utr, userName, userEmail, contentId, productType, planId, planName } = req.body;
+    const { amount, utr, userName, userEmail, contentId, productType, planId, planName, promoCode } = req.body;
     const request = await paymentRequestService.submitPaymentRequest(req.user!.id, {
       amountRupees: amount !== undefined && amount !== null && amount !== '' ? Number(amount) : undefined,
       utr,
@@ -34,6 +34,7 @@ paymentRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRequ
       productType: productType || 'MOVIE',
       planId: planId || null,
       planName: planName || null,
+      promoCode: promoCode || null,
     });
 
     const isApproved = request.status === 'APPROVED';

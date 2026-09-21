@@ -502,11 +502,12 @@ export const api = {
     },
 
     async submitRequest(
-      amountRupeesOrData: number | { amountRupees?: number; utr: string; userName?: string; userEmail?: string; contentId?: string | null; productType?: string; planId?: string | null; planName?: string | null },
+      amountRupeesOrData: number | { amountRupees?: number; utr: string; userName?: string; userEmail?: string; contentId?: string | null; productType?: string; planId?: string | null; planName?: string | null; promoCode?: string | null },
       utr?: string,
       userName?: string,
       userEmail?: string,
-      contentId?: string | null
+      contentId?: string | null,
+      promoCode?: string | null
     ) {
       const payload = typeof amountRupeesOrData === 'object'
         ? {
@@ -518,6 +519,7 @@ export const api = {
             productType: amountRupeesOrData.productType || 'MOVIE',
             planId: amountRupeesOrData.planId || null,
             planName: amountRupeesOrData.planName || null,
+            promoCode: amountRupeesOrData.promoCode || null,
           }
         : {
             amount: amountRupeesOrData,
@@ -526,6 +528,7 @@ export const api = {
             userEmail,
             contentId: contentId || null,
             productType: 'MOVIE',
+            promoCode: promoCode || null,
           };
       return request<{
         success: boolean;
@@ -1513,14 +1516,14 @@ export const api = {
       }>('/subscriptions/my-status');
     },
 
-    async submitRequest(plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', utr: string, userName?: string, userEmail?: string) {
+    async submitRequest(plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', utr: string, userName?: string, userEmail?: string, promoCode?: string | null) {
       return request<{
         success: boolean;
         message: string;
         subscription: any;
       }>('/subscriptions/submit-request', {
         method: 'POST',
-        body: JSON.stringify({ plan, utr, userName, userEmail })
+        body: JSON.stringify({ plan, utr, userName, userEmail, promoCode })
       });
     },
 
@@ -1687,6 +1690,7 @@ export const api = {
       utr: string;
       userName?: string;
       userEmail?: string;
+      promoCode?: string | null;
     }) {
       return request<{
         success: boolean;
@@ -1837,7 +1841,7 @@ export const api = {
       });
     },
 
-    async validate(code: string, amount: number) {
+    async validate(code: string, amount?: number) {
       return request<{
         success: boolean;
         valid: boolean;
@@ -1847,10 +1851,15 @@ export const api = {
         discountAmountRupees: number;
         finalAmountRupees: number;
         isFreePass: boolean;
+        discountEnabled?: boolean;
+        maxUses?: number | null;
+        timesUsed?: number;
+        isLifetime?: boolean;
+        perkType?: string;
         message: string;
       }>('/promos/validate', {
         method: 'POST',
-        body: JSON.stringify({ code, amount })
+        body: JSON.stringify({ code, amount: amount || 0 })
       });
     },
 

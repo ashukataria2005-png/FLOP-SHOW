@@ -168,7 +168,17 @@ export const WatchPassModal: React.FC = () => {
     if (step === 'pay' && selectedPlan) {
       const upi = upiConfig?.upiId || 'flopshow@upi';
       const merchant = upiConfig?.merchantName || 'FLOPSHOW';
-      const price = Number(selectedPlan.priceRupees) || 44;
+      let price = Number(selectedPlan.priceRupees) || 44;
+
+      const storedPromo = sessionStorage.getItem('flops_applied_promo');
+      if (storedPromo) {
+        try {
+          const parsed = JSON.parse(storedPromo);
+          if (parsed && typeof parsed.finalPrice === 'number' && parsed.finalPrice >= 0) {
+            price = parsed.finalPrice;
+          }
+        } catch {}
+      }
 
       setQrLoading(true);
       generateUpiQrDataUrl(upi, price, merchant)
@@ -215,6 +225,15 @@ export const WatchPassModal: React.FC = () => {
     setSubmitting(true);
     setErrorMessage(null);
 
+    let appliedPromoCode: string | undefined = undefined;
+    const storedPromo = sessionStorage.getItem('flops_applied_promo');
+    if (storedPromo) {
+      try {
+        const parsed = JSON.parse(storedPromo);
+        if (parsed?.code) appliedPromoCode = parsed.code;
+      } catch {}
+    }
+
     try {
       const res = await api.watchPasses.submitRequest({
         contentId: watchPassTarget?.id || null,
@@ -222,9 +241,11 @@ export const WatchPassModal: React.FC = () => {
         utr: clean,
         userName: user?.name,
         userEmail: user?.email,
+        promoCode: appliedPromoCode || null
       });
 
       if (res?.success) {
+        sessionStorage.removeItem('flops_applied_promo');
         showToast('Watch Pass request submitted! Catalog-wide access will activate upon admin approval.', 'success');
         closeWatchPassModal();
       } else {

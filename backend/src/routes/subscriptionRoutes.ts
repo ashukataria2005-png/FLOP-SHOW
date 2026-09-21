@@ -36,7 +36,7 @@ subscriptionRouter.get('/my-status', requireAuth, async (req: AuthenticatedReque
 // User submits manual UPI subscription payment request with UTR (Creates unified payment request)
 subscriptionRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
-    const { plan, utr, paymentReference, userName, userEmail } = req.body;
+    const { plan, utr, paymentReference, userName, userEmail, promoCode } = req.body;
     const finalUtr = utr || paymentReference;
     if (!plan || !finalUtr) {
       res.status(400).json({
@@ -51,6 +51,7 @@ subscriptionRouter.post('/submit-request', requireAuth, async (req: Authenticate
       utr: finalUtr,
       userName: userName || (req.user as any)?.name,
       userEmail: userEmail || req.user!.email,
+      promoCode: promoCode || null,
     });
 
     const isApproved = payReq.status === 'APPROVED';

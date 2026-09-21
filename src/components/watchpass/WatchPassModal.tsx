@@ -239,22 +239,25 @@ export const WatchPassModal: React.FC = () => {
 
   return (
     <div
+      className="modal-backdrop"
       style={{
-        position: 'fixed',
-        inset: 0,
+        zIndex: 2500,
         backgroundColor: 'rgba(5, 5, 8, 0.88)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        zIndex: 2500,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '16px',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehaviorY: 'contain',
         animation: 'fadeIn 0.2s ease-out'
       }}
       onClick={closeWatchPassModal}
     >
       <div
+        className="modal-dialog"
         style={{
           backgroundColor: 'var(--bg-surface, #12121A)',
           borderRadius: '24px',
@@ -262,9 +265,14 @@ export const WatchPassModal: React.FC = () => {
           boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(245, 197, 24, 0.12)',
           maxWidth: '560px',
           width: '100%',
-          maxHeight: '92vh',
+          maxHeight: 'min(92vh, 92dvh)',
           overflowY: 'auto',
-          padding: '28px',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+          touchAction: 'pan-y',
+          padding: '24px 20px',
+          paddingBottom: 'calc(28px + env(safe-area-inset-bottom, 20px))',
+          margin: 'auto 0',
           position: 'relative',
           color: '#FFFFFF'
         }}

@@ -56,19 +56,28 @@ const getProductBadge = (p: PaymentRequest) => {
   }
   if (type === 'SERIES') {
     return {
-      label: 'SERIES',
+      label: 'SERIES PURCHASE',
       color: '#FB923C',
       bg: 'rgba(251, 146, 60, 0.15)',
       border: 'rgba(251, 146, 60, 0.3)',
       subtitle: p.plan_name || '30-Day Series Pass'
     };
   }
+  if (type === 'MOVIE') {
+    return {
+      label: 'MOVIE PURCHASE',
+      color: 'var(--brand-gold, #F5C518)',
+      bg: 'rgba(245, 197, 24, 0.15)',
+      border: 'rgba(245, 197, 24, 0.3)',
+      subtitle: p.plan_name || '30-Day Movie Pass'
+    };
+  }
   return {
-    label: 'MOVIE',
-    color: 'var(--brand-gold, #F5C518)',
-    bg: 'rgba(245, 197, 24, 0.15)',
-    border: 'rgba(245, 197, 24, 0.3)',
-    subtitle: p.plan_name || '30-Day Movie Pass'
+    label: (type as string).replace(/_/g, ' '),
+    color: '#34D399',
+    bg: 'rgba(52, 211, 153, 0.15)',
+    border: 'rgba(52, 211, 153, 0.3)',
+    subtitle: p.plan_name || p.plan_id || (type as string).replace(/_/g, ' ')
   };
 };
 
@@ -95,6 +104,7 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
   });
 
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [productTypeFilter, setProductTypeFilter] = useState<'ALL' | 'MOVIE' | 'SERIES' | 'WATCH_PASS' | 'SUBSCRIPTION'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedPayment, setSelectedPayment] = useState<PaymentRequest | null>(null);
   const [adminNote, setAdminNote] = useState<string>('');
@@ -190,8 +200,12 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
     }
   };
 
-  // Filter list by search query
+  // Filter list by product type and search query
   const filteredRequests = requests.filter(r => {
+    if (productTypeFilter !== 'ALL') {
+      const type = r.product_type || 'MOVIE';
+      if (type !== productTypeFilter) return false;
+    }
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
     return (
@@ -450,66 +464,102 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
           padding: '16px 20px',
           marginBottom: '20px',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px'
+          flexDirection: 'column',
+          gap: '14px'
         }}
       >
-        {/* Status Tabs */}
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveFilter(tab)}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          {/* Status Tabs */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveFilter(tab)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: activeFilter === tab ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.04)',
+                  color: activeFilter === tab ? '#0E0E12' : '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {tab === 'ALL' && 'All Statuses'}
+                {tab === 'PENDING' && `Pending (${metrics.pendingCount})`}
+                {tab === 'APPROVED' && `Approved (${metrics.approvedCount})`}
+                {tab === 'REJECTED' && `Rejected (${metrics.rejectedCount})`}
+              </button>
+            ))}
+          </div>
+
+          {/* Search Input */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '8px',
+              padding: '0 12px',
+              width: '280px'
+            }}
+          >
+            <Search size={16} color="#9CA3AF" />
+            <input
+              type="text"
+              placeholder="Search by UTR, User, or ID..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
               style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                backgroundColor: activeFilter === tab ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.04)',
-                color: activeFilter === tab ? '#0E0E12' : '#FFFFFF',
-                fontSize: '13px',
-                fontWeight: 700,
+                background: 'transparent',
                 border: 'none',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
+                outline: 'none',
+                padding: '8px 10px',
+                fontSize: '13px',
+                color: '#FFFFFF',
+                width: '100%'
               }}
-            >
-              {tab === 'ALL' && 'All Requests'}
-              {tab === 'PENDING' && `Pending (${metrics.pendingCount})`}
-              {tab === 'APPROVED' && `Approved (${metrics.approvedCount})`}
-              {tab === 'REJECTED' && `Rejected (${metrics.rejectedCount})`}
-            </button>
-          ))}
+            />
+          </div>
         </div>
 
-        {/* Search Input */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '8px',
-            padding: '0 12px',
-            width: '280px'
-          }}
-        >
-          <Search size={16} color="#9CA3AF" />
-          <input
-            type="text"
-            placeholder="Search by UTR, User, or ID..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              padding: '8px 10px',
-              fontSize: '13px',
-              color: '#FFFFFF',
-              width: '100%'
-            }}
-          />
+        {/* Product Type Filter Chips */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+          <span style={{ fontSize: '11.5px', color: '#9CA3AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '4px' }}>
+            Filter Product Type:
+          </span>
+          {[
+            { id: 'ALL', label: 'All Types' },
+            { id: 'MOVIE', label: 'Movies' },
+            { id: 'SERIES', label: 'Series' },
+            { id: 'WATCH_PASS', label: 'Watch Passes' },
+            { id: 'SUBSCRIPTION', label: 'VIP Subscriptions' }
+          ].map(pt => {
+            const isSelected = productTypeFilter === pt.id;
+            return (
+              <button
+                key={pt.id}
+                type="button"
+                onClick={() => setProductTypeFilter(pt.id as any)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: isSelected ? 800 : 600,
+                  backgroundColor: isSelected ? 'rgba(245, 197, 24, 0.18)' : 'rgba(255, 255, 255, 0.03)',
+                  border: isSelected ? '1px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  color: isSelected ? 'var(--brand-gold, #F5C518)' : '#9CA3AF',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {pt.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -921,7 +971,7 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
                   marginBottom: '20px'
                 }}
               >
-                <strong style={{ color: 'var(--brand-gold, #F5C518)' }}>Verification Checklist:</strong> Verify this UTR in your UPI app or bank statement. Approving will activate the user's {selectedPayment.product_type === 'SUBSCRIPTION' ? 'VIP subscription' : selectedPayment.product_type === 'WATCH_PASS' ? 'Watch Pass' : 'entitlement'} immediately.
+                <strong style={{ color: 'var(--brand-gold, #F5C518)' }}>Verification Checklist:</strong> Verify this UTR in your UPI app or bank statement. Approving will activate the user's {selectedPayment.product_type === 'SUBSCRIPTION' ? 'VIP subscription' : selectedPayment.product_type === 'WATCH_PASS' ? 'Watch Pass' : `${selectedPayment.product_type === 'SERIES' ? 'Series' : 'Movie'} entitlement`} immediately.
               </div>
 
               {/* Admin Note Input */}

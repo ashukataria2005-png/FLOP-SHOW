@@ -10,16 +10,16 @@ import {
   Save,
   Loader2,
   Film,
-  Search,
-  XCircle,
-  TrendingUp
+  TrendingUp,
+  ArrowRight,
+  XCircle
 } from 'lucide-react';
 
 interface AdminWatchPassPageProps {
   onNavigateTab: (tab: string, param?: string) => void;
 }
 
-export const AdminWatchPassPage: React.FC<AdminWatchPassPageProps> = () => {
+export const AdminWatchPassPage: React.FC<AdminWatchPassPageProps> = ({ onNavigateTab }) => {
   const { showToast } = useApp();
 
   // Dynamic Hybrid Watch Pass pricing state (24H, 3D, 7D, 15D only — 30D removed)
@@ -61,13 +61,6 @@ export const AdminWatchPassPage: React.FC<AdminWatchPassPageProps> = () => {
   });
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
 
-  // Requests Table
-  const [activeTab, setActiveTab] = useState<'pending' | 'active' | 'expired' | 'all'>('pending');
-  const [requests, setRequests] = useState<any[]>([]);
-  const [loadingRequests, setLoadingRequests] = useState(false);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-
   const fetchPlans = async () => {
     try {
       const res = await api.watchPasses.getPlans();
@@ -98,29 +91,10 @@ export const AdminWatchPassPage: React.FC<AdminWatchPassPageProps> = () => {
     }
   };
 
-  const fetchRequests = async () => {
-    try {
-      setLoadingRequests(true);
-      const statusFilter = activeTab === 'all' ? undefined : activeTab.toUpperCase();
-      const res = await api.watchPasses.adminGetRequests(statusFilter, 100);
-      if (res && res.requests) {
-        setRequests(res.requests);
-      }
-    } catch {
-      // Fallback
-    } finally {
-      setLoadingRequests(false);
-    }
-  };
-
   useEffect(() => {
     fetchPlans();
     fetchAnalytics();
   }, []);
-
-  useEffect(() => {
-    fetchRequests();
-  }, [activeTab]);
 
   const handleSavePrices = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,53 +116,6 @@ export const AdminWatchPassPage: React.FC<AdminWatchPassPageProps> = () => {
       setSavingPrices(false);
     }
   };
-
-  const handleApprove = async (passId: string) => {
-    setProcessingId(passId);
-    try {
-      const res = await api.watchPasses.adminApprove(passId);
-      if (res?.success) {
-        showToast('Watch Pass approved and activated!', 'success');
-        fetchRequests();
-        fetchAnalytics();
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to approve pass.', 'error');
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleReject = async (passId: string) => {
-    const reason = window.prompt('Enter rejection reason (optional):', 'UTR invalid or payment not received');
-    if (reason === null) return;
-
-    setProcessingId(passId);
-    try {
-      const res = await api.watchPasses.adminReject(passId, reason);
-      if (res?.success) {
-        showToast('Watch Pass request rejected.', 'info');
-        fetchRequests();
-        fetchAnalytics();
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to reject pass.', 'error');
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const filteredRequests = requests.filter(r => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      (r.content_title || '').toLowerCase().includes(q) ||
-      (r.user_name || '').toLowerCase().includes(q) ||
-      (r.user_email || '').toLowerCase().includes(q) ||
-      (r.payment_reference || '').toLowerCase().includes(q) ||
-      (r.plan || '').toLowerCase().includes(q)
-    );
-  });
 
   const planStats = [
     {
@@ -246,8 +173,8 @@ export const AdminWatchPassPage: React.FC<AdminWatchPassPageProps> = () => {
         </div>
 
         <button
-          onClick={() => { fetchAnalytics(); fetchRequests(); }}
-          disabled={loadingAnalytics || loadingRequests}
+          onClick={() => { fetchAnalytics(); fetchPlans(); }}
+          disabled={loadingAnalytics}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -259,12 +186,12 @@ export const AdminWatchPassPage: React.FC<AdminWatchPassPageProps> = () => {
             color: '#FFFFFF',
             fontSize: '12px',
             fontWeight: 700,
-            cursor: loadingAnalytics || loadingRequests ? 'not-allowed' : 'pointer',
-            opacity: loadingAnalytics || loadingRequests ? 0.7 : 1
+            cursor: loadingAnalytics ? 'not-allowed' : 'pointer',
+            opacity: loadingAnalytics ? 0.7 : 1
           }}
         >
-          <RefreshCw size={14} className={loadingAnalytics || loadingRequests ? 'animate-spin' : ''} />
-          <span>{loadingAnalytics ? 'Refreshing...' : 'Refresh Ledger'}</span>
+          <RefreshCw size={14} className={loadingAnalytics ? 'animate-spin' : ''} />
+          <span>{loadingAnalytics ? 'Refreshing...' : 'Refresh Analytics'}</span>
         </button>
       </div>
 
@@ -528,183 +455,68 @@ export const AdminWatchPassPage: React.FC<AdminWatchPassPageProps> = () => {
         </form>
       </div>
 
-      {/* WATCH PASS REQUESTS & VERIFICATION LEDGER */}
-      <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '20px', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
-          {/* Status filter tabs */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {(['pending', 'active', 'expired', 'all'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '10px',
-                  backgroundColor: activeTab === tab ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.04)',
-                  color: activeTab === tab ? '#0E0E12' : '#9CA3AF',
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  border: 'none',
-                  cursor: 'pointer',
-                  textTransform: 'uppercase'
-                }}
-              >
-                {tab}
-              </button>
-            ))}
+      {/* CENTRALIZED PAYMENT VERIFICATION NOTICE */}
+      <div
+        style={{
+          backgroundColor: 'var(--bg-surface, #12121A)',
+          borderRadius: '20px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', maxWidth: '720px' }}>
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '12px',
+              backgroundColor: 'rgba(245, 197, 24, 0.12)',
+              border: '1px solid rgba(245, 197, 24, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--brand-gold, #F5C518)',
+              flexShrink: 0
+            }}
+          >
+            <ShieldCheck size={26} />
           </div>
-
-          {/* Search Bar */}
-          <div style={{ position: 'relative', width: '280px' }}>
-            <Search size={15} style={{ position: 'absolute', left: '12px', top: '11px', color: '#6B7280' }} />
-            <input
-              type="text"
-              placeholder="Search user, title, UTR..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '9px 12px 9px 34px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#FFFFFF',
-                fontSize: '13px',
-                boxSizing: 'border-box'
-              }}
-            />
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 4px' }}>
+              Centralized Payment Verification
+            </h3>
+            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0, lineHeight: 1.5 }}>
+              All user payment requests — including Watch Passes, Movie purchases, Series purchases, and VIP Subscriptions — are verified exclusively in <strong>Verify Payments</strong>. Check submitted UTRs and activate access from the unified ledger.
+            </p>
           </div>
         </div>
 
-        {/* Requests Table */}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: '#9CA3AF' }}>
-                <th style={{ padding: '12px 14px' }}>SCOPE / TITLE</th>
-                <th style={{ padding: '12px 14px' }}>USER</th>
-                <th style={{ padding: '12px 14px' }}>PLAN</th>
-                <th style={{ padding: '12px 14px' }}>AMOUNT</th>
-                <th style={{ padding: '12px 14px' }}>UTR REFERENCE</th>
-                <th style={{ padding: '12px 14px' }}>STATUS</th>
-                <th style={{ padding: '12px 14px' }}>ACTIVATION & EXPIRY</th>
-                <th style={{ padding: '12px 14px', textAlign: 'right' }}>ACTION</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loadingRequests ? (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: '#9CA3AF' }}>
-                    <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-                    Loading Watch Pass requests...
-                  </td>
-                </tr>
-              ) : filteredRequests.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: '#9CA3AF' }}>
-                    No Watch Pass records found.
-                  </td>
-                </tr>
-              ) : (
-                filteredRequests.map(r => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <td style={{ padding: '12px 14px', fontWeight: 700, color: '#FFFFFF' }}>
-                      {r.content_title ? r.content_title : 'Catalog-Wide Access'}
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ fontWeight: 600, color: '#FFFFFF' }}>{r.user_name || 'User'}</div>
-                      <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{r.user_email || r.user_id}</div>
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <span style={{ padding: '3px 8px', borderRadius: '6px', backgroundColor: 'rgba(245, 197, 24, 0.15)', color: 'var(--brand-gold, #F5C518)', fontSize: '11px', fontWeight: 800 }}>
-                        {r.plan ? r.plan.replace('PASS_', '') : 'PASS'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 14px', fontWeight: 800, color: '#FFFFFF' }}>
-                      ₹{r.amount_paid}
-                    </td>
-                    <td style={{ padding: '12px 14px', fontFamily: 'monospace', color: '#D1D5DB' }}>
-                      {r.payment_reference || 'N/A'}
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <span
-                        style={{
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: 800,
-                          backgroundColor:
-                            r.status === 'ACTIVE'
-                              ? 'rgba(16, 185, 129, 0.2)'
-                              : r.status === 'PENDING'
-                              ? 'rgba(245, 197, 24, 0.2)'
-                              : 'rgba(239, 68, 68, 0.2)',
-                          color:
-                            r.status === 'ACTIVE'
-                              ? '#34D399'
-                              : r.status === 'PENDING'
-                              ? 'var(--brand-gold, #F5C518)'
-                              : '#F87171'
-                        }}
-                      >
-                        {r.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 14px', fontSize: '11.5px', color: '#9CA3AF' }}>
-                      <div>Sub: {new Date(r.submitted_at).toLocaleDateString('en-IN')}</div>
-                      {r.activated_at && (
-                        <div style={{ color: '#9CA3AF' }}>Act: {new Date(r.activated_at).toLocaleDateString('en-IN')}</div>
-                      )}
-                      {r.expires_at && (
-                        <div style={{ color: '#34D399' }}>Exp: {new Date(r.expires_at).toLocaleDateString('en-IN')}</div>
-                      )}
-                    </td>
-                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                      {r.status === 'PENDING' ? (
-                        <div style={{ display: 'inline-flex', gap: '8px' }}>
-                          <button
-                            onClick={() => handleApprove(r.id)}
-                            disabled={processingId === r.id}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: '6px',
-                              backgroundColor: '#10B981',
-                              color: '#0E0E12',
-                              fontWeight: 800,
-                              fontSize: '12px',
-                              border: 'none',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleReject(r.id)}
-                            disabled={processingId === r.id}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
-                              color: '#F87171',
-                              fontWeight: 700,
-                              fontSize: '12px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ color: '#6B7280', fontSize: '12px' }}>Verified</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <button
+          type="button"
+          onClick={() => onNavigateTab('admin-payments')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 20px',
+            borderRadius: '10px',
+            backgroundColor: 'var(--brand-gold, #F5C518)',
+            color: '#0E0E12',
+            fontSize: '13px',
+            fontWeight: 800,
+            border: 'none',
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(245, 197, 24, 0.25)'
+          }}
+        >
+          <span>Go to Verify Payments</span>
+          <ArrowRight size={16} />
+        </button>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { watchPassService } from '../services/watchPassService.js';
 import { paymentRequestService } from '../services/paymentRequestService.js';
+import { paymentRequestRepository } from '../repositories/paymentRequestRepository.js';
 import { requireAuth, AuthenticatedRequest } from '../middlewares/authMiddleware.js';
 import { requireAdmin } from '../middlewares/adminMiddleware.js';
 import { adminService } from '../services/adminService.js';
@@ -96,12 +97,23 @@ watchPassRouter.get('/admin/requests', requireAuth, requireAdmin, async (req: Au
   }
 });
 
-// Admin: approve pending pass
+// Admin: approve pending pass (centralized through paymentRequestService)
 watchPassRouter.post('/admin/approve', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { passId, adminNote } = req.body;
     if (!passId) {
       res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'passId is required.' } });
+      return;
+    }
+
+    const payReq = await paymentRequestRepository.getById(passId);
+    if (payReq) {
+      const result = await paymentRequestService.approvePayment(req.user!.id, passId, adminNote);
+      res.json({
+        success: true,
+        message: result.message,
+        payment: result.payment,
+      });
       return;
     }
 
@@ -116,12 +128,23 @@ watchPassRouter.post('/admin/approve', requireAuth, requireAdmin, async (req: Au
   }
 });
 
-// Admin: reject pending pass
+// Admin: reject pending pass (centralized through paymentRequestService)
 watchPassRouter.post('/admin/reject', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { passId, adminNote } = req.body;
     if (!passId) {
       res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'passId is required.' } });
+      return;
+    }
+
+    const payReq = await paymentRequestRepository.getById(passId);
+    if (payReq) {
+      const result = await paymentRequestService.rejectPayment(req.user!.id, passId, adminNote);
+      res.json({
+        success: true,
+        message: result.message,
+        payment: result.payment,
+      });
       return;
     }
 

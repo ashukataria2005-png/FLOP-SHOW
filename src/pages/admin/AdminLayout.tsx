@@ -112,7 +112,9 @@ const navGroups: NavGroup[] = [
     icon: TrendingUp,
     items: [
       { id: 'admin-analytics', label: 'Analytics', icon: TrendingUp },
-      { id: 'admin-watch-pass', label: 'Watch Passes', icon: Zap }
+      { id: 'admin-analytics-movie', label: 'Per-Movie / Series', icon: Film },
+      { id: 'admin-watch-pass', label: 'Watch Passes', icon: Zap },
+      { id: 'admin-analytics-vip', label: 'VIP Plans', icon: Crown }
     ]
   },
   // 6. Ads

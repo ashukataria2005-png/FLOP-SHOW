@@ -82,10 +82,11 @@ function StatCard({
 
 interface AdminAnalyticsPageProps {
   onNavigateTab: (tab: string) => void;
+  initialFilter?: AnalyticsFilter;
 }
 
-export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = () => {
-  const [filter, setFilter] = useState<AnalyticsFilter>('ALL');
+export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ initialFilter = 'ALL' }) => {
+  const [filter, setFilter] = useState<AnalyticsFilter>(initialFilter);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,14 +105,15 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = () => {
   };
 
   useEffect(() => {
-    load(filter);
-  }, []);
+    setFilter(initialFilter);
+    load(initialFilter);
+  }, [initialFilter]);
 
   const FILTERS = [
-    { id: 'ALL' as AnalyticsFilter, label: 'ALL', color: '#F5C518' },
-    { id: 'MOVIE_SERIES' as AnalyticsFilter, label: 'MOVIE / SERIES', color: '#60A5FA' },
-    { id: 'WATCH_PASS' as AnalyticsFilter, label: 'WATCH PASS', color: '#C084FC' },
-    { id: 'VIP_PLANS' as AnalyticsFilter, label: 'VIP PLANS', color: '#34D399' },
+    { id: 'ALL' as AnalyticsFilter, label: 'Analytics', color: '#F5C518' },
+    { id: 'MOVIE_SERIES' as AnalyticsFilter, label: 'Per-Movie / Series', color: '#60A5FA' },
+    { id: 'WATCH_PASS' as AnalyticsFilter, label: 'Watch Passes', color: '#C084FC' },
+    { id: 'VIP_PLANS' as AnalyticsFilter, label: 'VIP Plans', color: '#34D399' },
   ];
 
   const activeFilter = FILTERS.find((f) => f.id === filter)!;
@@ -163,10 +165,10 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = () => {
               margin: 0,
             }}
           >
-            Unified Analytics
+            Analytics & Passes
           </h1>
           <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0' }}>
-            Real-time database-backed performance across Movie/Series, Watch Pass, and VIP Subscriptions.
+            Real-time database-backed performance across Analytics, Per-Movie / Series, Watch Pass, and VIP Plans.
           </p>
         </div>
 

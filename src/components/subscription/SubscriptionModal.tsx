@@ -159,12 +159,17 @@ export const SubscriptionModal: React.FC = () => {
         style={{
           maxWidth: '560px',
           width: '94%',
-          maxHeight: '90vh',
+          maxHeight: 'min(92vh, 92dvh)',
           overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+          touchAction: 'pan-y',
           backgroundColor: '#12121A',
           border: '1px solid rgba(245, 166, 35, 0.3)',
           borderRadius: '24px',
-          boxShadow: '0 24px 80px rgba(0, 0, 0, 0.8), 0 0 40px rgba(245, 166, 35, 0.1)'
+          boxShadow: '0 24px 80px rgba(0, 0, 0, 0.8), 0 0 40px rgba(245, 166, 35, 0.1)',
+          margin: 'auto 0',
+          paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 16px))'
         }}
       >
         {/* Header */}

@@ -54,7 +54,7 @@ export const PlanSelectionModal: React.FC = () => {
             setBackendPassPlans(res.plans);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
 
       api.subscriptions.getPlans()
         .then(res => {
@@ -62,7 +62,7 @@ export const PlanSelectionModal: React.FC = () => {
             setBackendVipPlans(res.plans);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [activeModal]);
 
@@ -827,7 +827,8 @@ export const PlanSelectionModal: React.FC = () => {
                   </div>
                   {activeTier === 'vip' && (
                     <p style={{ fontSize: '11.5px', color: '#9CA3AF', margin: '2px 0 0' }}>
-                      Full catalog unlimited streaming & downloads across all devices (Monthly, 3 Months, Yearly)
+                      Full catalog unlimited streaming & downloads access
+
                     </p>
                   )}
                 </div>

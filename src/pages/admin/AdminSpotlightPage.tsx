@@ -43,7 +43,7 @@ export const AdminSpotlightPage: React.FC<AdminSpotlightPageProps> = ({ onNaviga
       setLoading(true);
       const [spotlightsData, contentData] = await Promise.all([
         api.admin.getSpotlights(),
-        api.admin.listContent({ status: 'PUBLISHED', limit: 100 })
+        api.admin.listContent({ status: 'PUBLISHED', limit: 1000, all: true })
       ]);
       setSpotlights(spotlightsData || []);
       setCatalog(contentData || []);
@@ -742,6 +742,9 @@ export const AdminSpotlightPage: React.FC<AdminSpotlightPageProps> = ({ onNaviga
 
             {/* Results Content List */}
             <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '4px' }}>
+                Showing {filteredCatalog.length} of {catalog.length >= 300 ? '300+' : `${catalog.length}`} titles
+              </div>
               {filteredCatalog.length === 0 ? (
                 <div style={{ padding: '36px 0', textAlign: 'center', color: '#9CA3AF' }}>
                   <p style={{ margin: 0, fontSize: '14px' }}>

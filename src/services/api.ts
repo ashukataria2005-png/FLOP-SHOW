@@ -350,11 +350,12 @@ export const api = {
   // CONTENT & CATALOG
   // --------------------------------------------------------------------------
   content: {
-    async list(params?: { type?: 'MOVIE' | 'SERIES'; genre?: string; limit?: number }) {
+    async list(params?: { type?: 'MOVIE' | 'SERIES'; genre?: string; limit?: number; all?: boolean }) {
       const query = new URLSearchParams();
       if (params?.type) query.append('type', params.type);
       if (params?.genre && params.genre !== 'All') query.append('genre', params.genre);
       if (params?.limit) query.append('limit', String(params.limit));
+      if (params?.all) query.append('all', 'true');
 
       const qs = query.toString() ? `?${query.toString()}` : '';
       const data = await request<{ items: any[] }>(`/content${qs}`);
@@ -830,6 +831,7 @@ export const api = {
       sortBy?: string;
       limit?: number;
       offset?: number;
+      all?: boolean;
     } = {}) {
       const params = new URLSearchParams();
       if (filters.status) params.set('status', filters.status);
@@ -841,6 +843,7 @@ export const api = {
       if (filters.sortBy) params.set('sortBy', filters.sortBy);
       if (filters.limit) params.set('limit', String(filters.limit));
       if (filters.offset) params.set('offset', String(filters.offset));
+      if (filters.all) params.set('all', 'true');
 
       const query = params.toString() ? `?${params.toString()}` : '';
       const res = await request<{ count: number; items: any[] }>(`/admin/content${query}`);

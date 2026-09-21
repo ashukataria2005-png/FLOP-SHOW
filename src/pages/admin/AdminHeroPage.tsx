@@ -36,7 +36,7 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
       setLoading(true);
       const [heroData, contentData] = await Promise.all([
         api.admin.getHero(),
-        api.admin.listContent({ status: 'PUBLISHED' })
+        api.admin.listContent({ status: 'PUBLISHED', limit: 1000, all: true })
       ]);
       setCurrentHero(heroData);
       setCatalog(contentData || []);
@@ -64,7 +64,8 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
         !q ||
         item.title.toLowerCase().includes(q) ||
         (item.director && item.director.toLowerCase().includes(q)) ||
-        (item.genres && item.genres.some(g => g.toLowerCase().includes(q)));
+        (item.genres && item.genres.some(g => g.toLowerCase().includes(q))) ||
+        (item.categoryLabel && item.categoryLabel.toLowerCase().includes(q));
 
       return matchesType && matchesSearch;
     });
@@ -361,7 +362,12 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
               Select Title from Published Catalog
             </h2>
             <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0' }}>
-              Showing {filteredCatalog.length} published titles available in the central catalog.
+              Showing {filteredCatalog.length} of {catalog.length >= 300 ? '300+' : `${catalog.length}`} titles
+              {catalog.length > 0 && (
+                <span style={{ marginLeft: '6px', color: '#6B7280', fontSize: '12px' }}>
+                  ({catalog.length} total catalog titles loaded)
+                </span>
+              )}
             </p>
           </div>
 

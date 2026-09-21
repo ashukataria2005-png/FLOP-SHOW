@@ -748,6 +748,7 @@ export const adminService = {
       sortBy?: 'newest' | 'oldest' | 'title' | 'price_asc' | 'price_desc' | 'featured' | 'priority';
       limit?: number;
       offset?: number;
+      all?: boolean;
     } = {}
   ): Promise<any[]> {
     const rawItems = await contentRepository.list(filters);

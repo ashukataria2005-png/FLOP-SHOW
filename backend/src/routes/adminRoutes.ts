@@ -272,7 +272,10 @@ adminRouter.get('/media/vcdn/status/:id', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 adminRouter.get('/content', async (req, res, next) => {
   try {
-    const { status, type, genre, featured, trending, search, sortBy, limit, offset } = req.query;
+    const { status, type, genre, featured, trending, search, sortBy, limit, offset, all } = req.query;
+    const isAll = all === 'true' || all === '1';
+    const parsedLimit = isAll ? 2000 : (limit ? parseInt(limit as string, 10) : 1000);
+
     const items = await adminService.listAllContent({
       status: status as any,
       type: type as any,
@@ -281,8 +284,9 @@ adminRouter.get('/content', async (req, res, next) => {
       trendingOnly: trending === 'true',
       search: search as string,
       sortBy: sortBy as any,
-      limit: limit ? parseInt(limit as string, 10) : 100,
+      limit: parsedLimit,
       offset: offset ? parseInt(offset as string, 10) : 0,
+      all: isAll,
     });
     res.json({ count: items.length, items });
   } catch (err) {

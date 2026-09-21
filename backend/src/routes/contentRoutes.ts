@@ -43,8 +43,9 @@ contentRouter.get('/', async (req, res, next) => {
   try {
     const type = req.query.type as 'MOVIE' | 'SERIES' | undefined;
     const genre = req.query.genre as string | undefined;
+    const isAll = req.query.all === 'true' || req.query.all === '1';
     const featured = req.query.featured !== undefined ? req.query.featured === 'true' : undefined;
-    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+    const limit = isAll ? 2000 : (req.query.limit ? parseInt(req.query.limit as string, 10) : undefined);
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
 
     const items = await contentService.listPublished({
@@ -53,6 +54,7 @@ contentRouter.get('/', async (req, res, next) => {
       featured,
       limit,
       offset,
+      all: isAll,
     });
 
     res.json({ count: items.length, items });

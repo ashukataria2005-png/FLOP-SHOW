@@ -12,6 +12,7 @@ export const contentService = {
       featured?: boolean;
       limit?: number;
       offset?: number;
+      all?: boolean;
     } = {}
   ): Promise<ContentRecord[]> {
     return contentRepository.list({

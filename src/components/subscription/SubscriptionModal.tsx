@@ -67,10 +67,13 @@ export const SubscriptionModal: React.FC = () => {
   // 1. Background Movie Screen Scroll Lock jab modal open ho
   useEffect(() => {
     if (activeModal === 'subscription') {
-      const originalOverflow = document.body.style.overflow;
+      const origBodyOverflow = document.body.style.overflow;
+      const origHtmlOverflow = document.documentElement.style.overflow;
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
       return () => {
-        document.body.style.overflow = originalOverflow || '';
+        document.body.style.overflow = origBodyOverflow || '';
+        document.documentElement.style.overflow = origHtmlOverflow || '';
       };
     }
   }, [activeModal]);
@@ -175,7 +178,10 @@ export const SubscriptionModal: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '12px'
+        padding: '12px',
+        overflow: 'hidden',
+        overscrollBehavior: 'contain',
+        touchAction: 'none'
       }}
     >
       <div

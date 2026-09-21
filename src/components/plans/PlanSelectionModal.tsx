@@ -32,10 +32,13 @@ export const PlanSelectionModal: React.FC = () => {
   // Background Movie Screen Scroll Lock when modal is open
   useEffect(() => {
     if (activeModal === 'plan_selector') {
-      const originalOverflow = document.body.style.overflow;
+      const origBodyOverflow = document.body.style.overflow;
+      const origHtmlOverflow = document.documentElement.style.overflow;
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
       return () => {
-        document.body.style.overflow = originalOverflow || '';
+        document.body.style.overflow = origBodyOverflow || '';
+        document.documentElement.style.overflow = origHtmlOverflow || '';
       };
     }
   }, [activeModal]);
@@ -206,16 +209,20 @@ export const PlanSelectionModal: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '12px'
+        padding: '12px',
+        overflow: 'hidden',
+        overscrollBehavior: 'contain',
+        touchAction: 'none'
       }}
     >
       <div
-        className="modal-dialog plan-modal-dialog"
+        className="modal-dialog"
         onClick={e => e.stopPropagation()}
         style={{
           maxWidth: '780px',
           width: '100%',
           maxHeight: '88vh',
+          height: 'auto',
           minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -298,9 +305,8 @@ export const PlanSelectionModal: React.FC = () => {
           </button>
         </div>
 
-        {/* ONE SINGLE CONTINUOUS VERTICAL SCROLL BODY */}
+        {/* Inner Scrollable Container */}
         <div
-          className="plan-modal-body modal-scroll-content"
           style={{
             flex: 1,
             minHeight: 0,
@@ -308,11 +314,10 @@ export const PlanSelectionModal: React.FC = () => {
             WebkitOverflowScrolling: 'touch',
             overscrollBehavior: 'contain',
             touchAction: 'pan-y',
-            padding: '20px',
+            padding: '16px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px',
-            paddingBottom: 'max(40px, calc(32px + env(safe-area-inset-bottom, 24px)))'
+            gap: '16px'
           }}
         >
           {/* ============================================================ */}

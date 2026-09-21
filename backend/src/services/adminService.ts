@@ -1155,12 +1155,12 @@ export const adminService = {
       const byPlan: Record<string, number> = {};
       for (const row of (plans || []) as any[]) {
         if (row.plan) {
-          byPlan[row.plan] = Math.round(Number(row.rev || 0) / 100);
+          byPlan[row.plan] = Math.round(Number(row.rev || 0));
         }
       }
       watchPass = {
         total: Number((t as any)?.c || 0),
-        revenueRupees: Math.round(Number((r as any)?.s || 0) / 100),
+        revenueRupees: Math.round(Number((r as any)?.s || 0)),
         successful: Number((a as any)?.c || 0) + Number((ex as any)?.c || 0),
         active: Number((a as any)?.c || 0),
         expired: Number((ex as any)?.c || 0),
@@ -1184,12 +1184,12 @@ export const adminService = {
       const byPlan: Record<string, number> = {};
       for (const row of (plans || []) as any[]) {
         if (row.plan) {
-          byPlan[row.plan] = Math.round(Number(row.rev || 0) / 100);
+          byPlan[row.plan] = Math.round(Number(row.rev || 0));
         }
       }
       vipPlans = {
         total: Number((t as any)?.c || 0),
-        revenueRupees: Math.round(Number((r as any)?.s || 0) / 100),
+        revenueRupees: Math.round(Number((r as any)?.s || 0)),
         successful: Number((a as any)?.c || 0) + Number((ex as any)?.c || 0),
         active: Number((a as any)?.c || 0),
         expired: Number((ex as any)?.c || 0),
@@ -1235,7 +1235,7 @@ export const adminService = {
           category: 'WATCH_PASS',
           userName: r.user_name,
           title: `Watch Pass (${r.plan})`,
-          amountRupees: Math.round(Number(r.amount) / 100),
+          amountRupees: Math.round(Number(r.amount)),
           timestamp: r.ts,
         }))
       );
@@ -1254,8 +1254,8 @@ export const adminService = {
           id: r.id,
           category: 'VIP_PLANS',
           userName: r.user_name,
-          title: `VIP ${r.plan}`,
-          amountRupees: Math.round(Number(r.amount) / 100),
+          title: `VIP Subscription (${r.plan})`,
+          amountRupees: Math.round(Number(r.amount)),
           timestamp: r.ts,
         }))
       );
@@ -1349,14 +1349,14 @@ export const adminService = {
         db.query(`SELECT COUNT(*) as c, COALESCE(SUM(amount_paid),0) as s FROM watch_passes WHERE status IN ('ACTIVE','EXPIRED') AND activated_at >= ? AND activated_at <= ?`, [startISO, endISO]),
         db.query("SELECT COUNT(*) as c FROM watch_passes WHERE status = 'PENDING'"),
       ]);
-      pass = { sales: Number((r as any)?.c||0), revenueRupees: Math.round(Number((r as any)?.s||0)/100), pending: Number((p as any)?.c||0) };
+      pass = { sales: Number((r as any)?.c||0), revenueRupees: Math.round(Number((r as any)?.s||0)), pending: Number((p as any)?.c||0) };
     }
     if (filter === 'ALL' || filter === 'VIP_PLANS') {
       const [{ rows: [r] }, { rows: [p] }] = await Promise.all([
         db.query(`SELECT COUNT(*) as c, COALESCE(SUM(amount_paid),0) as s FROM subscriptions WHERE status IN ('ACTIVE','EXPIRED') AND activated_at >= ? AND activated_at <= ?`, [startISO, endISO]),
         db.query("SELECT COUNT(*) as c FROM subscriptions WHERE status = 'PENDING'"),
       ]);
-      vip = { sales: Number((r as any)?.c||0), revenueRupees: Math.round(Number((r as any)?.s||0)/100), pending: Number((p as any)?.c||0) };
+      vip = { sales: Number((r as any)?.c||0), revenueRupees: Math.round(Number((r as any)?.s||0)), pending: Number((p as any)?.c||0) };
     }
     return { filter, calendarDate, windowStart: startISO, windowEnd: endISO, totalSales: oneTitle.sales + pass.sales + vip.sales, totalRevenueRupees: oneTitle.revenueRupees + pass.revenueRupees + vip.revenueRupees, oneTitle, pass, vip };
   },

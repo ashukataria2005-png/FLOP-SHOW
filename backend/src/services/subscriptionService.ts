@@ -134,7 +134,7 @@ export const subscriptionService = {
     // Check for duplicate UTR in subscriptions
     const existingWithUtr = await subscriptionRepository.getByPaymentReference(cleanUtr);
     if (existingWithUtr) {
-      if (existingWithUtr.status === 'APPROVED' || existingWithUtr.status === 'ACTIVE') {
+      if ((existingWithUtr.status as string) === 'APPROVED' || existingWithUtr.status === 'ACTIVE') {
         const err = new Error('This UTR has already been approved for an active subscription.');
         (err as any).statusCode = 409;
         throw err;
@@ -393,13 +393,9 @@ export const subscriptionService = {
 
     return {
       hasActiveSubscription: Boolean(activeWithRemaining),
-      has_active: Boolean(activeWithRemaining),
       activeSubscription: activeWithRemaining,
-      active: activeWithRemaining,
       pendingSubscription: pending,
-      pending,
       latestSubscription: latest,
-      latest,
     };
   },
 

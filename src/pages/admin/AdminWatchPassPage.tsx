@@ -38,12 +38,16 @@ export const AdminWatchPassPage: React.FC<AdminWatchPassPageProps> = ({ onNaviga
     rejectedPasses: number;
     totalRevenueRupees: number;
     durationBreakdown: Record<string, number>;
+    revenueByPlan?: Record<string, number>;
+    activeByPlan?: Record<string, number>;
     planMetrics?: {
       PASS_24H?: { sales: number; revenueRupees: number; active: number };
       PASS_3D?: { sales: number; revenueRupees: number; active: number };
       PASS_7D?: { sales: number; revenueRupees: number; active: number };
       PASS_15D?: { sales: number; revenueRupees: number; active: number };
     };
+    averageRevenueRupees?: number;
+    topDuration?: string;
   }>({
     totalPasses: 0,
     activePasses: 0,
@@ -119,38 +123,54 @@ export const AdminWatchPassPage: React.FC<AdminWatchPassPageProps> = ({ onNaviga
 
   const planStats = [
     {
-      id: 'PASS_24H',
+      id: 'PASS_24H' as const,
       label: '24 Hours',
       duration: '1 Day',
       quality: '720p HD',
       configuredPrice: price24h,
-      stats: analytics.planMetrics?.PASS_24H || { sales: 0, revenueRupees: 0, active: 0 }
+      stats: analytics.planMetrics?.PASS_24H || {
+        sales: analytics.durationBreakdown?.['PASS_24H'] ?? 0,
+        revenueRupees: analytics.revenueByPlan?.['PASS_24H'] ?? 0,
+        active: analytics.activeByPlan?.['PASS_24H'] ?? 0,
+      }
     },
     {
-      id: 'PASS_3D',
+      id: 'PASS_3D' as const,
       label: '3 Days',
       duration: '3 Days',
       quality: '720p HD',
       configuredPrice: price3d,
-      stats: analytics.planMetrics?.PASS_3D || { sales: 0, revenueRupees: 0, active: 0 }
+      stats: analytics.planMetrics?.PASS_3D || {
+        sales: analytics.durationBreakdown?.['PASS_3D'] ?? 0,
+        revenueRupees: analytics.revenueByPlan?.['PASS_3D'] ?? 0,
+        active: analytics.activeByPlan?.['PASS_3D'] ?? 0,
+      }
     },
     {
-      id: 'PASS_7D',
+      id: 'PASS_7D' as const,
       label: '7 Days',
       duration: '7 Days',
       quality: '1080p FHD',
       configuredPrice: price7d,
       isRecommended: true,
-      stats: analytics.planMetrics?.PASS_7D || { sales: 0, revenueRupees: 0, active: 0 }
+      stats: analytics.planMetrics?.PASS_7D || {
+        sales: analytics.durationBreakdown?.['PASS_7D'] ?? 0,
+        revenueRupees: analytics.revenueByPlan?.['PASS_7D'] ?? 0,
+        active: analytics.activeByPlan?.['PASS_7D'] ?? 0,
+      }
     },
     {
-      id: 'PASS_15D',
+      id: 'PASS_15D' as const,
       label: '15 Days',
       duration: '15 Days',
       quality: '1080p FHD',
       configuredPrice: price15d,
       isBestValue: true,
-      stats: analytics.planMetrics?.PASS_15D || { sales: 0, revenueRupees: 0, active: 0 }
+      stats: analytics.planMetrics?.PASS_15D || {
+        sales: analytics.durationBreakdown?.['PASS_15D'] ?? 0,
+        revenueRupees: analytics.revenueByPlan?.['PASS_15D'] ?? 0,
+        active: analytics.activeByPlan?.['PASS_15D'] ?? 0,
+      }
     }
   ];
 
@@ -290,6 +310,38 @@ export const AdminWatchPassPage: React.FC<AdminWatchPassPageProps> = ({ onNaviga
           </div>
           <p style={{ fontSize: '11px', color: '#9CA3AF', margin: '4px 0 0' }}>
             Invalid UTR / unpaid
+          </p>
+        </div>
+
+        {/* Average Revenue Per Pass */}
+        <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '16px', border: '1px solid rgba(192, 132, 252, 0.3)', padding: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#C084FC', textTransform: 'uppercase' }}>
+              Avg Rev / Pass
+            </span>
+            <TrendingUp size={16} color="#C084FC" />
+          </div>
+          <div style={{ fontSize: '26px', fontWeight: 900, color: '#C084FC' }}>
+            ₹{analytics.averageRevenueRupees ?? (analytics.totalRevenueRupees > 0 && (analytics.activePasses + analytics.expiredPasses) > 0 ? Math.round(analytics.totalRevenueRupees / (analytics.activePasses + analytics.expiredPasses)) : 0)}
+          </div>
+          <p style={{ fontSize: '11px', color: '#9CA3AF', margin: '4px 0 0' }}>
+            Real average spend per pass
+          </p>
+        </div>
+
+        {/* Top Purchased Duration */}
+        <div style={{ backgroundColor: 'var(--bg-surface, #12121A)', borderRadius: '16px', border: '1px solid rgba(96, 165, 250, 0.3)', padding: '18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#60A5FA', textTransform: 'uppercase' }}>
+              Top Duration
+            </span>
+            <Zap size={16} color="#60A5FA" />
+          </div>
+          <div style={{ fontSize: '26px', fontWeight: 900, color: '#60A5FA' }}>
+            {(analytics.topDuration || 'PASS_7D').replace('PASS_', '')}
+          </div>
+          <p style={{ fontSize: '11px', color: '#9CA3AF', margin: '4px 0 0' }}>
+            Most popular duration tier
           </p>
         </div>
       </div>

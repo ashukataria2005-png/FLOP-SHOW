@@ -730,7 +730,7 @@ export const metadataImportService = {
 
     // Default FLOPSHOW price: ₹30 for Movie, ₹35 for Series (configurable in admin settings)
     const defaultPrices = await contentRepository.getDefaultPrices();
-    const defaultPriceRupees = type === 'MOVIE' ? defaultPrices.movieRupees : defaultPrices.seriesRupees;
+    const defaultPriceRupees = type === 'MOVIE' ? defaultPrices.defaultMoviePrice : defaultPrices.defaultSeriesPrice;
     const finalPriceRupees = payload.priceRupees !== undefined ? Number(payload.priceRupees) : defaultPriceRupees;
     const pricePaise = Math.round(finalPriceRupees * 100);
 

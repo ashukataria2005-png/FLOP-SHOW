@@ -154,8 +154,8 @@ export const watchPassRepository = {
     submittedAt: string;
     activatedAt?: string | null;
     expiresAt?: string | null;
-  }): Promise<WatchPassRecord> {
-    const db = getAdapter();
+  }, adapter?: any): Promise<WatchPassRecord> {
+    const db = adapter || getAdapter();
     const now = new Date().toISOString();
 
     await db.query(
@@ -293,6 +293,14 @@ export const watchPassRepository = {
     durationBreakdown: Record<string, number>;
     revenueByPlan: Record<string, number>;
     activeByPlan: Record<string, number>;
+    planMetrics: {
+      PASS_24H: { sales: number; revenueRupees: number; active: number };
+      PASS_3D: { sales: number; revenueRupees: number; active: number };
+      PASS_7D: { sales: number; revenueRupees: number; active: number };
+      PASS_15D: { sales: number; revenueRupees: number; active: number };
+    };
+    averageRevenueRupees: number;
+    topDuration: string;
   }> {
     await this.markExpiredPasses();
     const db = getAdapter();
@@ -350,16 +358,55 @@ export const watchPassRepository = {
       }
     }
 
+    const planMetrics = {
+      PASS_24H: {
+        sales: durationBreakdown.PASS_24H || 0,
+        revenueRupees: revenueByPlan.PASS_24H || 0,
+        active: activeByPlan.PASS_24H || 0,
+      },
+      PASS_3D: {
+        sales: durationBreakdown.PASS_3D || 0,
+        revenueRupees: revenueByPlan.PASS_3D || 0,
+        active: activeByPlan.PASS_3D || 0,
+      },
+      PASS_7D: {
+        sales: durationBreakdown.PASS_7D || 0,
+        revenueRupees: revenueByPlan.PASS_7D || 0,
+        active: activeByPlan.PASS_7D || 0,
+      },
+      PASS_15D: {
+        sales: durationBreakdown.PASS_15D || 0,
+        revenueRupees: revenueByPlan.PASS_15D || 0,
+        active: activeByPlan.PASS_15D || 0,
+      },
+    };
+
+    const totalRevenueRupees = Number(stats?.total_rev || 0);
+    const completedPurchases = Number(stats?.active_count || 0) + Number(stats?.expired_count || 0);
+    const averageRevenueRupees = completedPurchases > 0 ? Math.round(totalRevenueRupees / completedPurchases) : 0;
+
+    let topDuration = 'PASS_7D';
+    let maxSales = -1;
+    for (const [key, count] of Object.entries(durationBreakdown)) {
+      if (count > maxSales) {
+        maxSales = count;
+        topDuration = key;
+      }
+    }
+
     return {
       totalPasses: Number(stats?.total_count || 0),
       activePasses: Number(stats?.active_count || 0),
       expiredPasses: Number(stats?.expired_count || 0),
       pendingPasses: Number(stats?.pending_count || 0),
       rejectedPasses: Number(stats?.rejected_count || 0),
-      totalRevenueRupees: Number(stats?.total_rev || 0),
+      totalRevenueRupees,
       durationBreakdown,
       revenueByPlan,
       activeByPlan,
+      planMetrics,
+      averageRevenueRupees,
+      topDuration,
     };
   }
 };

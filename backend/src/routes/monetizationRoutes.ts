@@ -31,9 +31,10 @@ monetizationRouter.get('/admin', requireAuth, requireAdmin, async (_req: Authent
 
 monetizationRouter.put('/admin', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
-    const { mode, weeklyPrice, monthlyPrice, yearlyPrice, prices, defaultMoviePrice, defaultSeriesPrice } = req.body;
+    const { mode, weeklyPrice, monthlyPrice, threeMonthsPrice, yearlyPrice, prices, defaultMoviePrice, defaultSeriesPrice } = req.body;
     const finalWeekly = weeklyPrice !== undefined ? Number(weeklyPrice) : (prices?.weekly !== undefined ? Number(prices.weekly) : undefined);
     const finalMonthly = monthlyPrice !== undefined ? Number(monthlyPrice) : (prices?.monthly !== undefined ? Number(prices.monthly) : undefined);
+    const finalThreeMonths = threeMonthsPrice !== undefined ? Number(threeMonthsPrice) : (prices?.threeMonths !== undefined ? Number(prices.threeMonths) : undefined);
     const finalYearly = yearlyPrice !== undefined ? Number(yearlyPrice) : (prices?.yearly !== undefined ? Number(prices.yearly) : undefined);
     const finalDefaultMoviePrice = defaultMoviePrice !== undefined ? Number(defaultMoviePrice) : (prices?.defaultMoviePrice !== undefined ? Number(prices.defaultMoviePrice) : undefined);
     const finalDefaultSeriesPrice = defaultSeriesPrice !== undefined ? Number(defaultSeriesPrice) : (prices?.defaultSeriesPrice !== undefined ? Number(prices.defaultSeriesPrice) : undefined);
@@ -42,6 +43,7 @@ monetizationRouter.put('/admin', requireAuth, requireAdmin, async (req: Authenti
       mode,
       weeklyPrice: finalWeekly,
       monthlyPrice: finalMonthly,
+      threeMonthsPrice: finalThreeMonths,
       yearlyPrice: finalYearly,
       defaultMoviePrice: finalDefaultMoviePrice,
       defaultSeriesPrice: finalDefaultSeriesPrice,

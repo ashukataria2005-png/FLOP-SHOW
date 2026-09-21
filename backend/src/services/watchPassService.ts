@@ -144,6 +144,7 @@ export const watchPassService = {
         maxDevices: WATCH_PASS_DEVICE_LIMITS.PASS_7D.maxDevices,
         allowedDevicesLabel: WATCH_PASS_DEVICE_LIMITS.PASS_7D.allowedDevicesLabel,
         allowedDeviceTypes: WATCH_PASS_DEVICE_LIMITS.PASS_7D.allowedDeviceTypes,
+        description: PLAN_DESC_MAP.PASS_7D,
         popular: true,
         highlight: 'Recommended',
         benefits: [
@@ -166,6 +167,7 @@ export const watchPassService = {
         maxDevices: WATCH_PASS_DEVICE_LIMITS.PASS_15D.maxDevices,
         allowedDevicesLabel: WATCH_PASS_DEVICE_LIMITS.PASS_15D.allowedDevicesLabel,
         allowedDeviceTypes: WATCH_PASS_DEVICE_LIMITS.PASS_15D.allowedDeviceTypes,
+        description: PLAN_DESC_MAP.PASS_15D,
         highlight: 'Best Value',
         benefits: [
           '15 Days Access',
@@ -184,6 +186,7 @@ export const watchPassService = {
     if (found) return found;
 
     const days = DURATION_DAYS_MAP[plan] || 1;
+    const limits = WATCH_PASS_DEVICE_LIMITS[plan] || { maxDevices: 1, allowedDevicesLabel: '1 Device', allowedDeviceTypes: ['Mobile', 'Tablet', 'TV', 'Laptop'] };
     return {
       id: plan,
       plan,
@@ -193,6 +196,9 @@ export const watchPassService = {
       priceRupees: 44,
       maxResolution: days >= 7 ? '1080p' : '720p',
       downloadAllowed: days >= 7,
+      maxDevices: limits.maxDevices,
+      allowedDevicesLabel: limits.allowedDevicesLabel,
+      allowedDeviceTypes: limits.allowedDeviceTypes,
       description: PLAN_DESC_MAP[plan] || 'FLOPSHOW Watch Pass',
       benefits: ['Unlimited movies & web series'],
     };
@@ -220,7 +226,7 @@ export const watchPassService = {
 
     let finalContentId: string | null = null;
     if (data.contentId && data.contentId !== 'ALL_CATALOG') {
-      const content = await contentRepository.getById(data.contentId);
+      const content = await contentRepository.findByIdOrSlug(data.contentId);
       if (content) {
         finalContentId = content.id;
       }

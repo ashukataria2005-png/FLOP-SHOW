@@ -105,6 +105,15 @@ const navGroups: NavGroup[] = [
       { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck }
     ]
   },
+  // 5. Plans & Pricing
+  {
+    id: 'group-pricing',
+    title: 'PLANS & PRICING',
+    icon: Tag,
+    items: [
+      { id: 'admin-pricing', label: 'Plans & Pricing', icon: Tag }
+    ]
+  },
   // 5. Analytics & Access Passes
   {
     id: 'group-analytics',

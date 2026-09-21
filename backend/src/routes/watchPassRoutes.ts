@@ -27,7 +27,8 @@ watchPassRouter.get('/plans', async (_req, res, next) => {
 // Check user's watch pass status on a specific movie or series
 watchPassRouter.get('/content-status/:contentId', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
-    const status = await watchPassService.getContentPassStatus(req.user!.id, req.params.contentId);
+    const contentIdStr = Array.isArray(req.params.contentId) ? req.params.contentId[0] : req.params.contentId;
+    const status = await watchPassService.getContentPassStatus(req.user!.id, contentIdStr);
     res.json(status);
   } catch (err) {
     next(err);
@@ -139,11 +140,11 @@ watchPassRouter.post('/admin/reject', requireAuth, requireAdmin, async (req: Aut
 
     const payReq = await paymentRequestRepository.getById(passId);
     if (payReq) {
-      const result = await paymentRequestService.rejectPayment(req.user!.id, passId, adminNote);
+      const rejectedPay = await paymentRequestService.rejectPayment(req.user!.id, passId, adminNote);
       res.json({
         success: true,
-        message: result.message,
-        payment: result.payment,
+        message: 'Watch Pass payment request rejected.',
+        payment: rejectedPay,
       });
       return;
     }

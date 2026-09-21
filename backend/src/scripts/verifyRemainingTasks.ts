@@ -62,7 +62,7 @@ async function verify() {
         password: 'Password123!'
       })
     });
-    const userData = await userRes.json();
+    const userData: any = await userRes.json();
     const token = userData.token;
     const userId = userData.user.id;
 
@@ -121,7 +121,7 @@ async function verify() {
     const getMovieProg = await fetch(`${baseUrl}/api/library/progress/${movieId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    const movieProgData = await getMovieProg.json();
+    const movieProgData: any = await getMovieProg.json();
     assert(movieProgData.progress?.current_time_seconds === 345, 'Movie progress saved & retrieved exactly at 345s');
     assert(movieProgData.progress?.completed === 0, 'Movie progress is not completed');
 
@@ -160,12 +160,12 @@ async function verify() {
     const getEp2 = await fetch(`${baseUrl}/api/library/progress/${seriesId}?episodeId=ep-2-cw`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    const ep2Data = await getEp2.json();
+    const ep2Data: any = await getEp2.json();
 
     const getEp3 = await fetch(`${baseUrl}/api/library/progress/${seriesId}?episodeId=ep-3-cw`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    const ep3Data = await getEp3.json();
+    const ep3Data: any = await getEp3.json();
 
     assert(ep2Data.progress?.current_time_seconds === 480, 'Episode 2 resumes at 480s');
     assert(ep3Data.progress?.current_time_seconds === 120, 'Episode 3 resumes at 120s');
@@ -178,7 +178,7 @@ async function verify() {
     const allProgRes = await fetch(`${baseUrl}/api/library/progress`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    const allProgData = await allProgRes.json();
+    const allProgData: any = await allProgRes.json();
     assert(Array.isArray(allProgData.progress) && allProgData.progress.length >= 3, 'All progress items retrieved for reload persistence');
 
     // 3. Test Completion Threshold (>= 90%)
@@ -199,7 +199,7 @@ async function verify() {
     const getCompletedMovie = await fetch(`${baseUrl}/api/library/progress/${movieId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    const completedData = await getCompletedMovie.json();
+    const completedData: any = await getCompletedMovie.json();
     assert(completedData.progress?.completed === 1, 'Content at 98% is marked completed in database');
 
     // ------------------------------------------------------------------------
@@ -216,14 +216,14 @@ async function verify() {
     // 2. Set trailer on movie
     await db.query(`UPDATE content SET trailer_url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' WHERE id = '${movieId}'`);
     const movieTrailerRes = await fetch(`${baseUrl}/api/media/content/${movieId}?type=TRAILER`);
-    const movieTrailerData = await movieTrailerRes.json();
+    const movieTrailerData: any = await movieTrailerRes.json();
     assert(movieTrailerData.sourceType === 'YOUTUBE', 'Movie trailer publicly accessible with YOUTUBE sourceType');
     assert(movieTrailerData.url.includes('dQw4w9WgXcQ'), 'Movie trailer URL matches set YouTube trailer');
 
     // 3. Set trailer on series
     await db.query(`UPDATE content SET trailer_url = 'https://stream.vcdn.me/trailer/series.mp4' WHERE id = '${seriesId}'`);
     const seriesTrailerRes = await fetch(`${baseUrl}/api/media/content/${seriesId}?type=TRAILER`);
-    const seriesTrailerData = await seriesTrailerRes.json();
+    const seriesTrailerData: any = await seriesTrailerRes.json();
     assert(seriesTrailerData.mediaType === 'TRAILER', 'Series trailer returns mediaType TRAILER');
     assert(seriesTrailerData.url === 'https://stream.vcdn.me/trailer/series.mp4', 'Series trailer URL verified');
 

@@ -9,7 +9,9 @@ import {
   Download,
   ArrowRight,
   Crown,
-  Sparkles
+  Sparkles,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 export const PlanSelectionModal: React.FC = () => {
@@ -22,6 +24,7 @@ export const PlanSelectionModal: React.FC = () => {
     openSubscriptionModal
   } = useApp();
 
+  const [selectedTier, setSelectedTier] = useState<'single' | 'pass' | 'vip'>('single');
   const [selectedPassPlan, setSelectedPassPlan] = useState<'PASS_24H' | 'PASS_3D' | 'PASS_7D' | 'PASS_15D'>('PASS_7D');
   const [selectedVipPlan, setSelectedVipPlan] = useState<'MONTHLY' | '3_MONTHS' | 'YEARLY'>('3_MONTHS');
 
@@ -196,6 +199,24 @@ export const PlanSelectionModal: React.FC = () => {
   const currentPass = passConfig[selectedPassPlan];
   const currentVip = vipConfig[selectedVipPlan];
 
+  const currentAction = selectedTier === 'single'
+    ? handlePayOwn
+    : selectedTier === 'pass'
+      ? handlePayWatchPass
+      : handlePayVip;
+
+  const currentLabel = selectedTier === 'single'
+    ? `Continue to Pay ₹${ownPrice}`
+    : selectedTier === 'pass'
+      ? `Pay ₹${currentPass.price} (${currentPass.name})`
+      : `Pay ₹${currentVip.price} (${currentVip.name})`;
+
+  const currentAccentColor = selectedTier === 'single'
+    ? 'var(--brand-gold, #F5C518)'
+    : selectedTier === 'pass'
+      ? '#38BDF8'
+      : '#C084FC';
+
   return (
     <div
       className="modal-backdrop"
@@ -221,8 +242,8 @@ export const PlanSelectionModal: React.FC = () => {
         style={{
           maxWidth: '780px',
           width: '100%',
-          maxHeight: '88vh',
-          height: 'auto',
+          maxHeight: '90vh',
+          height: '90vh',
           minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -305,7 +326,7 @@ export const PlanSelectionModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Inner Scrollable Container */}
+        {/* Scrollable Middle Body */}
         <div
           style={{
             flex: 1,
@@ -315,9 +336,10 @@ export const PlanSelectionModal: React.FC = () => {
             overscrollBehavior: 'contain',
             touchAction: 'pan-y',
             padding: '16px',
+            paddingBottom: '24px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px'
+            gap: '14px'
           }}
         >
           {/* ============================================================ */}
@@ -326,21 +348,35 @@ export const PlanSelectionModal: React.FC = () => {
           <div
             style={{
               borderRadius: '16px',
-              border: '1.5px solid var(--brand-gold, #F5C518)',
-              backgroundColor: 'rgba(245, 197, 24, 0.03)',
+              border: selectedTier === 'single'
+                ? '2px solid var(--brand-gold, #F5C518)'
+                : '1px solid rgba(255, 255, 255, 0.1)',
+              backgroundColor: selectedTier === 'single'
+                ? 'rgba(245, 197, 24, 0.04)'
+                : 'rgba(255, 255, 255, 0.02)',
               overflow: 'hidden',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+              boxShadow: selectedTier === 'single'
+                ? '0 4px 20px rgba(245, 197, 24, 0.15)'
+                : 'none',
+              transition: 'all 0.2s ease'
             }}
           >
-            {/* Section Header */}
+            {/* Header (Clickable to select/expand) */}
             <div
+              onClick={() => setSelectedTier('single')}
               style={{
                 padding: '14px 18px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                borderBottom: '1px solid rgba(245, 197, 24, 0.15)',
-                backgroundColor: 'rgba(245, 197, 24, 0.06)'
+                borderBottom: selectedTier === 'single'
+                  ? '1px solid rgba(245, 197, 24, 0.15)'
+                  : 'none',
+                backgroundColor: selectedTier === 'single'
+                  ? 'rgba(245, 197, 24, 0.08)'
+                  : 'transparent',
+                cursor: 'pointer',
+                userSelect: 'none'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -349,19 +385,20 @@ export const PlanSelectionModal: React.FC = () => {
                     width: '28px',
                     height: '28px',
                     borderRadius: '8px',
-                    backgroundColor: 'var(--brand-gold, #F5C518)',
-                    color: '#000000',
+                    backgroundColor: selectedTier === 'single' ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.1)',
+                    color: selectedTier === 'single' ? '#000000' : '#FFFFFF',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 800,
-                    fontSize: '13px'
+                    fontSize: '13px',
+                    flexShrink: 0
                   }}
                 >
                   1
                 </div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
                       {isSeries ? 'Series 30-Day Access' : 'Movie 30-Day Access'}
                     </h4>
@@ -385,75 +422,82 @@ export const PlanSelectionModal: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '20px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, textAlign: 'right' }}>
+                <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)' }}>
                   ₹{ownPrice}
                 </span>
+                {selectedTier === 'single' ? (
+                  <ChevronUp size={18} color="var(--brand-gold, #F5C518)" />
+                ) : (
+                  <ChevronDown size={18} color="#6B7280" />
+                )}
               </div>
             </div>
 
-            {/* Section Details & CTA */}
-            <div style={{ padding: '16px 18px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#E5E7EB' }}>
-                  <Check size={15} color="var(--brand-gold, #F5C518)" />
-                  <span><strong>30 Days Full Access</strong></span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#E5E7EB' }}>
-                  <Check size={15} color="var(--brand-gold, #F5C518)" />
-                  <span><strong>Full HD 1080p Quality</strong></span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#E5E7EB' }}>
-                  <Download size={15} color="var(--brand-gold, #F5C518)" />
-                  <span><strong>Offline Download Available</strong></span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#E5E7EB' }}>
-                  <Check size={15} color="var(--brand-gold, #F5C518)" />
-                  <span>{isSeries ? 'All seasons & all episodes' : 'Full uncut movie'}</span>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingTop: '12px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                  flexWrap: 'wrap',
-                  gap: '10px'
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>Total for 30-day access:</span>
-                  <span style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', marginLeft: '6px' }}>
-                    ₹{ownPrice}
-                  </span>
+            {/* Sub-options & Details (Only visible when active) */}
+            {selectedTier === 'single' && (
+              <div style={{ padding: '16px 18px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#E5E7EB' }}>
+                    <Check size={15} color="var(--brand-gold, #F5C518)" />
+                    <span><strong>30 Days Full Access</strong></span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#E5E7EB' }}>
+                    <Check size={15} color="var(--brand-gold, #F5C518)" />
+                    <span><strong>Full HD 1080p Quality</strong></span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#E5E7EB' }}>
+                    <Download size={15} color="var(--brand-gold, #F5C518)" />
+                    <span><strong>Offline Download Available</strong></span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#E5E7EB' }}>
+                    <Check size={15} color="var(--brand-gold, #F5C518)" />
+                    <span>{isSeries ? 'All seasons & all episodes' : 'Full uncut movie'}</span>
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handlePayOwn}
+                <div
                   style={{
-                    padding: '10px 20px',
-                    borderRadius: '10px',
-                    backgroundColor: 'var(--brand-gold, #F5C518)',
-                    color: '#000000',
-                    fontWeight: 800,
-                    fontSize: '13px',
-                    border: 'none',
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 4px 14px rgba(245, 197, 24, 0.25)'
+                    justifyContent: 'space-between',
+                    paddingTop: '12px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                    flexWrap: 'wrap',
+                    gap: '10px'
                   }}
                 >
-                  <span>Continue to Pay ₹{ownPrice}</span>
-                  <ArrowRight size={14} />
-                </button>
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#9CA3AF' }}>Total for 30-day access:</span>
+                    <span style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', marginLeft: '6px' }}>
+                      ₹{ownPrice}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handlePayOwn}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '10px',
+                      backgroundColor: 'var(--brand-gold, #F5C518)',
+                      color: '#000000',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 14px rgba(245, 197, 24, 0.25)'
+                    }}
+                  >
+                    <span>Continue to Pay ₹{ownPrice}</span>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* ============================================================ */}
@@ -462,21 +506,35 @@ export const PlanSelectionModal: React.FC = () => {
           <div
             style={{
               borderRadius: '16px',
-              border: '1.5px solid #38BDF8',
-              backgroundColor: 'rgba(56, 189, 248, 0.03)',
+              border: selectedTier === 'pass'
+                ? '2px solid #38BDF8'
+                : '1px solid rgba(255, 255, 255, 0.1)',
+              backgroundColor: selectedTier === 'pass'
+                ? 'rgba(56, 189, 248, 0.04)'
+                : 'rgba(255, 255, 255, 0.02)',
               overflow: 'hidden',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+              boxShadow: selectedTier === 'pass'
+                ? '0 4px 20px rgba(56, 189, 248, 0.15)'
+                : 'none',
+              transition: 'all 0.2s ease'
             }}
           >
-            {/* Section Header */}
+            {/* Header (Clickable to select/expand) */}
             <div
+              onClick={() => setSelectedTier('pass')}
               style={{
                 padding: '14px 18px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                borderBottom: '1px solid rgba(56, 189, 248, 0.15)',
-                backgroundColor: 'rgba(56, 189, 248, 0.06)'
+                borderBottom: selectedTier === 'pass'
+                  ? '1px solid rgba(56, 189, 248, 0.15)'
+                  : 'none',
+                backgroundColor: selectedTier === 'pass'
+                  ? 'rgba(56, 189, 248, 0.08)'
+                  : 'transparent',
+                cursor: 'pointer',
+                userSelect: 'none'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -485,19 +543,20 @@ export const PlanSelectionModal: React.FC = () => {
                     width: '28px',
                     height: '28px',
                     borderRadius: '8px',
-                    backgroundColor: '#38BDF8',
-                    color: '#000000',
+                    backgroundColor: selectedTier === 'pass' ? '#38BDF8' : 'rgba(255, 255, 255, 0.1)',
+                    color: selectedTier === 'pass' ? '#000000' : '#FFFFFF',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 800,
-                    fontSize: '13px'
+                    fontSize: '13px',
+                    flexShrink: 0
                   }}
                 >
                   2
                 </div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
                       Watch Pass (Catalog-Wide)
                     </h4>
@@ -521,124 +580,137 @@ export const PlanSelectionModal: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '12px', color: '#9CA3AF' }}>From </span>
-                <span style={{ fontSize: '20px', fontWeight: 900, color: '#38BDF8' }}>
-                  ₹{passConfig.PASS_24H.price}
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, textAlign: 'right' }}>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>From </span>
+                  <span style={{ fontSize: '18px', fontWeight: 900, color: '#38BDF8' }}>
+                    ₹{passConfig.PASS_24H.price}
+                  </span>
+                </div>
+                {selectedTier === 'pass' ? (
+                  <ChevronUp size={18} color="#38BDF8" />
+                ) : (
+                  <ChevronDown size={18} color="#6B7280" />
+                )}
               </div>
             </div>
 
-            {/* All 4 Watch Pass Options */}
-            <div style={{ padding: '16px 18px' }}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                  gap: '10px',
-                  marginBottom: '14px'
-                }}
-              >
-                {(['PASS_24H', 'PASS_3D', 'PASS_7D', 'PASS_15D'] as const).map(pId => {
-                  const plan = passConfig[pId];
-                  const isSelected = selectedPassPlan === pId;
-                  return (
-                    <div
-                      key={pId}
-                      onClick={() => setSelectedPassPlan(pId)}
-                      style={{
-                        padding: '12px 10px',
-                        borderRadius: '12px',
-                        border: isSelected ? '2px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.1)',
-                        backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.14)' : 'rgba(255, 255, 255, 0.03)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        gap: '6px',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <div>
-                        <span
-                          style={{
-                            fontSize: '9px',
-                            fontWeight: 800,
-                            padding: '2px 5px',
-                            borderRadius: '4px',
-                            backgroundColor: isSelected ? '#38BDF8' : 'rgba(255, 255, 255, 0.08)',
-                            color: isSelected ? '#000000' : '#9CA3AF',
-                            textTransform: 'uppercase'
-                          }}
-                        >
-                          {plan.badge}
-                        </span>
-                        <div style={{ fontSize: '13px', fontWeight: 800, color: '#FFFFFF', marginTop: '6px' }}>
-                          {plan.durationLabel}
-                        </div>
-                      </div>
-
-                      <div>
-                        <span style={{ fontSize: '19px', fontWeight: 900, color: isSelected ? '#38BDF8' : '#FFFFFF' }}>
-                          ₹{plan.price}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Selected Pass Features & CTA */}
-              <div
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '12px',
-                  padding: '14px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '12px'
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#FFFFFF' }}>
-                    {currentPass.name} • ₹{currentPass.price}
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px', fontSize: '11.5px', color: '#9CA3AF' }}>
-                    {currentPass.features.map((feat, idx) => (
-                      <span key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Check size={12} color="#38BDF8" />
-                        <span>{feat}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handlePayWatchPass}
+            {/* Sub-options & Details (Only visible when active) */}
+            {selectedTier === 'pass' && (
+              <div style={{ padding: '16px 18px' }}>
+                <div
                   style={{
-                    padding: '10px 20px',
-                    borderRadius: '10px',
-                    backgroundColor: '#38BDF8',
-                    color: '#000000',
-                    fontWeight: 800,
-                    fontSize: '13px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 4px 14px rgba(56, 189, 248, 0.25)'
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                    gap: '10px',
+                    marginBottom: '14px'
                   }}
                 >
-                  <span>Continue to Pay ₹{currentPass.price}</span>
-                  <ArrowRight size={14} />
-                </button>
+                  {(['PASS_24H', 'PASS_3D', 'PASS_7D', 'PASS_15D'] as const).map(pId => {
+                    const plan = passConfig[pId];
+                    const isSelected = selectedPassPlan === pId;
+                    return (
+                      <div
+                        key={pId}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPassPlan(pId);
+                          setSelectedTier('pass');
+                        }}
+                        style={{
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          border: isSelected ? '2px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.1)',
+                          backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.14)' : 'rgba(255, 255, 255, 0.03)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: '6px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div>
+                          <span
+                            style={{
+                              fontSize: '9px',
+                              fontWeight: 800,
+                              padding: '2px 5px',
+                              borderRadius: '4px',
+                              backgroundColor: isSelected ? '#38BDF8' : 'rgba(255, 255, 255, 0.08)',
+                              color: isSelected ? '#000000' : '#9CA3AF',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            {plan.badge}
+                          </span>
+                          <div style={{ fontSize: '13px', fontWeight: 800, color: '#FFFFFF', marginTop: '6px' }}>
+                            {plan.durationLabel}
+                          </div>
+                        </div>
+
+                        <div>
+                          <span style={{ fontSize: '19px', fontWeight: 900, color: isSelected ? '#38BDF8' : '#FFFFFF' }}>
+                            ₹{plan.price}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Selected Pass Features & CTA */}
+                <div
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '12px',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#FFFFFF' }}>
+                      {currentPass.name} • ₹{currentPass.price}
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px', fontSize: '11.5px', color: '#9CA3AF' }}>
+                      {currentPass.features.map((feat, idx) => (
+                        <span key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Check size={12} color="#38BDF8" />
+                          <span>{feat}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handlePayWatchPass}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '10px',
+                      backgroundColor: '#38BDF8',
+                      color: '#000000',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 14px rgba(56, 189, 248, 0.25)'
+                    }}
+                  >
+                    <span>Continue to Pay ₹{currentPass.price}</span>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* ============================================================ */}
@@ -647,21 +719,35 @@ export const PlanSelectionModal: React.FC = () => {
           <div
             style={{
               borderRadius: '16px',
-              border: '1.5px solid #C084FC',
-              backgroundColor: 'rgba(192, 132, 252, 0.03)',
+              border: selectedTier === 'vip'
+                ? '2px solid #C084FC'
+                : '1px solid rgba(255, 255, 255, 0.1)',
+              backgroundColor: selectedTier === 'vip'
+                ? 'rgba(192, 132, 252, 0.04)'
+                : 'rgba(255, 255, 255, 0.02)',
               overflow: 'hidden',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
+              boxShadow: selectedTier === 'vip'
+                ? '0 4px 20px rgba(192, 132, 252, 0.15)'
+                : 'none',
+              transition: 'all 0.2s ease'
             }}
           >
-            {/* Section Header */}
+            {/* Header (Clickable to select/expand) */}
             <div
+              onClick={() => setSelectedTier('vip')}
               style={{
                 padding: '14px 18px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                borderBottom: '1px solid rgba(192, 132, 252, 0.15)',
-                backgroundColor: 'rgba(192, 132, 252, 0.06)'
+                borderBottom: selectedTier === 'vip'
+                  ? '1px solid rgba(192, 132, 252, 0.15)'
+                  : 'none',
+                backgroundColor: selectedTier === 'vip'
+                  ? 'rgba(192, 132, 252, 0.08)'
+                  : 'transparent',
+                cursor: 'pointer',
+                userSelect: 'none'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -670,19 +756,20 @@ export const PlanSelectionModal: React.FC = () => {
                     width: '28px',
                     height: '28px',
                     borderRadius: '8px',
-                    backgroundColor: '#C084FC',
-                    color: '#000000',
+                    backgroundColor: selectedTier === 'vip' ? '#C084FC' : 'rgba(255, 255, 255, 0.1)',
+                    color: selectedTier === 'vip' ? '#000000' : '#FFFFFF',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 800,
-                    fontSize: '13px'
+                    fontSize: '13px',
+                    flexShrink: 0
                   }}
                 >
                   3
                 </div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
                       VIP Subscription Plans
                     </h4>
@@ -710,134 +797,147 @@ export const PlanSelectionModal: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '12px', color: '#9CA3AF' }}>From </span>
-                <span style={{ fontSize: '20px', fontWeight: 900, color: '#C084FC' }}>
-                  ₹{vipConfig.MONTHLY.price}
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, textAlign: 'right' }}>
+                <div>
+                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>From </span>
+                  <span style={{ fontSize: '18px', fontWeight: 900, color: '#C084FC' }}>
+                    ₹{vipConfig.MONTHLY.price}
+                  </span>
+                </div>
+                {selectedTier === 'vip' ? (
+                  <ChevronUp size={18} color="#C084FC" />
+                ) : (
+                  <ChevronDown size={18} color="#6B7280" />
+                )}
               </div>
             </div>
 
-            {/* All 3 VIP Plan Cards */}
-            <div style={{ padding: '16px 18px' }}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-                  gap: '12px',
-                  marginBottom: '14px'
-                }}
-              >
-                {(['MONTHLY', '3_MONTHS', 'YEARLY'] as const).map(vId => {
-                  const plan = vipConfig[vId];
-                  const isSelected = selectedVipPlan === vId;
-                  return (
-                    <div
-                      key={vId}
-                      onClick={() => setSelectedVipPlan(vId)}
-                      style={{
-                        padding: '14px 12px',
-                        borderRadius: '12px',
-                        border: isSelected ? '2px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
-                        backgroundColor: isSelected ? 'rgba(192, 132, 252, 0.14)' : 'rgba(255, 255, 255, 0.03)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        gap: '8px',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <div>
-                        <span
-                          style={{
-                            fontSize: '9px',
-                            fontWeight: 800,
-                            padding: '2px 5px',
-                            borderRadius: '4px',
-                            backgroundColor: isSelected ? '#C084FC' : 'rgba(255, 255, 255, 0.08)',
-                            color: isSelected ? '#000000' : '#9CA3AF',
-                            textTransform: 'uppercase'
-                          }}
-                        >
-                          {plan.badge}
-                        </span>
-                        <div style={{ fontSize: '13px', fontWeight: 800, color: '#FFFFFF', marginTop: '6px' }}>
-                          {plan.durationLabel}
-                        </div>
-                      </div>
-
-                      <div>
-                        <span style={{ fontSize: '20px', fontWeight: 900, color: isSelected ? '#C084FC' : '#FFFFFF' }}>
-                          ₹{plan.price}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Selected VIP Details & CTA */}
-              <div
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '12px',
-                  padding: '14px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '12px'
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#FFFFFF' }}>
-                    {currentVip.name} • ₹{currentVip.price}
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px', fontSize: '11.5px', color: '#9CA3AF' }}>
-                    {currentVip.features.map((feat, idx) => (
-                      <span key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Check size={12} color="#C084FC" />
-                        <span>{feat}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handlePayVip}
+            {/* Sub-options & Details (Only visible when active) */}
+            {selectedTier === 'vip' && (
+              <div style={{ padding: '16px 18px' }}>
+                <div
                   style={{
-                    padding: '10px 20px',
-                    borderRadius: '10px',
-                    backgroundColor: '#C084FC',
-                    color: '#000000',
-                    fontWeight: 800,
-                    fontSize: '13px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 4px 14px rgba(192, 132, 252, 0.25)'
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                    gap: '12px',
+                    marginBottom: '14px'
                   }}
                 >
-                  <span>Continue to Pay ₹{currentVip.price}</span>
-                  <ArrowRight size={14} />
-                </button>
+                  {(['MONTHLY', '3_MONTHS', 'YEARLY'] as const).map(vId => {
+                    const plan = vipConfig[vId];
+                    const isSelected = selectedVipPlan === vId;
+                    return (
+                      <div
+                        key={vId}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedVipPlan(vId);
+                          setSelectedTier('vip');
+                        }}
+                        style={{
+                          padding: '14px 12px',
+                          borderRadius: '12px',
+                          border: isSelected ? '2px solid #C084FC' : '1px solid rgba(255, 255, 255, 0.1)',
+                          backgroundColor: isSelected ? 'rgba(192, 132, 252, 0.14)' : 'rgba(255, 255, 255, 0.03)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div>
+                          <span
+                            style={{
+                              fontSize: '9px',
+                              fontWeight: 800,
+                              padding: '2px 5px',
+                              borderRadius: '4px',
+                              backgroundColor: isSelected ? '#C084FC' : 'rgba(255, 255, 255, 0.08)',
+                              color: isSelected ? '#000000' : '#9CA3AF',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            {plan.badge}
+                          </span>
+                          <div style={{ fontSize: '13px', fontWeight: 800, color: '#FFFFFF', marginTop: '6px' }}>
+                            {plan.durationLabel}
+                          </div>
+                        </div>
+
+                        <div>
+                          <span style={{ fontSize: '20px', fontWeight: 900, color: isSelected ? '#C084FC' : '#FFFFFF' }}>
+                            ₹{plan.price}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Selected VIP Details & CTA */}
+                <div
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '12px',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#FFFFFF' }}>
+                      {currentVip.name} • ₹{currentVip.price}
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '4px', fontSize: '11.5px', color: '#9CA3AF' }}>
+                      {currentVip.features.map((feat, idx) => (
+                        <span key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Check size={12} color="#C084FC" />
+                          <span>{feat}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handlePayVip}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '10px',
+                      backgroundColor: '#C084FC',
+                      color: '#000000',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 4px 14px rgba(192, 132, 252, 0.25)'
+                    }}
+                  >
+                    <span>Continue to Pay ₹{currentVip.price}</span>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Modal Footer */}
+        {/* Modal Bottom Bar */}
         <div
           style={{
-            padding: '12px 20px',
+            padding: '12px 16px',
             paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
             borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-            backgroundColor: 'rgba(10, 10, 16, 0.95)',
+            backgroundColor: 'rgba(10, 10, 16, 0.98)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -846,27 +946,51 @@ export const PlanSelectionModal: React.FC = () => {
             flexShrink: 0
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9CA3AF' }}>
-            <Sparkles size={14} color="var(--brand-gold, #F5C518)" />
-            <span>Instant activation upon administrator UPI verification</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#9CA3AF' }}>
+            <Sparkles size={14} color="var(--brand-gold, #F5C518)" style={{ flexShrink: 0 }} />
+            <span>Instant activation on UPI</span>
           </div>
 
-          <button
-            type="button"
-            onClick={closePlanSelector}
-            style={{
-              padding: '6px 16px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: '#D1D5DB',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            Close
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={closePlanSelector}
+              style={{
+                padding: '9px 14px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#D1D5DB',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Close
+            </button>
+
+            <button
+              type="button"
+              onClick={currentAction}
+              style={{
+                padding: '9px 18px',
+                borderRadius: '8px',
+                backgroundColor: currentAccentColor,
+                color: '#000000',
+                fontWeight: 800,
+                fontSize: '13px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.3)'
+              }}
+            >
+              <span>{currentLabel}</span>
+              <ArrowRight size={14} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

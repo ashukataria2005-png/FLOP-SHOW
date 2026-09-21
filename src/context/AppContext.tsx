@@ -245,22 +245,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setWatchPassInitialStep('choose');
   };
 
-  // Lock body and HTML scrolling when any modal is open to prevent mobile background scrolling leakage
+  // Lock background page scrolling when any modal is open without suppressing the modal's own touch gestures.
   useEffect(() => {
     if (typeof document === 'undefined') return;
     if (activeModal !== null) {
       const originalBodyOverflow = document.body.style.overflow;
       const originalDocOverflow = document.documentElement.style.overflow;
-      const originalTouchAction = document.body.style.touchAction;
+      const originalBodyTouchAction = document.body.style.touchAction;
+      const originalHtmlTouchAction = document.documentElement.style.touchAction;
 
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
-      document.body.style.touchAction = 'none';
+      document.body.style.touchAction = '';
+      document.documentElement.style.touchAction = '';
 
       return () => {
         document.body.style.overflow = originalBodyOverflow;
         document.documentElement.style.overflow = originalDocOverflow;
-        document.body.style.touchAction = originalTouchAction;
+        document.body.style.touchAction = originalBodyTouchAction;
+        document.documentElement.style.touchAction = originalHtmlTouchAction;
       };
     }
   }, [activeModal]);

@@ -9,7 +9,6 @@ import {
   Download,
   ArrowRight,
   Crown,
-  Zap,
   Sparkles
 } from 'lucide-react';
 
@@ -29,6 +28,17 @@ export const PlanSelectionModal: React.FC = () => {
   // Backend configured live plans
   const [backendPassPlans, setBackendPassPlans] = useState<any[]>([]);
   const [backendVipPlans, setBackendVipPlans] = useState<any[]>([]);
+
+  // Background Movie Screen Scroll Lock when modal is open
+  useEffect(() => {
+    if (activeModal === 'plan_selector') {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow || '';
+      };
+    }
+  }, [activeModal]);
 
   useEffect(() => {
     if (activeModal === 'plan_selector') {
@@ -188,10 +198,15 @@ export const PlanSelectionModal: React.FC = () => {
       className="modal-backdrop"
       onClick={closePlanSelector}
       style={{
-        zIndex: 1050,
         position: 'fixed',
         inset: 0,
-        overflow: 'hidden'
+        zIndex: 1000,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        backdropFilter: 'blur(6px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '12px'
       }}
     >
       <div
@@ -199,8 +214,8 @@ export const PlanSelectionModal: React.FC = () => {
         onClick={e => e.stopPropagation()}
         style={{
           maxWidth: '780px',
-          width: '95%',
-          maxHeight: 'min(92dvh, 92vh)',
+          width: '100%',
+          maxHeight: '88vh',
           minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -208,9 +223,7 @@ export const PlanSelectionModal: React.FC = () => {
           borderRadius: '20px',
           border: '1px solid rgba(255, 255, 255, 0.14)',
           overflow: 'hidden',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.85)',
-          touchAction: 'pan-y',
-          overscrollBehavior: 'contain'
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.85)'
         }}
       >
         {/* Fixed Header */}
@@ -289,6 +302,12 @@ export const PlanSelectionModal: React.FC = () => {
         <div
           className="plan-modal-body modal-scroll-content"
           style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+            touchAction: 'pan-y',
             padding: '20px',
             display: 'flex',
             flexDirection: 'column',

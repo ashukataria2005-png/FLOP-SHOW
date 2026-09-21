@@ -70,7 +70,7 @@ export const SubscriptionModal: React.FC = () => {
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       return () => {
-        document.body.style.overflow = originalOverflow;
+        document.body.style.overflow = originalOverflow || '';
       };
     }
   }, [activeModal]);
@@ -185,6 +185,7 @@ export const SubscriptionModal: React.FC = () => {
           maxWidth: '560px',
           width: '100%',
           maxHeight: '88vh',
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: '#12121A',
@@ -252,12 +253,14 @@ export const SubscriptionModal: React.FC = () => {
         {/* Modal Body - Independent Touch Scrollable Container */}
         <div
           style={{
-            padding: '18px',
+            flex: 1,
+            minHeight: 0,
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
             overscrollBehavior: 'contain',
             touchAction: 'pan-y',
-            flex: 1
+            padding: '18px',
+            paddingBottom: 'max(24px, calc(18px + env(safe-area-inset-bottom, 16px)))'
           }}
         >
           {/* If user already has an active subscription */}

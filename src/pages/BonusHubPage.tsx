@@ -51,10 +51,17 @@ interface PromoRedemptionItem {
   promo_code_id: string;
   promo_code: string;
   user_id: string;
-  content_id: string;
+  content_id: string | null;
   redeemed_at: string;
   expires_at: string;
   created_at: string;
+  item_type?: string;
+  item_title?: string;
+  original_price?: number;
+  discount_percent?: number;
+  amount_paid?: number;
+  status?: string;
+  payment_request_id?: string | null;
   content_title?: string;
   content_poster?: string;
   content_type?: string;
@@ -883,111 +890,227 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {usedPromos.map(item => (
-                <div
-                  key={item.id}
-                  style={{
-                    backgroundColor: 'var(--bg-surface, #12121A)',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                    borderRadius: '16px',
-                    padding: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '16px'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    {item.content_poster ? (
-                      <img
-                        src={item.content_poster}
-                        alt={item.content_title || 'Unlocked Title'}
-                        style={{
-                          width: '64px',
-                          height: '92px',
-                          objectFit: 'cover',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(255, 255, 255, 0.1)'
-                        }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: '64px',
-                          height: '92px',
-                          backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#9CA3AF'
-                        }}
-                      >
-                        <Film size={24} />
-                      </div>
-                    )}
+              {usedPromos.map(item => {
+                const isVip = item.item_type === 'SUBSCRIPTION';
+                const isPass = item.item_type === 'WATCH_PASS';
+                const itemTypeLabel = isVip ? 'VIP SUBSCRIPTION' : isPass ? 'WATCH PASS' : 'MOVIE / SERIES';
+                const badgeColor = isVip ? '#C084FC' : isPass ? '#38BDF8' : 'var(--brand-gold, #F5C518)';
+                const badgeBg = isVip ? 'rgba(192, 132, 252, 0.15)' : isPass ? 'rgba(56, 189, 248, 0.15)' : 'rgba(245, 197, 24, 0.15)';
+                const badgeBorder = isVip ? 'rgba(192, 132, 252, 0.35)' : isPass ? 'rgba(56, 189, 248, 0.35)' : 'rgba(245, 197, 24, 0.35)';
+                const displayTitle = item.item_title || item.content_title || (isVip ? 'VIP Subscription' : isPass ? 'Watch Pass' : 'Unlocked Content');
 
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <span
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      backgroundColor: 'var(--bg-surface, #12121A)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '16px',
+                      padding: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '16px',
+                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: '260px' }}>
+                      {/* Icon / Thumbnail Box */}
+                      {item.content_poster ? (
+                        <img
+                          src={item.content_poster}
+                          alt={displayTitle}
                           style={{
-                            fontSize: '11px',
-                            fontWeight: 800,
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                            color: '#34D399',
-                            border: '1px solid rgba(16, 185, 129, 0.3)'
+                            width: '64px',
+                            height: '92px',
+                            objectFit: 'cover',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(255, 255, 255, 0.1)'
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: '64px',
+                            height: '92px',
+                            backgroundColor: badgeBg,
+                            border: `1px solid ${badgeBorder}`,
+                            borderRadius: '10px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: badgeColor,
+                            gap: '4px'
                           }}
                         >
-                          UNLOCKED
-                        </span>
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
-                          Code: {item.promo_code}
-                        </span>
-                      </div>
-                      <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 6px' }}>
-                        {item.content_title || 'Unlocked Title'}
-                      </h3>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: '#9CA3AF' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Calendar size={13} />
-                          <span>Redeemed: {new Date(item.redeemed_at).toLocaleString()}</span>
+                          {isVip ? <Crown size={26} /> : isPass ? <Tag size={26} /> : <Film size={26} />}
+                          <span style={{ fontSize: '9px', fontWeight: 800, textAlign: 'center' }}>
+                            {isVip ? 'VIP' : isPass ? 'PASS' : 'TITLE'}
+                          </span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Clock size={13} />
-                          <span>Expires: {new Date(item.expires_at).toLocaleDateString()}</span>
+                      )}
+
+                      <div>
+                        {/* Header Badges: Promo Code & Item Type */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 900,
+                              letterSpacing: '0.04em',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                              color: 'var(--brand-gold, #F5C518)',
+                              border: '1px solid rgba(245, 197, 24, 0.35)'
+                            }}
+                          >
+                            PROMO: {item.promo_code}
+                          </span>
+
+                          <span
+                            style={{
+                              fontSize: '10.5px',
+                              fontWeight: 800,
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: badgeBg,
+                              color: badgeColor,
+                              border: `1px solid ${badgeBorder}`,
+                              letterSpacing: '0.03em'
+                            }}
+                          >
+                            {itemTypeLabel}
+                          </span>
+
+                          <span
+                            style={{
+                              fontSize: '10.5px',
+                              fontWeight: 800,
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                              color: '#34D399',
+                              border: '1px solid rgba(16, 185, 129, 0.3)'
+                            }}
+                          >
+                            ● {item.status || 'APPROVED'}
+                          </span>
+                        </div>
+
+                        {/* Title */}
+                        <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 6px' }}>
+                          {displayTitle}
+                        </h3>
+
+                        {/* Price Breakdown: Original vs Paid */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                          {item.original_price && item.original_price > 0 ? (
+                            <div style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ color: '#9CA3AF' }}>Original:</span>
+                              <span style={{ color: '#9CA3AF', textDecoration: 'line-through' }}>₹{item.original_price}</span>
+                              <span style={{ color: '#9CA3AF' }}>→</span>
+                              <span style={{ color: 'var(--brand-gold, #F5C518)', fontWeight: 800 }}>
+                                Paid: ₹{item.amount_paid ?? 0}
+                              </span>
+                              {item.discount_percent ? (
+                                <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#34D399', backgroundColor: 'rgba(16, 185, 129, 0.12)', padding: '1px 6px', borderRadius: '4px' }}>
+                                  ({item.discount_percent}% Discount)
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '12.5px', color: '#34D399', fontWeight: 700 }}>
+                              100% Free Promotional Unlock (Saved ₹{item.original_price || 30})
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Redemption Date & Expiry */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: '#9CA3AF', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Calendar size={13} />
+                            <span>Redeemed: {new Date(item.redeemed_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                          </div>
+                          {item.expires_at && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Clock size={13} />
+                              <span>Valid Until: {new Date(item.expires_at).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <button
-                    onClick={() => {
-                      if (item.content_id) {
-                        onNavigate('library');
-                      }
-                    }}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '10px 18px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--brand-gold, #F5C518)',
-                      color: '#0A0A0F',
-                      fontSize: '13px',
-                      fontWeight: 800,
-                      border: 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Play size={14} fill="#0A0A0F" />
-                    <span>Watch in Library</span>
-                  </button>
-                </div>
-              ))}
+                    {/* Action Button */}
+                    <div>
+                      {isVip ? (
+                        <button
+                          onClick={() => onNavigate('plans')}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '10px 18px',
+                            borderRadius: '8px',
+                            backgroundColor: 'rgba(192, 132, 252, 0.15)',
+                            border: '1px solid rgba(192, 132, 252, 0.4)',
+                            color: '#C084FC',
+                            fontSize: '13px',
+                            fontWeight: 800,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Crown size={15} />
+                          <span>VIP Active</span>
+                        </button>
+                      ) : isPass ? (
+                        <button
+                          onClick={() => onNavigate('plans')}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '10px 18px',
+                            borderRadius: '8px',
+                            backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                            border: '1px solid rgba(56, 189, 248, 0.4)',
+                            color: '#38BDF8',
+                            fontSize: '13px',
+                            fontWeight: 800,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Tag size={15} />
+                          <span>Pass Active</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onNavigate('library')}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '10px 18px',
+                            borderRadius: '8px',
+                            backgroundColor: 'var(--brand-gold, #F5C518)',
+                            color: '#0A0A0F',
+                            fontSize: '13px',
+                            fontWeight: 800,
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Play size={14} fill="#0A0A0F" />
+                          <span>Watch in Library</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

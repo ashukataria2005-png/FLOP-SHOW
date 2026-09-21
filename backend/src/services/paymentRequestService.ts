@@ -158,20 +158,24 @@ export const paymentRequestService = {
       }
     }
 
-    // Apply promo code discount if provided and valid
+    const originalPriceRupees = numRupees;
+    let appliedPromoCode: string | null = null;
+    let discountPercentApplied: number | null = null;
+    let promoAdminNote: string | null = null;
+
+    // Apply promo code discount if provided and valid (Requirement 3: strict validation)
     if (data.promoCode && typeof data.promoCode === 'string' && data.promoCode.trim()) {
       try {
-        const promoRes = await promoService.validatePromoForCheckout(userId, data.promoCode.trim(), numRupees);
+        const promoRes = await promoService.validatePromoForCheckout(userId, data.promoCode.trim(), originalPriceRupees);
         if (promoRes.valid && promoRes.discountAmountRupees > 0) {
           numRupees = promoRes.finalAmountRupees;
-          await promoService.recordPromoRedemption(
-            userId,
-            promoRes.code,
-            finalContentId || planId || undefined
-          );
+          appliedPromoCode = promoRes.code;
+          discountPercentApplied = promoRes.discountPercent;
+          promoAdminNote = `PROMO APPLIED: ${promoRes.code} | Original: ₹${originalPriceRupees} -> Paid: ₹${numRupees} (${promoRes.discountPercent}% Discount)`;
         }
-      } catch (e) {
-        console.warn('[PaymentRequestService] Promo code checkout discount notice:', e);
+      } catch (e: any) {
+        console.warn('[PaymentRequestService] Promo code checkout validation:', e?.message || e);
+        throw new Error(e?.message || 'Invalid or expired promo code.');
       }
     }
 
@@ -228,6 +232,10 @@ export const paymentRequestService = {
       productType,
       planId,
       planName,
+      promoCode: appliedPromoCode,
+      originalAmountPaise: originalPriceRupees * 100,
+      discountPercent: discountPercentApplied,
+      adminNote: promoAdminNote,
     });
 
     const created = await paymentRequestRepository.getById(requestId);
@@ -322,15 +330,43 @@ export const paymentRequestService = {
         throw err;
       }
 
+      // Preserve promo details in admin note if not already present
+      const finalNote = adminNote
+        ? (payment.admin_note && !adminNote.includes('PROMO APPLIED') ? `${payment.admin_note} | ${adminNote}` : adminNote)
+        : (payment.admin_note || 'Verified and approved by admin');
+
       // 2. Mark payment request APPROVED
       await paymentRequestRepository.updateStatus(
         payment.id,
         'APPROVED',
         adminId,
-        adminNote || 'Verified and approved by admin',
+        finalNote,
         now,
         txAdapter
       );
+
+      // Requirement 3b: Trigger approved promo redemption & usage count increment / auto-exhaust
+      const resolvedPromoCode = payment.promo_code || (payment.admin_note?.match(/PROMO APPLIED:\s*([A-Z0-9_-]+)/i)?.[1] || null);
+      if (resolvedPromoCode) {
+        try {
+          await promoService.applyApprovedPromoRedemption(
+            {
+              paymentRequestId: payment.id,
+              userId: payment.user_id,
+              promoCode: resolvedPromoCode,
+              productType: payment.product_type,
+              planName: payment.plan_name,
+              originalPriceRupees: payment.original_amount ? Math.round(payment.original_amount / 100) : Math.round(payment.amount / 100),
+              discountPercent: payment.discount_percent || 0,
+              amountPaidRupees: Math.round(payment.amount / 100),
+              contentId: payment.content_id
+            },
+            txAdapter
+          );
+        } catch (promoErr) {
+          console.error('[PaymentRequestService] Failed to record approved promo redemption:', promoErr);
+        }
+      }
 
       // 3. Grant entitlement based on product_type
       if (payment.product_type === 'SUBSCRIPTION') {

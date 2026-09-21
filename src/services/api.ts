@@ -1881,6 +1881,31 @@ export const api = {
       }>(`/promos/admin/${id}`, {
         method: 'DELETE'
       });
+    },
+
+    async adminGetRedemptions(limit = 100) {
+      return request<{
+        success: boolean;
+        redemptions: Array<{
+          id: string;
+          promo_code_id: string;
+          promo_code: string;
+          user_id: string;
+          user_name: string | null;
+          user_email: string | null;
+          user_phone: string | null;
+          item_type: string;
+          item_title: string;
+          original_price: number;
+          discount_percent: number;
+          amount_paid: number;
+          status: string;
+          payment_request_id?: string | null;
+          redeemed_at: string;
+          created_at: string;
+          content_title?: string;
+        }>;
+      }>(`/promos/admin/redemptions?limit=${limit}`);
     }
   }
 };

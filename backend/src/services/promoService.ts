@@ -27,10 +27,20 @@ export interface PromoRedemptionRecord {
   promo_code_id: string;
   promo_code: string;
   user_id: string;
-  content_id: string;
+  content_id: string | null;
   redeemed_at: string;
   expires_at: string;
   created_at: string;
+  item_type?: string;
+  item_title?: string;
+  original_price?: number;
+  discount_percent?: number;
+  amount_paid?: number;
+  status?: string;
+  payment_request_id?: string | null;
+  user_name?: string | null;
+  user_email?: string | null;
+  user_phone?: string | null;
   content_title?: string;
   content_poster?: string;
   content_type?: string;
@@ -341,6 +351,7 @@ export const promoService = {
     if (userId) {
       const { rows: userRedemptions } = await db.query(
         `SELECT r.id, r.promo_code_id, r.promo_code, r.user_id, r.content_id, r.redeemed_at, r.expires_at, r.created_at,
+                r.item_type, r.item_title, r.original_price, r.discount_percent, r.amount_paid, r.status, r.payment_request_id,
                 c.title as content_title, c.poster as content_poster, c.type as content_type, c.slug as content_slug
          FROM promo_redemptions r
          LEFT JOIN content c ON r.content_id = c.id
@@ -412,20 +423,20 @@ export const promoService = {
       throw new Error(`Promo code "${code}" is no longer active.`);
     }
 
-    // 2. Per-user-per-code check: prevent user from reusing the exact same promo code
-    const { rows: priorThisCode } = await db.query(
-      `SELECT id FROM promo_redemptions WHERE user_id = ? AND (promo_code_id = ? OR promo_code = ?) LIMIT 1;`,
-      [userId, promo.id, code]
-    );
-    if (priorThisCode.length > 0) {
-      throw new Error(`You have already redeemed promo code "${code}". Each promo code can only be claimed once per user.`);
-    }
-
-    // 3. Max claim limit check
+    // 2. Max claim limit check
     if (promo.max_uses !== null && promo.max_uses !== undefined && Number(promo.max_uses) > 0) {
       if (Number(promo.times_used || 0) >= Number(promo.max_uses)) {
         throw new Error('This promo code has reached its maximum claim limit.');
       }
+    }
+
+    // 3. Per-user-per-code check: prevent user from reusing the exact same promo code
+    const { rows: priorThisCode } = await db.query(
+      `SELECT id FROM promo_redemptions WHERE user_id = ? AND (promo_code_id = ? OR UPPER(promo_code) = ?) LIMIT 1;`,
+      [userId, promo.id, code]
+    );
+    if (priorThisCode.length > 0) {
+      throw new Error('You have already used this promo code.');
     }
 
     // 4. Expiration check (lifetime codes never expire)
@@ -464,16 +475,45 @@ export const promoService = {
 
     // 8. Record redemption audit log
     const redemptionId = `redempt-${crypto.randomUUID()}`;
+    const origPrice = targetContent.priceRupees ?? (targetContent.price > 0 ? Math.round(targetContent.price / 100) : (targetContent.type === 'SERIES' ? 35 : 30));
     await db.run(
-      `INSERT INTO promo_redemptions (id, promo_code_id, promo_code, user_id, content_id, redeemed_at, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-      [redemptionId, promo.id, promo.code, userId, targetContent.id, nowIso, expiresAt, nowIso]
+      `INSERT INTO promo_redemptions (
+        id, promo_code_id, promo_code, user_id, content_id,
+        redeemed_at, expires_at, created_at,
+        item_type, item_title, original_price, discount_percent, amount_paid, status, payment_request_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [
+        redemptionId,
+        promo.id,
+        promo.code,
+        userId,
+        targetContent.id,
+        nowIso,
+        expiresAt,
+        nowIso,
+        targetContent.type === 'SERIES' ? 'SERIES' : 'MOVIE',
+        targetContent.title,
+        origPrice,
+        100,
+        0,
+        'APPROVED',
+        null
+      ]
     );
 
-    // 9. Increment times_used on promo code
+    // 9. Increment times_used on promo code & auto-disable if limit reached
+    const currentTimesUsed = Number(promo.times_used || 0);
+    const newTimesUsed = currentTimesUsed + 1;
+    let newStatus = promo.status || 'ACTIVE';
+    if (promo.max_uses !== null && promo.max_uses !== undefined && Number(promo.max_uses) > 0) {
+      if (newTimesUsed >= Number(promo.max_uses)) {
+        newStatus = 'DISABLED';
+      }
+    }
+
     await db.run(
-      `UPDATE promo_codes SET times_used = times_used + 1, updated_at = ? WHERE id = ?;`,
-      [nowIso, promo.id]
+      `UPDATE promo_codes SET times_used = ?, status = ?, updated_at = ? WHERE id = ?;`,
+      [newTimesUsed, newStatus, nowIso, promo.id]
     );
 
     const redemptionRecord: PromoRedemptionRecord = {
@@ -485,6 +525,12 @@ export const promoService = {
       redeemed_at: nowIso,
       expires_at: expiresAt,
       created_at: nowIso,
+      item_type: targetContent.type === 'SERIES' ? 'SERIES' : 'MOVIE',
+      item_title: targetContent.title,
+      original_price: origPrice,
+      discount_percent: 100,
+      amount_paid: 0,
+      status: 'APPROVED',
       content_title: targetContent.title,
       content_poster: targetContent.poster,
       content_type: targetContent.type,
@@ -539,21 +585,21 @@ export const promoService = {
       throw new Error(`Promo code "${code}" is no longer active.`);
     }
 
-    // 2. If user is logged in, check per-user-per-code check
-    if (userId) {
-      const { rows: priorThisCode } = await db.query(
-        `SELECT id FROM promo_redemptions WHERE user_id = ? AND (promo_code_id = ? OR promo_code = ?) LIMIT 1;`,
-        [userId, promo.id, code]
-      );
-      if (priorThisCode.length > 0) {
-        throw new Error(`You have already redeemed promo code "${code}". Each promo code can only be used once per user.`);
-      }
-    }
-
-    // 3. Claim limit
+    // 2. Claim limit check (Requirement 3a)
     if (promo.max_uses !== null && promo.max_uses !== undefined && Number(promo.max_uses) > 0) {
       if (Number(promo.times_used || 0) >= Number(promo.max_uses)) {
         throw new Error('This promo code has reached its maximum claim limit.');
+      }
+    }
+
+    // 3. If user is logged in, check per-user-per-code check (Requirement 3a)
+    if (userId) {
+      const { rows: priorThisCode } = await db.query(
+        `SELECT id FROM promo_redemptions WHERE user_id = ? AND (promo_code_id = ? OR UPPER(promo_code) = ?) LIMIT 1;`,
+        [userId, promo.id, code]
+      );
+      if (priorThisCode.length > 0) {
+        throw new Error('You have already used this promo code.');
       }
     }
 
@@ -590,31 +636,139 @@ export const promoService = {
   },
 
   /**
-   * Helper: Record promo redemption upon successful checkout / payment
+   * Requirement 3b: Admin Approval Trigger
+   * When the admin approves a payment request that contains a promo_code:
+   * 1. Increment times_used by 1 in promo_codes table.
+   * 2. If times_used + 1 >= max_uses, automatically mark the promo code status as DISABLED / EXHAUSTED.
+   * 3. Insert a permanent record into promo_redemptions linked to that user and promo ID.
+   */
+  async applyApprovedPromoRedemption(
+    params: {
+      paymentRequestId: string;
+      userId: string;
+      promoCode: string;
+      productType: string;
+      planName?: string | null;
+      originalPriceRupees: number;
+      discountPercent: number;
+      amountPaidRupees: number;
+      contentId?: string | null;
+    },
+    adapter?: any
+  ): Promise<void> {
+    const code = (params.promoCode || '').trim().toUpperCase();
+    if (!code || !params.userId) return;
+
+    const db = adapter || getAdapter();
+
+    // Idempotency check: Don't duplicate redemption record for this payment request
+    const { rows: existingRedemptions } = await db.query(
+      `SELECT id FROM promo_redemptions WHERE payment_request_id = ? LIMIT 1;`,
+      [params.paymentRequestId]
+    );
+    if (existingRedemptions && existingRedemptions.length > 0) {
+      return;
+    }
+
+    const { rows: promoRows } = await db.query(
+      `SELECT * FROM promo_codes WHERE UPPER(code) = ? LIMIT 1;`,
+      [code]
+    );
+    if (promoRows.length === 0) return;
+
+    const promo = promoRows[0] as any;
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    // 1. Increment times_used and auto-disable if max_uses reached
+    const currentTimesUsed = Number(promo.times_used || 0);
+    const newTimesUsed = currentTimesUsed + 1;
+    let newStatus = promo.status || 'ACTIVE';
+    if (promo.max_uses !== null && promo.max_uses !== undefined && Number(promo.max_uses) > 0) {
+      if (newTimesUsed >= Number(promo.max_uses)) {
+        newStatus = 'DISABLED';
+      }
+    }
+
+    await db.run(
+      `UPDATE promo_codes SET times_used = ?, status = ?, updated_at = ? WHERE id = ?;`,
+      [newTimesUsed, newStatus, nowIso, promo.id]
+    );
+
+    // 2. Calculate redemption expiration
+    const isLifetime = Boolean(promo.is_lifetime);
+    const validityDays = isLifetime ? 3650 : (promo.validity_hours ? Math.max(1, Math.round(promo.validity_hours / 24)) : 30);
+    const expiresAt = new Date(now.getTime() + validityDays * 24 * 60 * 60 * 1000).toISOString();
+
+    const redemptionId = `redempt_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+    const itemType = params.productType || 'MOVIE';
+    const itemTitle = params.planName || (itemType === 'SUBSCRIPTION' ? 'VIP Subscription' : itemType === 'WATCH_PASS' ? 'Watch Pass' : 'Movie Pass');
+
+    // 3. Insert permanent redemption record
+    await db.run(
+      `INSERT INTO promo_redemptions (
+        id, promo_code_id, promo_code, user_id, content_id,
+        redeemed_at, expires_at, created_at,
+        item_type, item_title, original_price, discount_percent, amount_paid,
+        status, payment_request_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [
+        redemptionId,
+        promo.id,
+        promo.code,
+        params.userId,
+        params.contentId || null,
+        nowIso,
+        expiresAt,
+        nowIso,
+        itemType,
+        itemTitle,
+        params.originalPriceRupees,
+        params.discountPercent,
+        params.amountPaidRupees,
+        'APPROVED',
+        params.paymentRequestId
+      ]
+    );
+  },
+
+  /**
+   * Requirement 4: Admin "Used Promos Audit" Section
+   * Returns all promo redemptions across all users with user details, item purchased, discount, amount paid, and timestamp.
+   */
+  async getAllRedemptionsAdmin(limit = 100): Promise<any[]> {
+    const db = getAdapter();
+    const { rows } = await db.query(
+      `SELECT r.id, r.promo_code_id, r.promo_code, r.user_id, r.content_id, r.redeemed_at, r.expires_at, r.created_at,
+              r.item_type, r.item_title, r.original_price, r.discount_percent, r.amount_paid, r.status, r.payment_request_id,
+              u.name as user_name, u.email as user_email, u.phone as user_phone,
+              c.title as content_title
+       FROM promo_redemptions r
+       LEFT JOIN users u ON r.user_id = u.id
+       LEFT JOIN content c ON r.content_id = c.id
+       ORDER BY r.created_at DESC
+       LIMIT ?;`,
+      [limit]
+    );
+    return rows;
+  },
+
+  /**
+   * Helper: Record promo redemption (legacy compatibility)
    */
   async recordPromoRedemption(userId: string, promoCode: string, targetIdOrPlan?: string): Promise<void> {
     const code = (promoCode || '').trim().toUpperCase();
     if (!userId || !code) return;
-    const db = getAdapter();
-    const { rows } = await db.query(`SELECT * FROM promo_codes WHERE code = ? LIMIT 1;`, [code]);
-    if (rows.length === 0) return;
-    const promo = rows[0] as any;
-    const nowIso = new Date().toISOString();
-    const expiresAt = promo.is_lifetime
-      ? new Date(Date.now() + 3650 * 24 * 3600 * 1000).toISOString()
-      : new Date(Date.now() + (promo.validity_hours || 720) * 3600 * 1000).toISOString();
-
-    const redemptionId = `p_red_${Date.now()}_${crypto.randomUUID()}`;
-    await db.run(
-      `INSERT INTO promo_redemptions (
-        id, promo_code_id, promo_code, user_id, content_id,
-        redeemed_at, expires_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-      [redemptionId, promo.id, promo.code, userId, targetIdOrPlan || 'plan_subscription', nowIso, expiresAt, nowIso]
-    );
-    await db.run(
-      `UPDATE promo_codes SET times_used = times_used + 1, updated_at = ? WHERE id = ?;`,
-      [nowIso, promo.id]
-    );
+    await this.applyApprovedPromoRedemption({
+      paymentRequestId: `legacy_${Date.now()}`,
+      userId,
+      promoCode: code,
+      productType: targetIdOrPlan && targetIdOrPlan.startsWith('PASS_') ? 'WATCH_PASS' : (targetIdOrPlan && ['MONTHLY', '3_MONTHS', 'YEARLY'].includes(targetIdOrPlan) ? 'SUBSCRIPTION' : 'MOVIE'),
+      planName: targetIdOrPlan || 'Promotional Pass',
+      originalPriceRupees: 0,
+      discountPercent: 100,
+      amountPaidRupees: 0,
+      contentId: targetIdOrPlan || null
+    });
   }
 };

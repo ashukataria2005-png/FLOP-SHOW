@@ -22,7 +22,10 @@ import {
   Globe,
   Lock,
   X,
-  Save
+  Save,
+  History,
+  Tag,
+  Search
 } from 'lucide-react';
 
 interface PromoCodeItem {
@@ -45,6 +48,26 @@ interface PromoCodeItem {
   is_lifetime?: boolean | number;
 }
 
+interface PromoRedemptionAuditItem {
+  id: string;
+  promo_code_id: string;
+  promo_code: string;
+  user_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  user_phone: string | null;
+  item_type: string;
+  item_title: string;
+  original_price: number;
+  discount_percent: number;
+  amount_paid: number;
+  status: string;
+  payment_request_id?: string | null;
+  redeemed_at: string;
+  created_at: string;
+  content_title?: string;
+}
+
 interface AdminPromoCodesPageProps {
   onNavigateTab?: (tab: string, param?: string) => void;
 }
@@ -55,6 +78,11 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Redemptions Audit State (Requirement 4)
+  const [redemptions, setRedemptions] = useState<PromoRedemptionAuditItem[]>([]);
+  const [redemptionsLoading, setRedemptionsLoading] = useState(false);
+  const [redemptionSearch, setRedemptionSearch] = useState('');
 
   // Creation Form State
   const [code, setCode] = useState('');
@@ -96,8 +124,23 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
     }
   };
 
+  const fetchRedemptions = async () => {
+    try {
+      setRedemptionsLoading(true);
+      const res = await api.promos.adminGetRedemptions(150);
+      if (res && res.redemptions) {
+        setRedemptions(res.redemptions);
+      }
+    } catch (err: any) {
+      console.error('Failed to load promo redemptions:', err);
+    } finally {
+      setRedemptionsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchPromos();
+    fetchRedemptions();
   }, []);
 
   // Open Edit Modal with prefilled values
@@ -1123,6 +1166,294 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* REQUIREMENT 4: USED PROMOS / REDEMPTIONS AUDIT SECTION */}
+      <div
+        style={{
+          marginTop: '36px',
+          backgroundColor: 'var(--bg-surface, #12121A)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '16px',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Audit Header */}
+        <div
+          style={{
+            padding: '20px 24px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '14px'
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <History size={20} color="var(--brand-gold, #F5C518)" />
+              <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                Used Promos / Redemptions History ({redemptions.length})
+              </h2>
+            </div>
+            <p style={{ fontSize: '12.5px', color: '#9CA3AF', margin: '4px 0 0' }}>
+              Full audit log of users who applied and redeemed promo codes across VIP Plans, Watch Passes, and Single Titles.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* Search */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                padding: '0 10px',
+                width: '240px'
+              }}
+            >
+              <Search size={14} color="#9CA3AF" />
+              <input
+                type="text"
+                placeholder="Search user, code, or ID..."
+                value={redemptionSearch}
+                onChange={e => setRedemptionSearch(e.target.value)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  padding: '7px 8px',
+                  fontSize: '12.5px',
+                  color: '#FFFFFF',
+                  width: '100%'
+                }}
+              />
+            </div>
+
+            <button
+              onClick={fetchRedemptions}
+              disabled={redemptionsLoading}
+              title="Refresh redemptions"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 12px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: '#D1D5DB',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              <RotateCcw size={13} className={redemptionsLoading ? 'spin' : ''} />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        {redemptionsLoading && redemptions.length === 0 ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0', gap: '10px', color: '#9CA3AF' }}>
+            <Loader2 size={24} className="spin" color="var(--brand-gold, #F5C518)" />
+            <span>Loading redemptions audit log...</span>
+          </div>
+        ) : redemptions.length === 0 ? (
+          <div style={{ padding: '60px 20px', textAlign: 'center', color: '#9CA3AF' }}>
+            <History size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+            <div style={{ fontSize: '15px', fontWeight: 700, color: '#FFFFFF' }}>No promo redemptions recorded yet</div>
+            <p style={{ fontSize: '13px', margin: '4px 0 0' }}>
+              When users redeem promo codes or get approved with coupons, audit logs will display here.
+            </p>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                  <th style={{ padding: '12px 18px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>User Name / ID</th>
+                  <th style={{ padding: '12px 18px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>User Email / Phone</th>
+                  <th style={{ padding: '12px 18px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Promo Code</th>
+                  <th style={{ padding: '12px 18px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Item Purchased</th>
+                  <th style={{ padding: '12px 18px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Discount %</th>
+                  <th style={{ padding: '12px 18px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Amount Paid</th>
+                  <th style={{ padding: '12px 18px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Redeemed At</th>
+                  <th style={{ padding: '12px 18px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {redemptions
+                  .filter(r => {
+                    if (!redemptionSearch.trim()) return true;
+                    const q = redemptionSearch.toLowerCase().trim();
+                    return (
+                      (r.promo_code && r.promo_code.toLowerCase().includes(q)) ||
+                      (r.user_name && r.user_name.toLowerCase().includes(q)) ||
+                      (r.user_email && r.user_email.toLowerCase().includes(q)) ||
+                      (r.user_phone && r.user_phone.toLowerCase().includes(q)) ||
+                      (r.user_id && r.user_id.toLowerCase().includes(q)) ||
+                      (r.item_title && r.item_title.toLowerCase().includes(q)) ||
+                      (r.item_type && r.item_type.toLowerCase().includes(q))
+                    );
+                  })
+                  .map(r => {
+                    const isVip = r.item_type === 'SUBSCRIPTION';
+                    const isPass = r.item_type === 'WATCH_PASS';
+                    const itemTypeLabel = isVip ? 'VIP PLAN' : isPass ? 'WATCH PASS' : 'MOVIE / SERIES';
+                    const badgeColor = isVip ? '#C084FC' : isPass ? '#38BDF8' : 'var(--brand-gold, #F5C518)';
+                    const badgeBg = isVip ? 'rgba(192, 132, 252, 0.15)' : isPass ? 'rgba(56, 189, 248, 0.15)' : 'rgba(245, 197, 24, 0.15)';
+                    const badgeBorder = isVip ? 'rgba(192, 132, 252, 0.35)' : isPass ? 'rgba(56, 189, 248, 0.35)' : 'rgba(245, 197, 24, 0.35)';
+
+                    return (
+                      <tr
+                        key={r.id}
+                        style={{
+                          borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                          transition: 'background-color 0.15s ease'
+                        }}
+                      >
+                        {/* User Name & ID */}
+                        <td style={{ padding: '14px 18px' }}>
+                          <div style={{ fontWeight: 700, color: '#FFFFFF', fontSize: '13px' }}>
+                            {r.user_name || 'Anonymous User'}
+                          </div>
+                          <div style={{ fontFamily: 'monospace', fontSize: '11px', color: '#6B7280', marginTop: '2px' }}>
+                            {r.user_id}
+                          </div>
+                        </td>
+
+                        {/* User Email / Phone */}
+                        <td style={{ padding: '14px 18px' }}>
+                          <div style={{ fontSize: '12.5px', color: '#D1D5DB' }}>
+                            {r.user_email || '—'}
+                          </div>
+                          {r.user_phone && (
+                            <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                              {r.user_phone}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Promo Code */}
+                        <td style={{ padding: '14px 18px' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '12px',
+                              fontWeight: 900,
+                              letterSpacing: '0.04em',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                              color: 'var(--brand-gold, #F5C518)',
+                              border: '1px solid rgba(245, 197, 24, 0.35)'
+                            }}
+                          >
+                            <Tag size={11} />
+                            {r.promo_code}
+                          </span>
+                        </td>
+
+                        {/* Item Purchased */}
+                        <td style={{ padding: '14px 18px' }}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              fontSize: '9.5px',
+                              fontWeight: 800,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: badgeBg,
+                              color: badgeColor,
+                              border: `1px solid ${badgeBorder}`,
+                              marginBottom: '3px'
+                            }}
+                          >
+                            {itemTypeLabel}
+                          </span>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: '#FFFFFF' }}>
+                            {r.item_title || r.content_title || 'Content'}
+                          </div>
+                        </td>
+
+                        {/* Discount % */}
+                        <td style={{ padding: '14px 18px' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              fontSize: '11.5px',
+                              fontWeight: 800,
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                              color: '#34D399',
+                              border: '1px solid rgba(16, 185, 129, 0.3)'
+                            }}
+                          >
+                            {r.discount_percent ?? 100}%
+                          </span>
+                        </td>
+
+                        {/* Amount Paid */}
+                        <td style={{ padding: '14px 18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)' }}>
+                              ₹{r.amount_paid ?? 0}
+                            </span>
+                            {r.original_price && r.original_price > (r.amount_paid ?? 0) ? (
+                              <span style={{ fontSize: '11px', color: '#6B7280', textDecoration: 'line-through' }}>
+                                ₹{r.original_price}
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+
+                        {/* Timestamp */}
+                        <td style={{ padding: '14px 18px', fontSize: '12px', color: '#9CA3AF' }}>
+                          {new Date(r.created_at || r.redeemed_at).toLocaleString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </td>
+
+                        {/* Status */}
+                        <td style={{ padding: '14px 18px' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '10.5px',
+                              fontWeight: 800,
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                              color: '#34D399',
+                              border: '1px solid rgba(16, 185, 129, 0.3)'
+                            }}
+                          >
+                            <CheckCircle2 size={11} />
+                            {r.status || 'APPROVED'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>

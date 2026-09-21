@@ -56,6 +56,20 @@ promoRouter.post('/validate', optionalAuth, async (req: AuthenticatedRequest, re
 // ============================================================================
 
 /**
+ * GET /api/promos/admin/redemptions
+ * Requirement 4: List all promo redemptions audit history
+ */
+promoRouter.get(['/admin/redemptions', '/redemptions'], requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
+    const redemptions = await promoService.getAllRedemptionsAdmin(limit);
+    res.json({ success: true, redemptions });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /api/promos/admin/all & /api/admin/promos
  * List all created promo codes with status, usage counts, and expiry
  */

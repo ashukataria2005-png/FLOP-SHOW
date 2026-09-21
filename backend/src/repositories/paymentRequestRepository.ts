@@ -19,6 +19,9 @@ export interface PaymentRequestRecord {
   product_type: 'MOVIE' | 'SERIES' | 'WATCH_PASS' | 'SUBSCRIPTION';
   plan_id: string | null;
   plan_name: string | null;
+  promo_code?: string | null;
+  original_amount?: number | null;
+  discount_percent?: number | null;
 }
 
 export interface PaymentMetrics {
@@ -45,6 +48,10 @@ export const paymentRequestRepository = {
       productType?: 'MOVIE' | 'SERIES' | 'WATCH_PASS' | 'SUBSCRIPTION';
       planId?: string | null;
       planName?: string | null;
+      promoCode?: string | null;
+      originalAmountPaise?: number | null;
+      discountPercent?: number | null;
+      adminNote?: string | null;
     },
     adapter?: DbAdapter
   ): Promise<void> {
@@ -54,8 +61,8 @@ export const paymentRequestRepository = {
       `INSERT INTO upi_payment_requests (
         id, user_id, user_name, user_email, amount, upi_id_snapshot,
         utr, status, admin_id, admin_note, submitted_at, processed_at,
-        content_id, product_type, plan_id, plan_name, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', NULL, NULL, ?, NULL, ?, ?, ?, ?, ?, ?);`,
+        content_id, product_type, plan_id, plan_name, promo_code, original_amount, discount_percent, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', NULL, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         data.id,
         data.userId,
@@ -64,11 +71,15 @@ export const paymentRequestRepository = {
         data.amountPaise,
         data.upiIdSnapshot,
         data.utr.trim(),
+        data.adminNote || null,
         data.submittedAt,
         data.contentId || null,
         data.productType || 'MOVIE',
         data.planId || null,
         data.planName || null,
+        data.promoCode || null,
+        data.originalAmountPaise || null,
+        data.discountPercent !== undefined && data.discountPercent !== null ? data.discountPercent : null,
         now,
         now,
       ]

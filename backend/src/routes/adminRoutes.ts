@@ -75,6 +75,16 @@ adminRouter.get('/users', async (_req, res, next) => {
   }
 });
 
+adminRouter.get(['/promos/redemptions', '/promo-redemptions'], async (req, res, next) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
+    const redemptions = await promoService.getAllRedemptionsAdmin(limit);
+    res.json({ success: true, redemptions });
+  } catch (err) {
+    next(err);
+  }
+});
+
 adminRouter.delete('/users', async (req, res, next) => {
   try {
     const { userIds } = req.body;

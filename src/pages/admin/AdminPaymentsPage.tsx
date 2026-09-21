@@ -12,7 +12,8 @@ import {
   Loader2,
   ShieldCheck,
   X,
-  RefreshCw
+  RefreshCw,
+  Tag
 } from 'lucide-react';
 
 interface PaymentRequest {
@@ -28,11 +29,37 @@ interface PaymentRequest {
   plan_id?: string | null;
   plan_name?: string | null;
   content_id?: string | null;
+  promo_code?: string | null;
+  original_amount?: number | null;
+  discount_percent?: number | null;
   admin_id: string | null;
   admin_note: string | null;
   submitted_at: string;
   processed_at: string | null;
 }
+
+const getPromoDetails = (p: PaymentRequest) => {
+  if (p.promo_code) {
+    const orig = p.original_amount ? (p.original_amount / 100).toFixed(0) : undefined;
+    const paid = (p.amount / 100).toFixed(0);
+    const pct = p.discount_percent ?? undefined;
+    const text = orig && pct
+      ? `PROMO APPLIED: ${p.promo_code} | Original: ₹${orig} -> Paid: ₹${paid} (${pct}% Discount)`
+      : `PROMO APPLIED: ${p.promo_code}`;
+    return { code: p.promo_code, note: text, percent: pct, origPrice: orig, paidPrice: paid };
+  }
+  if (p.admin_note && p.admin_note.includes('PROMO APPLIED:')) {
+    const match = p.admin_note.match(/PROMO APPLIED:\s*([A-Z0-9_-]+)/i);
+    return {
+      code: match ? match[1] : 'APPLIED',
+      note: p.admin_note,
+      percent: undefined,
+      origPrice: undefined,
+      paidPrice: (p.amount / 100).toFixed(0)
+    };
+  }
+  return null;
+};
 
 const getProductBadge = (p: PaymentRequest) => {
   const type = p.product_type || 'MOVIE';
@@ -668,9 +695,36 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
 
                     {/* Amount */}
                     <td style={{ padding: '14px 18px' }}>
-                      <span style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF' }}>
-                        ₹{(p.amount / 100).toFixed(0)}
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF' }}>
+                          ₹{(p.amount / 100).toFixed(0)}
+                        </span>
+                        {(() => {
+                          const promo = getPromoDetails(p);
+                          if (!promo) return null;
+                          return (
+                            <div style={{ marginTop: '4px' }}>
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  fontSize: '10.5px',
+                                  fontWeight: 800,
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                                  color: 'var(--brand-gold, #F5C518)',
+                                  border: '1px solid rgba(245, 197, 24, 0.35)'
+                                }}
+                              >
+                                <Tag size={10} />
+                                {promo.code} {promo.percent ? `(${promo.percent}% OFF)` : ''}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </td>
 
                     {/* UTR */}
@@ -813,6 +867,37 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
             </div>
 
             <div className="modal-body" style={{ padding: '24px' }}>
+              {/* Promo Code Alert Banner (Requirement 2) */}
+              {(() => {
+                const promo = getPromoDetails(selectedPayment);
+                if (!promo) return null;
+                return (
+                  <div
+                    style={{
+                      backgroundColor: 'rgba(245, 197, 24, 0.12)',
+                      border: '1.5px solid var(--brand-gold, #F5C518)',
+                      borderRadius: '12px',
+                      padding: '14px 16px',
+                      marginBottom: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      boxShadow: '0 4px 14px rgba(245, 197, 24, 0.15)'
+                    }}
+                  >
+                    <Tag size={24} color="var(--brand-gold, #F5C518)" style={{ flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontSize: '13.5px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)', letterSpacing: '0.02em' }}>
+                        {promo.note}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#D1D5DB', marginTop: '3px' }}>
+                        Verify that the reduced amount in the user's screenshot/UTR matches this applied promo code: <strong>₹{(selectedPayment.amount / 100).toFixed(0)}</strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Payment Details Card */}
               <div
                 style={{
@@ -840,9 +925,16 @@ export const AdminPaymentsPage: React.FC<{ onNavigateTab: (tab: string) => void 
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px', marginBottom: '12px' }}>
                   <div>
-                    <span style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase' }}>Purchase Amount</span>
-                    <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', marginTop: '2px' }}>
-                      ₹{(selectedPayment.amount / 100).toFixed(0)}
+                    <span style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase' }}>Purchase Amount (Paid)</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '2px' }}>
+                      <span style={{ fontSize: '24px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)' }}>
+                        ₹{(selectedPayment.amount / 100).toFixed(0)}
+                      </span>
+                      {selectedPayment.original_amount && selectedPayment.original_amount > selectedPayment.amount ? (
+                        <span style={{ fontSize: '14px', color: '#6B7280', textDecoration: 'line-through' }}>
+                          ₹{(selectedPayment.original_amount / 100).toFixed(0)}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   <div>

@@ -666,7 +666,43 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 14 };
+    // Apply incremental 019_promo_redemption_audit for PostgreSQL if not already applied
+    const promoAuditMigrationVersion = '019_promo_redemption_audit';
+    if (!appliedSet.has(promoAuditMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 019_promo_redemption_audit...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          ALTER TABLE promo_redemptions DROP CONSTRAINT IF EXISTS promo_redemptions_content_id_fkey;
+          ALTER TABLE promo_redemptions ALTER COLUMN content_id DROP NOT NULL;
+          ALTER TABLE promo_redemptions ADD COLUMN IF NOT EXISTS item_type VARCHAR(32) DEFAULT 'MOVIE';
+          ALTER TABLE promo_redemptions ADD COLUMN IF NOT EXISTS item_title TEXT;
+          ALTER TABLE promo_redemptions ADD COLUMN IF NOT EXISTS original_price REAL DEFAULT 0;
+          ALTER TABLE promo_redemptions ADD COLUMN IF NOT EXISTS discount_percent INTEGER DEFAULT 0;
+          ALTER TABLE promo_redemptions ADD COLUMN IF NOT EXISTS amount_paid REAL DEFAULT 0;
+          ALTER TABLE promo_redemptions ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'APPROVED';
+          ALTER TABLE promo_redemptions ADD COLUMN IF NOT EXISTS payment_request_id TEXT DEFAULT NULL;
+
+          ALTER TABLE upi_payment_requests ADD COLUMN IF NOT EXISTS promo_code TEXT DEFAULT NULL;
+          ALTER TABLE upi_payment_requests ADD COLUMN IF NOT EXISTS original_amount INTEGER DEFAULT NULL;
+          ALTER TABLE upi_payment_requests ADD COLUMN IF NOT EXISTS discount_percent INTEGER DEFAULT NULL;
+
+          CREATE INDEX IF NOT EXISTS idx_promo_redemptions_created ON promo_redemptions(created_at);
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${promoAuditMigrationVersion}', '019_promo_redemption_audit.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('019_promo_redemption_audit.sql');
+        console.log('✓ [PostgreSQL] Migration 019_promo_redemption_audit applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 15 };
   } finally {
     client.release();
     await pool.end();

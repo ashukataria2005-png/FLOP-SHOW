@@ -15,7 +15,14 @@ import {
   Users,
   AlertCircle,
   Copy,
-  Check
+  Check,
+  Edit2,
+  Percent,
+  Infinity as InfinityIcon,
+  Globe,
+  Lock,
+  X,
+  Save
 } from 'lucide-react';
 
 interface PromoCodeItem {
@@ -31,6 +38,11 @@ interface PromoCodeItem {
   updated_at: string;
   is_expired?: boolean;
   time_remaining_hours?: number;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  discount_enabled?: boolean | number;
+  discount_percent?: number;
+  max_uses?: number | null;
+  is_lifetime?: boolean | number;
 }
 
 interface AdminPromoCodesPageProps {
@@ -44,12 +56,31 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Form State
+  // Creation Form State
   const [code, setCode] = useState('');
   const [description, setDescription] = useState('');
-  const [validityUnit, setValidityUnit] = useState<'days' | 'hours'>('days');
-  const [validityValue, setValidityValue] = useState('30');
+  const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+  const [discountEnabled, setDiscountEnabled] = useState(false);
+  const [discountPercent, setDiscountPercent] = useState('20');
+  const [maxUses, setMaxUses] = useState('');
+  const [validityMode, setValidityMode] = useState<'preset' | 'lifetime' | 'custom_days' | 'exact_date'>('preset');
+  const [presetDuration, setPresetDuration] = useState('30'); // 30, 90, 180
+  const [customDays, setCustomDays] = useState('14');
   const [customExpiry, setCustomExpiry] = useState('');
+
+  // Edit Modal State
+  const [editingPromo, setEditingPromo] = useState<PromoCodeItem | null>(null);
+  const [editCode, setEditCode] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editVisibility, setEditVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+  const [editDiscountEnabled, setEditDiscountEnabled] = useState(false);
+  const [editDiscountPercent, setEditDiscountPercent] = useState('20');
+  const [editMaxUses, setEditMaxUses] = useState('');
+  const [editValidityMode, setEditValidityMode] = useState<'preset' | 'lifetime' | 'custom_days' | 'exact_date'>('preset');
+  const [editPresetDuration, setEditPresetDuration] = useState('30');
+  const [editCustomDays, setEditCustomDays] = useState('30');
+  const [editCustomExpiry, setEditCustomExpiry] = useState('');
+  const [updating, setUpdating] = useState(false);
 
   const fetchPromos = async () => {
     try {
@@ -69,6 +100,40 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
     fetchPromos();
   }, []);
 
+  // Open Edit Modal with prefilled values
+  const handleOpenEdit = (promo: PromoCodeItem) => {
+    setEditingPromo(promo);
+    setEditCode(promo.code);
+    setEditDescription(promo.description || '');
+    setEditVisibility((promo.visibility as 'PUBLIC' | 'PRIVATE') || 'PUBLIC');
+    setEditDiscountEnabled(Boolean(promo.discount_enabled));
+    setEditDiscountPercent(String(promo.discount_percent || 20));
+    setEditMaxUses(promo.max_uses ? String(promo.max_uses) : '');
+
+    if (promo.is_lifetime) {
+      setEditValidityMode('lifetime');
+    } else if (promo.expires_at) {
+      setEditValidityMode('exact_date');
+      // Format as YYYY-MM-DDTHH:mm
+      try {
+        const d = new Date(promo.expires_at);
+        const iso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        setEditCustomExpiry(iso);
+      } catch {
+        setEditCustomExpiry('');
+      }
+    } else {
+      const days = Math.round((promo.validity_hours || 720) / 24);
+      if ([30, 90, 180].includes(days)) {
+        setEditValidityMode('preset');
+        setEditPresetDuration(String(days));
+      } else {
+        setEditValidityMode('custom_days');
+        setEditCustomDays(String(days));
+      }
+    }
+  };
+
   const handleCreatePromo = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = code.trim().toUpperCase();
@@ -79,31 +144,89 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
 
     try {
       setCreating(true);
-      const valNum = Math.max(1, parseInt(validityValue) || 1);
       const payload: any = {
         code: cleanCode,
-        description: description.trim() || '1-Time Free Access to ANY Movie or Series of your choice.'
+        description: description.trim() || (discountEnabled ? `${discountPercent}% Discount Promo Coupon` : '1-Time Free Access to ANY Movie or Series.'),
+        visibility,
+        discount_enabled: discountEnabled,
+        discount_percent: discountEnabled ? Math.min(100, Math.max(1, parseInt(discountPercent) || 20)) : 0,
+        max_uses: maxUses.trim() ? Math.max(1, parseInt(maxUses) || 1) : null
       };
 
-      if (customExpiry) {
+      if (validityMode === 'lifetime') {
+        payload.is_lifetime = true;
+      } else if (validityMode === 'exact_date' && customExpiry) {
         payload.expires_at = new Date(customExpiry).toISOString();
-      } else if (validityUnit === 'days') {
-        payload.validity_days = valNum;
+        payload.is_lifetime = false;
+      } else if (validityMode === 'custom_days') {
+        payload.validity_days = Math.max(1, parseInt(customDays) || 1);
+        payload.is_lifetime = false;
       } else {
-        payload.validity_hours = valNum;
+        payload.validity_days = Math.max(1, parseInt(presetDuration) || 30);
+        payload.is_lifetime = false;
       }
 
       const res = await api.promos.adminCreate(payload);
       showToast(res.message || `Promo code "${cleanCode}" created!`, 'success');
       setCode('');
       setDescription('');
+      setVisibility('PUBLIC');
+      setDiscountEnabled(false);
+      setDiscountPercent('20');
+      setMaxUses('');
+      setValidityMode('preset');
+      setPresetDuration('30');
       setCustomExpiry('');
-      setValidityValue('30');
       await fetchPromos();
     } catch (err: any) {
       showToast(err.message || 'Failed to create promo code.', 'error');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleUpdatePromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPromo) return;
+
+    const cleanCode = editCode.trim().toUpperCase();
+    if (!cleanCode) {
+      showToast('Promo code string cannot be empty.', 'error');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const payload: any = {
+        code: cleanCode,
+        description: editDescription.trim(),
+        visibility: editVisibility,
+        discount_enabled: editDiscountEnabled,
+        discount_percent: editDiscountEnabled ? Math.min(100, Math.max(1, parseInt(editDiscountPercent) || 20)) : 0,
+        max_uses: editMaxUses.trim() ? Math.max(1, parseInt(editMaxUses) || 1) : null
+      };
+
+      if (editValidityMode === 'lifetime') {
+        payload.is_lifetime = true;
+      } else if (editValidityMode === 'exact_date' && editCustomExpiry) {
+        payload.expires_at = new Date(editCustomExpiry).toISOString();
+        payload.is_lifetime = false;
+      } else if (editValidityMode === 'custom_days') {
+        payload.validity_days = Math.max(1, parseInt(editCustomDays) || 1);
+        payload.is_lifetime = false;
+      } else {
+        payload.validity_days = Math.max(1, parseInt(editPresetDuration) || 30);
+        payload.is_lifetime = false;
+      }
+
+      const res = await api.promos.adminUpdate(editingPromo.id, payload);
+      showToast(res.message || `Promo code "${cleanCode}" updated successfully!`, 'success');
+      setEditingPromo(null);
+      await fetchPromos();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update promo code.', 'error');
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -142,7 +265,7 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
   };
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '16px 0 48px' }}>
+    <div style={{ maxWidth: '1180px', margin: '0 auto', padding: '16px 0 48px' }}>
       {/* Header */}
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
@@ -163,21 +286,21 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
           </div>
           <div>
             <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em', margin: 0 }}>
-              Bonus &amp; Promo Codes
+              Bonus &amp; Promo Codes v2
             </h1>
             <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0' }}>
-              Create and manage promotional coupons. Each code grants a 1-time free access pass to any single movie or series of the user's choice.
+              Create, edit live, and manage coupons with Public/Private visibility, percentage discounts, claim limits, and flexible validity.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Perk & Restriction Banner */}
+      {/* Feature Highlights Banner */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '16px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: '14px',
           marginBottom: '28px'
         }}
       >
@@ -186,19 +309,41 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
             backgroundColor: 'rgba(245, 197, 24, 0.08)',
             border: '1px solid rgba(245, 197, 24, 0.25)',
             borderRadius: '14px',
-            padding: '18px 20px',
+            padding: '16px 18px',
             display: 'flex',
             alignItems: 'flex-start',
             gap: '12px'
           }}
         >
-          <Film size={22} color="var(--brand-gold, #F5C518)" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <Edit2 size={20} color="var(--brand-gold, #F5C518)" style={{ flexShrink: 0, marginTop: '2px' }} />
           <div>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 4px' }}>
-              Universal Perk: Free 1-Title Access Pass
+            <h3 style={{ fontSize: '13.5px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 4px' }}>
+              Live Editable Codes
             </h3>
-            <p style={{ fontSize: '12.5px', color: '#D1D5DB', margin: 0, lineHeight: 1.5 }}>
-              Redeeming any active promo unlocks full streaming access to <strong>any 1 Movie or Web Series</strong> in your catalog for 30 days without payment.
+            <p style={{ fontSize: '12px', color: '#D1D5DB', margin: 0, lineHeight: 1.45 }}>
+              Update promo string, discount %, usage limits, or validity anytime without disabling the promo.
+            </p>
+          </div>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: 'rgba(139, 92, 246, 0.08)',
+            border: '1px solid rgba(139, 92, 246, 0.25)',
+            borderRadius: '14px',
+            padding: '16px 18px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px'
+          }}
+        >
+          <Lock size={20} color="#A78BFA" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            <h3 style={{ fontSize: '13.5px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 4px' }}>
+              Public vs Private Visibility
+            </h3>
+            <p style={{ fontSize: '12px', color: '#D1D5DB', margin: 0, lineHeight: 1.45 }}>
+              Public promos appear in user Bonus Hub; Private promos stay hidden for VIPs / direct outreach.
             </p>
           </div>
         </div>
@@ -208,19 +353,41 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
             backgroundColor: 'rgba(16, 185, 129, 0.08)',
             border: '1px solid rgba(16, 185, 129, 0.25)',
             borderRadius: '14px',
-            padding: '18px 20px',
+            padding: '16px 18px',
             display: 'flex',
             alignItems: 'flex-start',
             gap: '12px'
           }}
         >
-          <Users size={22} color="#10B981" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <Percent size={20} color="#10B981" style={{ flexShrink: 0, marginTop: '2px' }} />
           <div>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 4px' }}>
-              Strict 1-Time User Restriction
+            <h3 style={{ fontSize: '13.5px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 4px' }}>
+              Discount (%) or Free Pass
             </h3>
-            <p style={{ fontSize: '12.5px', color: '#D1D5DB', margin: 0, lineHeight: 1.5 }}>
-              The system automatically enforces <strong>strictly 1-time use per user account</strong> on their first redemption to protect platform monetization.
+            <p style={{ fontSize: '12px', color: '#D1D5DB', margin: 0, lineHeight: 1.45 }}>
+              Toggle between flat 1-title free pass or percentage discount (10%-100%) applied during checkout.
+            </p>
+          </div>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: 'rgba(59, 130, 246, 0.08)',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
+            borderRadius: '14px',
+            padding: '16px 18px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px'
+          }}
+        >
+          <Users size={20} color="#60A5FA" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            <h3 style={{ fontSize: '13.5px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 4px' }}>
+              Max Claims &amp; Lifetime Validity
+            </h3>
+            <p style={{ fontSize: '12px', color: '#D1D5DB', margin: 0, lineHeight: 1.45 }}>
+              Cap redemptions (e.g. first 50 users) and choose Lifetime or 1/3/6-month expiration.
             </p>
           </div>
         </div>
@@ -244,7 +411,8 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
         </div>
 
         <form onSubmit={handleCreatePromo}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '18px', marginBottom: '18px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '18px', marginBottom: '18px' }}>
+            {/* Code */}
             <div>
               <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '6px' }}>
                 Promo Code String *
@@ -252,8 +420,8 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
               <input
                 type="text"
                 value={code}
-                onChange={e => setCode(e.target.value.toUpperCase())}
-                placeholder="e.g. SUMMERPASS, FLOPFREE"
+                onChange={e => setCode(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+                placeholder="e.g. VIP50, WELCOMEFREE"
                 required
                 style={{
                   width: '100%',
@@ -270,57 +438,122 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
               />
             </div>
 
+            {/* Visibility Toggle (Requirement 2) */}
             <div>
               <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '6px' }}>
-                Validity Duration
+                Visibility (Hub vs Direct Only)
               </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="number"
-                  min="1"
-                  value={validityValue}
-                  onChange={e => setValidityValue(e.target.value)}
-                  style={{
-                    width: '90px',
-                    padding: '11px 14px',
-                    borderRadius: '8px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: '#FFFFFF',
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    boxSizing: 'border-box'
-                  }}
-                />
-                <select
-                  value={validityUnit}
-                  onChange={e => setValidityUnit(e.target.value as any)}
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setVisibility('PUBLIC')}
                   style={{
                     flex: 1,
-                    padding: '11px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '10px',
                     borderRadius: '8px',
-                    backgroundColor: '#1E1E2A',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: '#FFFFFF',
-                    fontSize: '13px',
-                    fontWeight: 600,
+                    backgroundColor: visibility === 'PUBLIC' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    border: visibility === 'PUBLIC' ? '1.5px solid #10B981' : '1px solid rgba(255, 255, 255, 0.1)',
+                    color: visibility === 'PUBLIC' ? '#34D399' : '#9CA3AF',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
                     cursor: 'pointer'
                   }}
                 >
-                  <option value="days">Days</option>
-                  <option value="hours">Hours</option>
-                </select>
+                  <Globe size={14} />
+                  <span>PUBLIC</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setVisibility('PRIVATE')}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    backgroundColor: visibility === 'PRIVATE' ? 'rgba(167, 139, 250, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    border: visibility === 'PRIVATE' ? '1.5px solid #A78BFA' : '1px solid rgba(255, 255, 255, 0.1)',
+                    color: visibility === 'PRIVATE' ? '#C4B5FD' : '#9CA3AF',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Lock size={14} />
+                  <span>PRIVATE</span>
+                </button>
+              </div>
+              <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+                {visibility === 'PUBLIC' ? 'Visible in User Bonus Hub list' : 'Hidden from Hub list (manual code entry only)'}
               </div>
             </div>
 
+            {/* Benefit Mode: Discount (%) Toggle (Requirement 3) */}
             <div>
               <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '6px' }}>
-                Exact Expiry Date (Optional)
+                Perk Mode / Benefit
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minHeight: '42px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    checked={discountEnabled}
+                    onChange={e => setDiscountEnabled(e.target.checked)}
+                    style={{ width: '18px', height: '18px', accentColor: 'var(--brand-gold, #F5C518)', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: discountEnabled ? 'var(--brand-gold, #F5C518)' : '#D1D5DB' }}>
+                    Enable Discount (%)
+                  </span>
+                </label>
+
+                {discountEnabled ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={discountPercent}
+                      onChange={e => setDiscountPercent(e.target.value)}
+                      style={{
+                        width: '70px',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid var(--brand-gold, #F5C518)',
+                        color: '#FFFFFF',
+                        fontSize: '13.5px',
+                        fontWeight: 800,
+                        textAlign: 'center'
+                      }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)' }}>%</span>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '11.5px', color: '#10B981', fontWeight: 600 }}>
+                    (100% Free Title Pass)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Claim Limit (Requirement 4) */}
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '6px' }}>
+                Usage / Claim Limit (Max Claims)
               </label>
               <input
-                type="datetime-local"
-                value={customExpiry}
-                onChange={e => setCustomExpiry(e.target.value)}
+                type="number"
+                min="1"
+                value={maxUses}
+                onChange={e => setMaxUses(e.target.value)}
+                placeholder="Unlimited (e.g. 50, 100)"
                 style={{
                   width: '100%',
                   padding: '11px 14px',
@@ -332,9 +565,172 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
                   boxSizing: 'border-box'
                 }}
               />
+              <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+                Leave empty or blank for unlimited claims
+              </div>
             </div>
           </div>
 
+          {/* Validity Duration Modes (Requirement 5) */}
+          <div style={{ marginBottom: '18px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '8px' }}>
+              Validity Duration (Flexible Options)
+            </label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setValidityMode('lifetime')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: validityMode === 'lifetime' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: validityMode === 'lifetime' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  color: validityMode === 'lifetime' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <InfinityIcon size={14} />
+                <span>Lifetime (Never Expires)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setValidityMode('preset'); setPresetDuration('30'); }}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: validityMode === 'preset' && presetDuration === '30' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: validityMode === 'preset' && presetDuration === '30' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  color: validityMode === 'preset' && presetDuration === '30' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                1 Month (30 Days)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setValidityMode('preset'); setPresetDuration('90'); }}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: validityMode === 'preset' && presetDuration === '90' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: validityMode === 'preset' && presetDuration === '90' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  color: validityMode === 'preset' && presetDuration === '90' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                3 Months (90 Days)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setValidityMode('preset'); setPresetDuration('180'); }}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: validityMode === 'preset' && presetDuration === '180' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: validityMode === 'preset' && presetDuration === '180' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  color: validityMode === 'preset' && presetDuration === '180' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                6 Months (180 Days)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setValidityMode('custom_days')}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: validityMode === 'custom_days' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: validityMode === 'custom_days' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  color: validityMode === 'custom_days' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Custom Days
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setValidityMode('exact_date')}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: validityMode === 'exact_date' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: validityMode === 'exact_date' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  color: validityMode === 'exact_date' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Exact Date / Time
+              </button>
+            </div>
+
+            {validityMode === 'custom_days' && (
+              <div style={{ maxWidth: '240px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: '#9CA3AF', marginBottom: '4px' }}>
+                  Number of Days
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={customDays}
+                  onChange={e => setCustomDays(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#FFFFFF',
+                    fontSize: '13px'
+                  }}
+                />
+              </div>
+            )}
+
+            {validityMode === 'exact_date' && (
+              <div style={{ maxWidth: '300px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: '#9CA3AF', marginBottom: '4px' }}>
+                  Select Expiry Date &amp; Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={customExpiry}
+                  onChange={e => setCustomExpiry(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#FFFFFF',
+                    fontSize: '13px'
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Description */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '6px' }}>
               Description / Campaign Note
@@ -398,7 +794,9 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
             borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between'
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
           }}
         >
           <div>
@@ -406,7 +804,7 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
               Created Promo Codes ({promos.length})
             </h2>
             <p style={{ fontSize: '12.5px', color: '#9CA3AF', margin: '4px 0 0' }}>
-              Active promo codes are displayed to users in the rewards hub and can be redeemed for 1 title.
+              Manage active and live coupons. Click "Edit" to modify any code or rules directly in real-time.
             </p>
           </div>
 
@@ -443,7 +841,7 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
             <AlertCircle size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
             <div style={{ fontSize: '15px', fontWeight: 700, color: '#FFFFFF' }}>No promo codes created yet</div>
             <p style={{ fontSize: '13px', margin: '4px 0 0' }}>
-              Use the form above to generate your first welcome bonus promo code.
+              Use the form above to generate your first promo code.
             </p>
           </div>
         ) : (
@@ -452,15 +850,18 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
               <thead>
                 <tr style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
                   <th style={{ padding: '14px 20px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Promo Code</th>
-                  <th style={{ padding: '14px 20px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Perk / Description</th>
+                  <th style={{ padding: '14px 20px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Perk / Benefit</th>
+                  <th style={{ padding: '14px 20px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Visibility</th>
+                  <th style={{ padding: '14px 20px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Usage / Cap</th>
+                  <th style={{ padding: '14px 20px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Validity</th>
                   <th style={{ padding: '14px 20px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Status</th>
-                  <th style={{ padding: '14px 20px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Usage Count</th>
-                  <th style={{ padding: '14px 20px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>Validity / Expiry</th>
                   <th style={{ padding: '14px 20px', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {promos.map(item => {
+                  const isCapReached = item.max_uses !== null && item.max_uses !== undefined && item.times_used >= item.max_uses;
+
                   return (
                     <tr
                       key={item.id}
@@ -503,13 +904,103 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
                       </td>
 
                       {/* Perk / Description */}
-                      <td style={{ padding: '16px 20px', maxWidth: '280px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF' }}>
-                          1 Free Title (Movie/Series)
+                      <td style={{ padding: '16px 20px', maxWidth: '240px' }}>
+                        {item.discount_enabled ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34D399', fontSize: '11px', fontWeight: 800, marginBottom: '4px' }}>
+                            <Percent size={12} />
+                            <span>{item.discount_percent}% DISCOUNT</span>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '6px', backgroundColor: 'rgba(245, 197, 24, 0.15)', color: 'var(--brand-gold, #F5C518)', fontSize: '11px', fontWeight: 800, marginBottom: '4px' }}>
+                            <Film size={12} />
+                            <span>100% FREE PASS</span>
+                          </div>
+                        )}
+                        <div style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: 1.4 }}>
+                          {item.description || (item.discount_enabled ? `${item.discount_percent}% off checkout` : 'Free title access')}
                         </div>
-                        <div style={{ fontSize: '11.5px', color: '#9CA3AF', marginTop: '2px', lineHeight: 1.4 }}>
-                          {item.description || 'Access pass to any title of user choice.'}
+                      </td>
+
+                      {/* Visibility (Requirement 2) */}
+                      <td style={{ padding: '16px 20px' }}>
+                        {item.visibility === 'PRIVATE' ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              fontWeight: 800,
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(167, 139, 250, 0.15)',
+                              color: '#C4B5FD',
+                              border: '1px solid rgba(167, 139, 250, 0.3)'
+                            }}
+                            title="Hidden from Bonus Hub public list. Users must enter direct code."
+                          >
+                            <Lock size={12} />
+                            PRIVATE
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              fontWeight: 800,
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                              color: '#34D399',
+                              border: '1px solid rgba(16, 185, 129, 0.3)'
+                            }}
+                            title="Visible in User Bonus Hub list"
+                          >
+                            <Globe size={12} />
+                            PUBLIC
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Usage / Cap (Requirement 4) */}
+                      <td style={{ padding: '16px 20px' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#FFFFFF' }}>
+                          {item.times_used}
+                          <span style={{ fontSize: '12px', fontWeight: 500, color: '#9CA3AF' }}>
+                            {item.max_uses ? ` / ${item.max_uses} limit` : ' (Unlimited)'}
+                          </span>
                         </div>
+                        {isCapReached && (
+                          <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#F87171', marginTop: '2px' }}>
+                            CAP REACHED
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Validity (Requirement 5) */}
+                      <td style={{ padding: '16px 20px' }}>
+                        {item.is_lifetime ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
+                            <InfinityIcon size={14} />
+                            <span>Lifetime (Never Expires)</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#D1D5DB' }}>
+                              <Clock size={13} color="#9CA3AF" />
+                              <span>
+                                {item.expires_at ? new Date(item.expires_at).toLocaleDateString() : `${Math.round(item.validity_hours / 24)} Days`}
+                              </span>
+                            </div>
+                            {item.time_remaining_hours !== undefined && !item.is_expired && (
+                              <div style={{ fontSize: '11px', color: '#F5C518', marginTop: '2px' }}>
+                                {item.time_remaining_hours}h remaining
+                              </div>
+                            )}
+                          </>
+                        )}
                       </td>
 
                       {/* Status */}
@@ -570,35 +1061,36 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
                         )}
                       </td>
 
-                      {/* Usage Count */}
-                      <td style={{ padding: '16px 20px' }}>
-                        <div style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF' }}>
-                          {item.times_used} <span style={{ fontSize: '11px', fontWeight: 500, color: '#9CA3AF' }}>redemptions</span>
-                        </div>
-                      </td>
-
-                      {/* Expiry */}
-                      <td style={{ padding: '16px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#D1D5DB' }}>
-                          <Clock size={13} color="#9CA3AF" />
-                          <span>
-                            {item.expires_at ? new Date(item.expires_at).toLocaleDateString() : `${Math.round(item.validity_hours / 24)} Days`}
-                          </span>
-                        </div>
-                        {item.time_remaining_hours !== undefined && !item.is_expired && (
-                          <div style={{ fontSize: '11px', color: '#F5C518', marginTop: '2px' }}>
-                            {item.time_remaining_hours}h remaining
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Actions */}
+                      {/* Actions: Edit (Requirement 1), Status, Delete */}
                       <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          {/* EDIT BUTTON */}
+                          <button
+                            onClick={() => handleOpenEdit(item)}
+                            title="Edit promo properties (even if active)"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(245, 197, 24, 0.12)',
+                              border: '1px solid rgba(245, 197, 24, 0.3)',
+                              color: 'var(--brand-gold, #F5C518)',
+                              fontSize: '11.5px',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Edit2 size={12} />
+                            <span>Edit</span>
+                          </button>
+
+                          {/* Toggle Status */}
                           <button
                             onClick={() => handleToggleStatus(item)}
                             style={{
-                              padding: '6px 12px',
+                              padding: '6px 10px',
                               borderRadius: '6px',
                               backgroundColor: item.status === 'ACTIVE' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.15)',
                               border: item.status === 'ACTIVE' ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(16, 185, 129, 0.3)',
@@ -611,6 +1103,7 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
                             {item.status === 'ACTIVE' ? 'Disable' : 'Enable'}
                           </button>
 
+                          {/* Delete */}
                           <button
                             onClick={() => handleDeletePromo(item.id, item.code)}
                             title="Delete promo code"
@@ -635,6 +1128,415 @@ export const AdminPromoCodesPage: React.FC<AdminPromoCodesPageProps> = () => {
           </div>
         )}
       </div>
+
+      {/* EDIT PROMO MODAL (Requirement 1) */}
+      {editingPromo && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setEditingPromo(null)}
+        >
+          <div
+            style={{
+              backgroundColor: '#161622',
+              border: '1px solid rgba(245, 197, 24, 0.3)',
+              borderRadius: '18px',
+              maxWidth: '620px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '26px',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Edit2 size={18} color="var(--brand-gold, #F5C518)" />
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                  Edit Promo Code: <span style={{ color: 'var(--brand-gold, #F5C518)' }}>{editingPromo.code}</span>
+                </h3>
+              </div>
+              <button
+                onClick={() => setEditingPromo(null)}
+                style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdatePromo}>
+              {/* Code */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Promo Code String *
+                </label>
+                <input
+                  type="text"
+                  value={editCode}
+                  onChange={e => setEditCode(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '11px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Visibility (Requirement 2) */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Visibility (Hub vs Direct Code Only)
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditVisibility('PUBLIC')}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      backgroundColor: editVisibility === 'PUBLIC' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                      border: editVisibility === 'PUBLIC' ? '1.5px solid #10B981' : '1px solid rgba(255, 255, 255, 0.1)',
+                      color: editVisibility === 'PUBLIC' ? '#34D399' : '#9CA3AF',
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Globe size={14} />
+                    <span>PUBLIC (Shown in Bonus Hub)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditVisibility('PRIVATE')}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      backgroundColor: editVisibility === 'PRIVATE' ? 'rgba(167, 139, 250, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                      border: editVisibility === 'PRIVATE' ? '1.5px solid #A78BFA' : '1px solid rgba(255, 255, 255, 0.1)',
+                      color: editVisibility === 'PRIVATE' ? '#C4B5FD' : '#9CA3AF',
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Lock size={14} />
+                    <span>PRIVATE (Hidden from Hub)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Discount Toggle (Requirement 3) */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Discount (%) or Free Pass
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={editDiscountEnabled}
+                      onChange={e => setEditDiscountEnabled(e.target.checked)}
+                      style={{ width: '18px', height: '18px', accentColor: 'var(--brand-gold, #F5C518)', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: editDiscountEnabled ? 'var(--brand-gold, #F5C518)' : '#D1D5DB' }}>
+                      Enable Discount (%)
+                    </span>
+                  </label>
+
+                  {editDiscountEnabled && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={editDiscountPercent}
+                        onChange={e => setEditDiscountPercent(e.target.value)}
+                        style={{
+                          width: '70px',
+                          padding: '8px 10px',
+                          borderRadius: '6px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                          border: '1px solid var(--brand-gold, #F5C518)',
+                          color: '#FFFFFF',
+                          fontSize: '13.5px',
+                          fontWeight: 800,
+                          textAlign: 'center'
+                        }}
+                      />
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)' }}>%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Claim Limit (Requirement 4) */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Max Usage / Claims Limit
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editMaxUses}
+                  onChange={e => setEditMaxUses(e.target.value)}
+                  placeholder="Unlimited (e.g. 50, 100)"
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#FFFFFF',
+                    fontSize: '13px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Validity Options (Requirement 5) */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '8px' }}>
+                  Validity Duration
+                </label>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditValidityMode('lifetime')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '7px 12px',
+                      borderRadius: '6px',
+                      backgroundColor: editValidityMode === 'lifetime' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                      border: editValidityMode === 'lifetime' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                      color: editValidityMode === 'lifetime' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <InfinityIcon size={13} />
+                    <span>Lifetime</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setEditValidityMode('preset'); setEditPresetDuration('30'); }}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '6px',
+                      backgroundColor: editValidityMode === 'preset' && editPresetDuration === '30' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                      border: editValidityMode === 'preset' && editPresetDuration === '30' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                      color: editValidityMode === 'preset' && editPresetDuration === '30' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    1 Month (30d)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setEditValidityMode('preset'); setEditPresetDuration('90'); }}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '6px',
+                      backgroundColor: editValidityMode === 'preset' && editPresetDuration === '90' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                      border: editValidityMode === 'preset' && editPresetDuration === '90' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                      color: editValidityMode === 'preset' && editPresetDuration === '90' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    3 Months (90d)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setEditValidityMode('preset'); setEditPresetDuration('180'); }}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '6px',
+                      backgroundColor: editValidityMode === 'preset' && editPresetDuration === '180' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                      border: editValidityMode === 'preset' && editPresetDuration === '180' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                      color: editValidityMode === 'preset' && editPresetDuration === '180' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    6 Months (180d)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditValidityMode('custom_days')}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '6px',
+                      backgroundColor: editValidityMode === 'custom_days' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                      border: editValidityMode === 'custom_days' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                      color: editValidityMode === 'custom_days' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Custom Days
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditValidityMode('exact_date')}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '6px',
+                      backgroundColor: editValidityMode === 'exact_date' ? 'rgba(245, 197, 24, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                      border: editValidityMode === 'exact_date' ? '1.5px solid var(--brand-gold, #F5C518)' : '1px solid rgba(255, 255, 255, 0.1)',
+                      color: editValidityMode === 'exact_date' ? 'var(--brand-gold, #F5C518)' : '#D1D5DB',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Exact Date
+                  </button>
+                </div>
+
+                {editValidityMode === 'custom_days' && (
+                  <input
+                    type="number"
+                    min="1"
+                    value={editCustomDays}
+                    onChange={e => setEditCustomDays(e.target.value)}
+                    placeholder="Days (e.g. 45)"
+                    style={{
+                      maxWidth: '200px',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#FFFFFF',
+                      fontSize: '13px'
+                    }}
+                  />
+                )}
+
+                {editValidityMode === 'exact_date' && (
+                  <input
+                    type="datetime-local"
+                    value={editCustomExpiry}
+                    onChange={e => setEditCustomExpiry(e.target.value)}
+                    style={{
+                      maxWidth: '280px',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#FFFFFF',
+                      fontSize: '13px'
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Description */}
+              <div style={{ marginBottom: '22px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Description / Campaign Note
+                </label>
+                <input
+                  type="text"
+                  value={editDescription}
+                  onChange={e => setEditDescription(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#FFFFFF',
+                    fontSize: '13px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Footer Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingPromo(null)}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    color: '#D1D5DB',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={updating}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--brand-gold, #F5C518)',
+                    color: '#0A0A0F',
+                    fontSize: '13.5px',
+                    fontWeight: 800,
+                    border: 'none',
+                    cursor: updating ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {updating ? <Loader2 size={15} className="spin" /> : <Save size={15} />}
+                  <span>{updating ? 'Saving...' : 'Save Changes'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

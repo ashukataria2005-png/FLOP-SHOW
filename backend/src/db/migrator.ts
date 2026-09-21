@@ -640,7 +640,33 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 13 };
+    // Apply incremental 018_promo_system_v2 for PostgreSQL if not already applied
+    const promoV2MigrationVersion = '018_promo_system_v2';
+    if (!appliedSet.has(promoV2MigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 018_promo_system_v2...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS visibility VARCHAR(16) NOT NULL DEFAULT 'PUBLIC';
+          ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS discount_enabled INTEGER NOT NULL DEFAULT 0;
+          ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS discount_percent INTEGER NOT NULL DEFAULT 0;
+          ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS max_uses INTEGER DEFAULT NULL;
+          ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS is_lifetime INTEGER NOT NULL DEFAULT 0;
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${promoV2MigrationVersion}', '018_promo_system_v2.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('018_promo_system_v2.sql');
+        console.log('✓ [PostgreSQL] Migration 018_promo_system_v2 applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 14 };
   } finally {
     client.release();
     await pool.end();

@@ -17,7 +17,9 @@ import {
   X,
   Calendar,
   ShieldCheck,
-  History
+  History,
+  Percent,
+  Infinity as InfinityIcon
 } from 'lucide-react';
 
 interface PromoCodeItem {
@@ -33,6 +35,11 @@ interface PromoCodeItem {
   updated_at: string;
   is_expired?: boolean;
   time_remaining_hours?: number;
+  visibility?: 'PUBLIC' | 'PRIVATE';
+  discount_enabled?: boolean | number;
+  discount_percent?: number;
+  max_uses?: number | null;
+  is_lifetime?: boolean | number;
 }
 
 interface PromoRedemptionItem {
@@ -233,7 +240,7 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
               </span>
             </div>
             <p style={{ fontSize: '13.5px', color: '#9CA3AF', margin: '4px 0 0' }}>
-              Redeem exclusive welcome promo codes to unlock ANY single Movie or Web Series of your choice completely free for 30 days.
+              Redeem exclusive welcome promo codes to unlock ANY single Movie or Web Series of your choice completely free for 7 days.
             </p>
           </div>
         </div>
@@ -255,11 +262,11 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
             }}
           >
             {canRedeem ? <CheckCircle2 size={14} /> : <ShieldCheck size={14} />}
-            <span>{canRedeem ? '1 Free Movie/Series Access Pass Available' : 'Welcome Bonus Already Redeemed'}</span>
+            <span>{canRedeem ? '1-Free Movie/Series Access Pass Available' : 'Welcome Bonus Already Redeemed'}</span>
           </div>
 
           <span style={{ fontSize: '12px', color: '#6B7280' }}>•</span>
-          <span style={{ fontSize: '12px', color: '#9CA3AF' }}>Strictly 1-time redemption per user account</span>
+          <span style={{ fontSize: '12px', color: '#9CA3AF' }}>ONLY 1-TIME USAGE FOR NEW MEMBERS</span>
         </div>
       </div>
 
@@ -433,22 +440,64 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
                   }}
                 >
                   <div>
-                    {/* Top row: Code Pill & Copy */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                      <span
-                        style={{
-                          fontSize: '15px',
-                          fontWeight: 900,
-                          letterSpacing: '0.06em',
-                          padding: '5px 12px',
-                          borderRadius: '8px',
-                          backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                          color: 'var(--brand-gold, #F5C518)',
-                          border: '1px solid rgba(245, 197, 24, 0.35)'
-                        }}
-                      >
-                        {item.code}
-                      </span>
+                    {/* Top row: Code Pill & Copy & Badges */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            fontSize: '15px',
+                            fontWeight: 900,
+                            letterSpacing: '0.06em',
+                            padding: '5px 12px',
+                            borderRadius: '8px',
+                            backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                            color: 'var(--brand-gold, #F5C518)',
+                            border: '1px solid rgba(245, 197, 24, 0.35)'
+                          }}
+                        >
+                          {item.code}
+                        </span>
+
+                        {Boolean(item.is_lifetime) && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              fontWeight: 800,
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(245, 197, 24, 0.2)',
+                              color: 'var(--brand-gold, #F5C518)',
+                              border: '1px solid rgba(245, 197, 24, 0.4)'
+                            }}
+                          >
+                            <InfinityIcon size={12} />
+                            Lifetime Access
+                          </span>
+                        )}
+
+                        {Boolean(item.discount_enabled) && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              fontSize: '11px',
+                              fontWeight: 800,
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                              color: '#34D399',
+                              border: '1px solid rgba(16, 185, 129, 0.4)'
+                            }}
+                          >
+                            <Percent size={11} />
+                            {item.discount_percent}% OFF
+                          </span>
+                        )}
+                      </div>
 
                       <button
                         onClick={() => copyToClipboard(item.code)}
@@ -474,26 +523,44 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
 
                     {/* Perk Summary */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                      <Film size={15} color="var(--brand-gold, #F5C518)" />
+                      {item.discount_enabled ? (
+                        <Percent size={15} color="#10B981" />
+                      ) : (
+                        <Film size={15} color="var(--brand-gold, #F5C518)" />
+                      )}
                       <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
-                        1-Time Free Movie or Series Access
+                        {item.discount_enabled ? `${item.discount_percent}% Discount Coupon` : '1-Time Free Movie or Series Access'}
                       </h3>
                     </div>
                     <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 14px', lineHeight: 1.45 }}>
-                      {item.description || 'Redeem to unlock any paid catalog title for 30 days.'}
+                      {item.description || (item.discount_enabled ? `Save ${item.discount_percent}% on any catalog checkout.` : 'Redeem to unlock any paid catalog title completely free.')}
                     </p>
+
+                    {item.max_uses && item.max_uses > 0 && (
+                      <div style={{ fontSize: '11.5px', color: '#60A5FA', fontWeight: 600, marginBottom: '12px' }}>
+                        Limited Offer: {item.times_used} / {item.max_uses} claimed ({Math.max(0, item.max_uses - item.times_used)} remaining)
+                      </div>
+                    )}
                   </div>
 
                   {/* Bottom Footer: Time Remaining & Redeem Button */}
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid rgba(255, 255, 255, 0.06)', marginBottom: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9CA3AF' }}>
-                        <Clock size={13} />
-                        <span>
-                          {item.expires_at ? `Expires ${new Date(item.expires_at).toLocaleDateString()}` : `${Math.round(item.validity_hours / 24)} Days Validity`}
-                        </span>
-                      </div>
-                      {item.time_remaining_hours !== undefined && (
+                      {item.is_lifetime ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--brand-gold, #F5C518)', fontWeight: 700 }}>
+                          <InfinityIcon size={13} />
+                          <span>Lifetime Access (Never Expires)</span>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9CA3AF' }}>
+                          <Clock size={13} />
+                          <span>
+                            {item.expires_at ? `Expires ${new Date(item.expires_at).toLocaleDateString()}` : `${Math.round(item.validity_hours / 24)} Days Validity`}
+                          </span>
+                        </div>
+                      )}
+
+                      {item.time_remaining_hours !== undefined && !item.is_lifetime && (
                         <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--brand-gold, #F5C518)' }}>
                           {item.time_remaining_hours} hours left
                         </span>
@@ -516,7 +583,7 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      {canRedeem ? 'Redeem for 1 Free Movie/Series' : 'Welcome Pass Redeemed'}
+                      {canRedeem ? (item.discount_enabled ? `Claim & Use ${item.code}` : 'Redeem for 1 Free Movie/Series') : 'Welcome Pass Redeemed'}
                     </button>
                   </div>
                 </div>

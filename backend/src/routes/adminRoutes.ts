@@ -10,6 +10,7 @@ import { vcdnService } from '../services/vcdnService.js';
 import { isVcdnConfigured } from '../config/env.js';
 import { contentRepository } from '../repositories/contentRepository.js';
 import { mediaRepository } from '../repositories/mediaRepository.js';
+import { promoService } from '../services/promoService.js';
 import { getAdapter } from '../db/adapter.js';
 
 export const adminRouter = Router();
@@ -948,6 +949,58 @@ adminRouter.post('/reset-financials', async (req, res, next) => {
     }
     const result = await adminService.purgeAllFinancialRecords();
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ----------------------------------------------------------------------------
+// 9C. ADMIN PROMO CODES MANAGEMENT
+// ----------------------------------------------------------------------------
+adminRouter.get('/promos', async (_req, res, next) => {
+  try {
+    const promos = await promoService.getAllPromoCodesAdmin();
+    res.json({ success: true, promos });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/promos', async (req, res, next) => {
+  try {
+    const promo = await promoService.createPromoCodeAdmin(req.body);
+    res.status(201).json({ success: true, message: 'Promo code created successfully.', promo });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.put('/promos/:id', async (req, res, next) => {
+  try {
+    const promoId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const promo = await promoService.updatePromoCodeAdmin(promoId, req.body);
+    res.json({ success: true, message: `Promo code "${promo.code}" updated successfully.`, promo });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/promos/:id/status', async (req, res, next) => {
+  try {
+    const promoId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { status } = req.body;
+    const promo = await promoService.setPromoStatusAdmin(promoId, status);
+    res.json({ success: true, message: `Promo code set to ${status}.`, promo });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/promos/:id', async (req, res, next) => {
+  try {
+    const promoId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await promoService.deletePromoCodeAdmin(promoId);
+    res.json({ success: true, message: 'Promo code deleted successfully.' });
   } catch (err) {
     next(err);
   }

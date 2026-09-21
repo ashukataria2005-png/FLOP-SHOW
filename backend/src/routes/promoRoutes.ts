@@ -11,7 +11,7 @@ export const promoRouter = Router();
 
 /**
  * GET /api/promos/hub
- * Returns active promos, expired promos, and redemption history for user
+ * Returns active public promos, expired promos, and redemption history for user
  */
 promoRouter.get('/hub', optionalAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
@@ -36,15 +36,30 @@ promoRouter.post('/redeem', requireAuth, async (req: AuthenticatedRequest, res, 
   }
 });
 
+/**
+ * POST /api/promos/validate
+ * Validate promo code and calculate discount for checkout / payment
+ */
+promoRouter.post('/validate', optionalAuth, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { code, amount } = req.body;
+    const originalAmount = Math.max(0, Number(amount || 0));
+    const result = await promoService.validatePromoForCheckout(req.user?.id, code, originalAmount);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ============================================================================
 // ADMIN PROMO CODE MANAGEMENT ENDPOINTS
 // ============================================================================
 
 /**
- * GET /api/admin/promos
+ * GET /api/promos/admin/all & /api/admin/promos
  * List all created promo codes with status, usage counts, and expiry
  */
-promoRouter.get('/admin/all', requireAuth, requireAdmin, async (_req, res, next) => {
+promoRouter.get(['/admin/all', '/admin'], requireAuth, requireAdmin, async (_req, res, next) => {
   try {
     const promos = await promoService.getAllPromoCodesAdmin();
     res.json({ success: true, promos });
@@ -54,18 +69,35 @@ promoRouter.get('/admin/all', requireAuth, requireAdmin, async (_req, res, next)
 });
 
 /**
- * POST /api/admin/promos
+ * POST /api/promos/admin/create & /api/admin/promos
  * Create a new promo code
  */
-promoRouter.post('/admin/create', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+promoRouter.post(['/admin/create', '/admin'], requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { code, description, validity_days, validity_hours, expires_at } = req.body;
+    const {
+      code,
+      description,
+      validity_days,
+      validity_hours,
+      expires_at,
+      visibility,
+      discount_enabled,
+      discount_percent,
+      max_uses,
+      is_lifetime
+    } = req.body;
+
     const promo = await promoService.createPromoCodeAdmin({
       code,
       description,
       validity_days,
       validity_hours,
-      expires_at
+      expires_at,
+      visibility,
+      discount_enabled,
+      discount_percent,
+      max_uses,
+      is_lifetime
     });
     res.status(201).json({ success: true, message: 'Promo code created successfully.', promo });
   } catch (err) {
@@ -74,10 +106,51 @@ promoRouter.post('/admin/create', requireAuth, requireAdmin, async (req: Authent
 });
 
 /**
- * PATCH /api/admin/promos/:id/status
+ * PUT /api/promos/admin/:id & /api/admin/promos/:id
+ * Requirement 1: Update promo code cleanly even if live/active
+ */
+promoRouter.put(['/admin/:id', '/:id'], requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const promoId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const {
+      code,
+      description,
+      validity_days,
+      validity_hours,
+      expires_at,
+      visibility,
+      discount_enabled,
+      discount_percent,
+      max_uses,
+      is_lifetime,
+      status
+    } = req.body;
+
+    const promo = await promoService.updatePromoCodeAdmin(promoId, {
+      code,
+      description,
+      validity_days,
+      validity_hours,
+      expires_at,
+      visibility,
+      discount_enabled,
+      discount_percent,
+      max_uses,
+      is_lifetime,
+      status
+    });
+
+    res.json({ success: true, message: `Promo code "${promo.code}" updated successfully.`, promo });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PATCH /api/promos/admin/:id/status
  * Enable / disable promo code
  */
-promoRouter.patch('/admin/:id/status', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+promoRouter.patch(['/admin/:id/status', '/:id/status'], requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { status } = req.body;
     if (status !== 'ACTIVE' && status !== 'DISABLED') {
@@ -92,10 +165,10 @@ promoRouter.patch('/admin/:id/status', requireAuth, requireAdmin, async (req: Au
 });
 
 /**
- * DELETE /api/admin/promos/:id
+ * DELETE /api/promos/admin/:id & /api/admin/promos/:id
  * Delete promo code
  */
-promoRouter.delete('/admin/:id', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+promoRouter.delete(['/admin/:id', '/:id'], requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
   try {
     const promoId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     await promoService.deletePromoCodeAdmin(promoId);

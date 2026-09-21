@@ -1798,6 +1798,11 @@ export const api = {
       validity_days?: number;
       validity_hours?: number;
       expires_at?: string;
+      visibility?: 'PUBLIC' | 'PRIVATE';
+      discount_enabled?: boolean;
+      discount_percent?: number;
+      max_uses?: number | null;
+      is_lifetime?: boolean;
     }) {
       return request<{
         success: boolean;
@@ -1806,6 +1811,46 @@ export const api = {
       }>('/promos/admin/create', {
         method: 'POST',
         body: JSON.stringify(data)
+      });
+    },
+
+    async adminUpdate(id: string, data: {
+      code?: string;
+      description?: string;
+      validity_days?: number;
+      validity_hours?: number;
+      expires_at?: string | null;
+      visibility?: 'PUBLIC' | 'PRIVATE';
+      discount_enabled?: boolean;
+      discount_percent?: number;
+      max_uses?: number | null;
+      is_lifetime?: boolean;
+      status?: 'ACTIVE' | 'DISABLED';
+    }) {
+      return request<{
+        success: boolean;
+        message: string;
+        promo: any;
+      }>(`/admin/promos/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
+
+    async validate(code: string, amount: number) {
+      return request<{
+        success: boolean;
+        valid: boolean;
+        code: string;
+        description: string;
+        discountPercent: number;
+        discountAmountRupees: number;
+        finalAmountRupees: number;
+        isFreePass: boolean;
+        message: string;
+      }>('/promos/validate', {
+        method: 'POST',
+        body: JSON.stringify({ code, amount })
       });
     },
 

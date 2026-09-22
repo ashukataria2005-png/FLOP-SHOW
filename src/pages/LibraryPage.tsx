@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { ContentItem } from '../types/content';
 import { ContentCard } from '../components/cards/ContentCard';
-import { Bookmark, Film, PlayCircle, History, Compass, Clock, RotateCcw, Play } from 'lucide-react';
+import { Bookmark, Film, Zap, Compass, Clock, RotateCcw, Play } from 'lucide-react';
 
 interface LibraryPageProps {
   onSelectItem: (item: ContentItem) => void;
@@ -10,9 +10,9 @@ interface LibraryPageProps {
 }
 
 export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNavigate }) => {
-  const { purchases, myList, watchProgress, catalog, openPurchaseModal } = useApp();
+  const { purchases, myList, catalog, openPurchaseModal, userWatchPasses, openPlanSelector } = useApp();
   const activeCatalog = catalog || [];
-  const [activeTab, setActiveTab] = useState<'owned' | 'saved' | 'progress' | 'history'>('owned');
+  const [activeTab, setActiveTab] = useState<'saved' | 'owned' | 'passes'>('saved');
 
   // Purchased / Owned items
   const ownedItems = purchases
@@ -24,35 +24,11 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
     .map(id => activeCatalog.find(c => c.id === id))
     .filter((c): c is ContentItem => c !== undefined);
 
-  // Continue Watching items
-  const inProgressItems = watchProgress
-    .filter(wp => wp.percent > 0 && wp.percent < 95)
-    .map(wp => activeCatalog.find(c => c.id === wp.contentId))
-    .filter((c): c is ContentItem => c !== undefined);
-
-  // Watch History (all watched items)
-  const historyItems = watchProgress
-    .map(wp => activeCatalog.find(c => c.id === wp.contentId))
-    .filter((c): c is ContentItem => c !== undefined);
-
   const tabs = [
-    { id: 'owned', label: 'Purchased', count: ownedItems.length, icon: Film },
-    { id: 'saved', label: 'My List', count: savedItems.length, icon: Bookmark },
-    { id: 'progress', label: 'In Progress', count: inProgressItems.length, icon: PlayCircle },
-    { id: 'history', label: 'History', count: historyItems.length, icon: History }
+    { id: 'saved', label: 'Watchlist / Saved', count: savedItems.length, icon: Bookmark },
+    { id: 'owned', label: 'Purchased Titles', count: ownedItems.length, icon: Film },
+    { id: 'passes', label: 'My Passes', count: userWatchPasses.activePasses.length, icon: Zap }
   ];
-
-  const getActiveList = () => {
-    switch (activeTab) {
-      case 'owned': return ownedItems;
-      case 'saved': return savedItems;
-      case 'progress': return inProgressItems;
-      case 'history': return historyItems;
-      default: return [];
-    }
-  };
-
-  const currentItems = getActiveList();
 
   return (
     <div style={{ padding: '24px 20px', maxWidth: 'var(--max-width)', margin: '0 auto' }}>
@@ -69,7 +45,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
         My Library
       </h1>
 
-      {/* Tabs */}
+      {/* Clean Tabs */}
       <div
         style={{
           display: 'flex',
@@ -100,6 +76,7 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
                 color: isSelected ? '#0E0E12' : 'var(--text-secondary)',
                 border: 'none',
                 whiteSpace: 'nowrap',
+                cursor: 'pointer',
                 transition: 'all var(--transition-fast)'
               }}
             >
@@ -122,9 +99,65 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
         })}
       </div>
 
-      {/* Content Grid or Professional Empty State */}
-      {currentItems.length > 0 ? (
-        activeTab === 'owned' ? (
+      {/* Tab 1: Watchlist / Saved */}
+      {activeTab === 'saved' && (
+        savedItems.length > 0 ? (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: 'clamp(12px, 2.5vw, 20px)'
+            }}
+          >
+            {savedItems.map(item => (
+              <ContentCard key={item.id} item={item} onSelect={onSelectItem} />
+            ))}
+          </div>
+        ) : (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '70px 20px',
+              backgroundColor: 'rgba(22, 22, 34, 0.35)',
+              borderRadius: '20px',
+              border: '1px dashed rgba(255, 255, 255, 0.12)',
+              maxWidth: '520px',
+              margin: '40px auto'
+            }}
+          >
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(245, 166, 35, 0.1)',
+                border: '1px solid rgba(245, 166, 35, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
+                color: 'var(--brand-gold)'
+              }}
+            >
+              <Bookmark size={30} />
+            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', marginBottom: '8px' }}>
+              Your Watchlist is Empty
+            </h3>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '24px' }}>
+              Tap the "+ My list" button on any movie or series to keep track of what you want to watch next.
+            </p>
+            <button onClick={() => onNavigate('discover')} className="btn btn-primary btn-lg">
+              <Compass size={18} />
+              <span>Explore Discover</span>
+            </button>
+          </div>
+        )
+      )}
+
+      {/* Tab 2: Purchased Titles */}
+      {activeTab === 'owned' && (
+        ownedItems.length > 0 ? (
           <div
             style={{
               display: 'grid',
@@ -132,10 +165,9 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
               gap: 'clamp(14px, 2.5vw, 22px)'
             }}
           >
-            {currentItems.map(item => {
+            {ownedItems.map(item => {
               const purchase = purchases.find(p => p.contentId === item.id);
-              
-              // Dynamic countdown based on actual expiresAt
+
               const countdown = (() => {
                 if (!purchase?.expiresAt) {
                   return { label: '30 days left', isExpired: Boolean(purchase?.isExpired), isUrgent: false };
@@ -316,68 +348,173 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ onSelectItem, onNaviga
         ) : (
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-              gap: 'clamp(12px, 2.5vw, 20px)'
+              textAlign: 'center',
+              padding: '70px 20px',
+              backgroundColor: 'rgba(22, 22, 34, 0.35)',
+              borderRadius: '20px',
+              border: '1px dashed rgba(255, 255, 255, 0.12)',
+              maxWidth: '520px',
+              margin: '40px auto'
             }}
           >
-            {currentItems.map(item => (
-              <ContentCard key={item.id} item={item} onSelect={onSelectItem} />
-            ))}
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(245, 166, 35, 0.1)',
+                border: '1px solid rgba(245, 166, 35, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
+                color: 'var(--brand-gold)'
+              }}
+            >
+              <Film size={30} />
+            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', marginBottom: '8px' }}>
+              No Purchased Titles Yet
+            </h3>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '24px' }}>
+              Individual films and web series you buy will appear here permanently with unrestricted playback.
+            </p>
+            <button onClick={() => onNavigate('discover')} className="btn btn-primary btn-lg">
+              <Compass size={18} />
+              <span>Explore Discover</span>
+            </button>
           </div>
         )
-      ) : (
-        /* Empty State */
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '70px 20px',
-            backgroundColor: 'rgba(22, 22, 34, 0.35)',
-            borderRadius: '20px',
-            border: '1px dashed rgba(255, 255, 255, 0.12)',
-            maxWidth: '520px',
-            margin: '40px auto'
-          }}
-        >
+      )}
+
+      {/* Tab 3: My Passes */}
+      {activeTab === 'passes' && (
+        userWatchPasses.activePasses.length > 0 ? (
           <div
             style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(245, 166, 35, 0.1)',
-              border: '1px solid rgba(245, 166, 35, 0.25)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px',
-              color: 'var(--brand-gold)'
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: '16px'
             }}
           >
-            {activeTab === 'owned' && <Film size={30} />}
-            {activeTab === 'saved' && <Bookmark size={30} />}
-            {activeTab === 'progress' && <PlayCircle size={30} />}
-            {activeTab === 'history' && <History size={30} />}
+            {userWatchPasses.activePasses.map((p: any, idx: number) => {
+              const passTitle = p.content_title || p.title || (p.plan_type === '24H' ? 'Watch Pass (24 Hours)' : p.plan_type === '3D' ? 'Watch Pass (3 Days)' : p.plan_type === '7D' ? 'Watch Pass (7 Days)' : p.plan_type === '15D' ? 'Watch Pass (15 Days)' : 'Catalog Watch Pass');
+              const expDate = p.expires_at || p.expiresAt;
+              const remaining = p.remainingHours ? (p.remainingHours > 24 ? `${p.remainingDays} days left` : `${p.remainingHours}h left`) : null;
+
+              return (
+                <div
+                  key={p.id || idx}
+                  style={{
+                    backgroundColor: 'var(--bg-surface)',
+                    borderRadius: '16px',
+                    border: '1.5px solid rgba(16, 185, 129, 0.5)',
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.35)'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          padding: '3px 10px',
+                          borderRadius: '999px',
+                          backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                          color: '#34D399',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em'
+                        }}
+                      >
+                        Active Pass
+                      </span>
+                      {remaining && (
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#34D399' }}>
+                          {remaining}
+                        </span>
+                      )}
+                    </div>
+                    <h4 style={{ fontSize: '17px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 8px' }}>
+                      {passTitle}
+                    </h4>
+                    {expDate && (
+                      <div style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={13} color="#10B981" />
+                        <span>Valid until: {new Date(expDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => onNavigate('discover')}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      backgroundColor: '#10B981',
+                      color: '#0E0E12',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'transform 0.15s ease'
+                    }}
+                  >
+                    <Play size={15} fill="#0E0E12" />
+                    <span>Watch Catalog Now</span>
+                  </button>
+                </div>
+              );
+            })}
           </div>
-
-          <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', marginBottom: '8px' }}>
-            {activeTab === 'owned' && 'No Purchased Titles Yet'}
-            {activeTab === 'saved' && 'Your List is Empty'}
-            {activeTab === 'progress' && 'Nothing in Progress'}
-            {activeTab === 'history' && 'No Watch History'}
-          </h3>
-
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '24px' }}>
-            {activeTab === 'owned' && 'Individual films and webseries you buy will appear here permanently with unrestricted playback.'}
-            {activeTab === 'saved' && 'Tap the "+ My list" button on any movie or series to keep track of what you want to watch next.'}
-            {activeTab === 'progress' && 'Start streaming any title and your progress will automatically save right here.'}
-            {activeTab === 'history' && 'Stories you have watched will appear in your viewing log.'}
-          </p>
-
-          <button onClick={() => onNavigate('discover')} className="btn btn-primary btn-lg">
-            <Compass size={18} />
-            <span>Explore Discover</span>
-          </button>
-        </div>
+        ) : (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '70px 20px',
+              backgroundColor: 'rgba(22, 22, 34, 0.35)',
+              borderRadius: '20px',
+              border: '1px dashed rgba(255, 255, 255, 0.12)',
+              maxWidth: '520px',
+              margin: '40px auto'
+            }}
+          >
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
+                color: '#10B981'
+              }}
+            >
+              <Zap size={30} />
+            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', marginBottom: '8px' }}>
+              No Active Watch Passes
+            </h3>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '24px' }}>
+              You don't have an active pass right now. Get a 24H, 3D, 7D, or 15D Watch Pass to stream all 300+ blockbuster movies and series!
+            </p>
+            <button onClick={() => openPlanSelector()} className="btn btn-primary btn-lg">
+              <Zap size={18} />
+              <span>Explore Watch Passes</span>
+            </button>
+          </div>
+        )
       )}
     </div>
   );

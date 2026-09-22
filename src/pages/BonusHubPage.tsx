@@ -539,7 +539,7 @@ export const BonusHubPage: React.FC<BonusHubPageProps> = ({ onNavigate, onPlayCo
                 type="text"
                 value={inputCode}
                 onChange={e => setInputCode(e.target.value.toUpperCase())}
-                placeholder="ENTER PROMO CODE (e.g. FLOP10, WELCOMEBONUS)"
+                placeholder="ENTER PROMO CODE (e.g. WELCOMEBONUS or FLOP10)"
                 style={{
                   flex: 1,
                   minWidth: '240px',

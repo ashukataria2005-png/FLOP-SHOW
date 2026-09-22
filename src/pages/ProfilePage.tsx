@@ -52,22 +52,40 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     pendingSubscription,
     hasActiveSubscription,
     openSubscriptionModal,
+    openWatchPassModal,
     openPlanSelector,
-    refreshSubscriptionStatus
+    refreshSubscriptionStatus,
+    purchases,
+    catalog,
+    clearSearchHistory
   } = useApp();
 
   const [activeSection, setActiveSection] = useState<'profile' | 'subscription' | 'settings' | 'watchpasses'>(() => {
     if (initialSection === 'wallet') {
       return 'profile';
     }
+    if (initialSection === 'watchpasses') {
+      return 'subscription';
+    }
     return (initialSection as any) || 'profile';
   });
+  const [planCategoryFilter, setPlanCategoryFilter] = useState<'all' | 'watch_pass' | 'vip'>('all');
+  const [clearSearchSuccess, setClearSearchSuccess] = useState(false);
+
+  const handleClearSearchHistory = () => {
+    try {
+      clearSearchHistory();
+      setClearSearchSuccess(true);
+      setTimeout(() => setClearSearchSuccess(false), 3000);
+    } catch {
+      // Ignore
+    }
+  };
   const [userWatchPasses, setUserWatchPasses] = useState<{ activePasses: any[]; expiredPasses: any[]; pendingPasses: any[] }>({
     activePasses: [],
     expiredPasses: [],
     pendingPasses: []
   });
-  const [loadingPasses, setLoadingPasses] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(user.name);
@@ -119,7 +137,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
   const fetchUserPasses = async () => {
     if (!isAuthenticated) return;
     try {
-      setLoadingPasses(true);
       const res = await api.watchPasses.getMyPasses();
       if (res) {
         setUserWatchPasses({
@@ -130,8 +147,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
       }
     } catch {
       // Graceful fallback
-    } finally {
-      setLoadingPasses(false);
     }
   };
 
@@ -216,7 +231,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     }
   };
 
-  const hasAnyActivePlan = hasActiveSubscription || userWatchPasses.activePasses.length > 0;
+  const activePurchases = purchases.filter(p => !p.isExpired);
+  const hasAnyActivePlan = hasActiveSubscription || userWatchPasses.activePasses.length > 0 || activePurchases.length > 0;
 
   const getPlanDisplayName = () => {
     if (hasActiveSubscription && activeSubscription) {
@@ -235,6 +251,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
       if (planType === '7D') return 'Watch Pass (7 Days)';
       if (planType === '15D') return 'Watch Pass (15 Days)';
       return p.title ? `Watch Pass (${p.title})` : 'Watch Pass';
+    }
+    if (activePurchases.length > 0) {
+      const p = activePurchases[0];
+      const match = catalog.find(c => c.id === p.contentId);
+      return match ? `${match.title} (Movie Pass)` : 'Single Movie Pass';
     }
     if (pendingSubscription) {
       return 'VIP Subscription (Pending Approval)';
@@ -292,7 +313,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
           <span>Account Profile</span>
         </button>
 
-        {/* Active Subscriptions Tab */}
+        {/* Unified Active Passes & Subscriptions Tab */}
         <button
           onClick={() => setActiveSection('subscription')}
           style={{
@@ -301,17 +322,17 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
             gap: '8px',
             padding: '10px 18px',
             borderRadius: '12px',
-            border: activeSection === 'subscription' ? '1px solid rgba(245, 166, 35, 0.4)' : '1px solid transparent',
-            backgroundColor: activeSection === 'subscription' ? 'rgba(245, 166, 35, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-            color: activeSection === 'subscription' ? 'var(--brand-gold, #F5C518)' : 'var(--text-secondary)',
-            fontWeight: activeSection === 'subscription' ? 700 : 500,
+            border: activeSection === 'subscription' || activeSection === 'watchpasses' ? '1px solid rgba(245, 166, 35, 0.4)' : '1px solid transparent',
+            backgroundColor: activeSection === 'subscription' || activeSection === 'watchpasses' ? 'rgba(245, 166, 35, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+            color: activeSection === 'subscription' || activeSection === 'watchpasses' ? 'var(--brand-gold, #F5C518)' : 'var(--text-secondary)',
+            fontWeight: activeSection === 'subscription' || activeSection === 'watchpasses' ? 700 : 500,
             fontSize: '14px',
             cursor: 'pointer',
             transition: 'all var(--transition-fast)'
           }}
         >
           <Crown size={16} />
-          <span>Active Subscriptions</span>
+          <span>Active Passes &amp; Subscriptions</span>
           {hasAnyActivePlan ? (
             <span
               style={{
@@ -331,55 +352,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                 padding: '2px 8px',
                 borderRadius: '9999px',
                 backgroundColor: 'rgba(245, 166, 35, 0.2)',
-                color: 'var(--brand-gold)',
-                fontSize: '11px',
-                fontWeight: 800
-              }}
-            >
-              PENDING
-            </span>
-          ) : null}
-        </button>
-
-        {/* Watch Passes Tab (Independent access mechanism) */}
-        <button
-          onClick={() => setActiveSection('watchpasses')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 18px',
-            borderRadius: '12px',
-            border: activeSection === 'watchpasses' ? '1px solid rgba(245, 166, 35, 0.4)' : '1px solid transparent',
-            backgroundColor: activeSection === 'watchpasses' ? 'rgba(245, 166, 35, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-            color: activeSection === 'watchpasses' ? 'var(--brand-gold, #F5C518)' : 'var(--text-secondary)',
-            fontWeight: activeSection === 'watchpasses' ? 700 : 500,
-            fontSize: '14px',
-            cursor: 'pointer',
-            transition: 'all var(--transition-fast)'
-          }}
-        >
-          <Zap size={16} />
-          <span>Watch Passes</span>
-          {userWatchPasses.activePasses.length > 0 ? (
-            <span
-              style={{
-                padding: '2px 8px',
-                borderRadius: '9999px',
-                backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                color: '#10B981',
-                fontSize: '11px',
-                fontWeight: 800
-              }}
-            >
-              {userWatchPasses.activePasses.length} ACTIVE
-            </span>
-          ) : userWatchPasses.pendingPasses.length > 0 ? (
-            <span
-              style={{
-                padding: '2px 8px',
-                borderRadius: '9999px',
-                backgroundColor: 'rgba(245, 197, 24, 0.2)',
                 color: 'var(--brand-gold)',
                 fontSize: '11px',
                 fontWeight: 800
@@ -561,7 +533,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
             )}
           </div>
 
-          {/* Active Subscriptions Shortcut Strip */}
+          {/* Active Passes & Subscriptions Shortcut Strip */}
           <div
             onClick={() => {
               if (!hasAnyActivePlan) {
@@ -600,7 +572,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
               </div>
               <div>
                 <span style={{ fontSize: '12px', color: hasAnyActivePlan ? '#10B981' : 'var(--brand-gold)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  Active Subscriptions
+                  Active Passes &amp; Subscriptions
                 </span>
                 <div style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF' }}>
                   {hasAnyActivePlan
@@ -755,8 +727,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
         </>
       )}
 
-      {/* SECTION: ACTIVE SUBSCRIPTIONS & PLANS */}
-      {activeSection === 'subscription' && (
+      {/* SECTION: UNIFIED ACTIVE PASSES & SUBSCRIPTIONS */}
+      {(activeSection === 'subscription' || activeSection === 'watchpasses') && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           {/* Main Status Hero Card */}
           <div
@@ -796,7 +768,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--brand-gold, #F5C518)' }}>
                 <Crown size={20} />
                 <span style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                  Active Subscriptions
+                  Active Passes &amp; Subscriptions
                 </span>
               </div>
               {hasAnyActivePlan ? (
@@ -889,7 +861,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                         </span>
                       </div>
                       <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                        Unlimited streaming of all movies and web series unlocked. Full HD & 4K streaming.
+                        Unlimited streaming of all 300+ movies and web series unlocked. Full HD &amp; 4K streaming.
                       </p>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13px', color: '#D1D5DB' }}>
                         {activeSubscription.start_date && (
@@ -912,7 +884,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
 
                   {/* Active Watch Passes */}
                   {userWatchPasses.activePasses.map((p: any, idx: number) => {
-                    const passTitle = p.title || (p.plan_type === '24H' ? 'Watch Pass (24 Hours)' : p.plan_type === '3D' ? 'Watch Pass (3 Days)' : p.plan_type === '7D' ? 'Watch Pass (7 Days)' : p.plan_type === '15D' ? 'Watch Pass (15 Days)' : 'Watch Pass');
+                    const passTitle = p.content_title || p.title || (p.plan_type === '24H' ? 'Watch Pass (24 Hours)' : p.plan_type === '3D' ? 'Watch Pass (3 Days)' : p.plan_type === '7D' ? 'Watch Pass (7 Days)' : p.plan_type === '15D' ? 'Watch Pass (15 Days)' : 'Catalog Watch Pass');
                     const expStr = p.expires_at || p.expiresAt;
                     const startStr = p.created_at || p.createdAt || p.start_date || p.startsAt;
                     return (
@@ -962,6 +934,63 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <Clock size={15} color="#10B981" />
                               <span>Countdown: <strong style={{ color: '#10B981' }}>{formatCountdown(expStr)}</strong></span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Active Single Movie Passes */}
+                  {activePurchases.map((p, idx) => {
+                    const item = catalog.find(c => c.id === p.contentId);
+                    return (
+                      <div
+                        key={p.id || idx}
+                        style={{
+                          backgroundColor: 'rgba(168, 85, 247, 0.08)',
+                          border: '1px solid rgba(168, 85, 247, 0.3)',
+                          borderRadius: '16px',
+                          padding: '18px 20px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <Film size={20} color="#C084FC" />
+                            <span style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF' }}>
+                              {item?.title || 'Single Title Pass'}
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              padding: '3px 10px',
+                              borderRadius: '9999px',
+                              backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                              color: '#C084FC',
+                              fontSize: '12px',
+                              fontWeight: 800
+                            }}
+                          >
+                            ACTIVE MOVIE PASS
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13px', color: '#D1D5DB' }}>
+                          {p.purchasedAt && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Calendar size={15} color="#C084FC" />
+                              <span>Purchased: <strong>{new Date(p.purchasedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>
+                            </div>
+                          )}
+                          {p.expiresAt && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Calendar size={15} color="#C084FC" />
+                              <span>Valid until: <strong>{new Date(p.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>
+                            </div>
+                          )}
+                          {p.expiresAt && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Clock size={15} color="#C084FC" />
+                              <span>Countdown: <strong style={{ color: '#C084FC' }}>{formatCountdown(p.expiresAt)}</strong></span>
                             </div>
                           )}
                         </div>
@@ -1018,17 +1047,69 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
             )}
           </div>
 
-          {/* Available Plans Section */}
+          {/* All Available Plans Section (Watch Passes + VIP Subscriptions) */}
           <div>
-            <div style={{ marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', marginBottom: '4px' }}>
-                Subscription Plans
-              </h2>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                Select a plan, pay via any UPI app, and submit your UTR reference for instant verification.
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
+              <div>
+                <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF', marginBottom: '4px' }}>
+                  Available Passes &amp; Subscriptions
+                </h2>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  Choose flexible event-based Watch Passes or upgrade to full VIP subscriptions. Pay via any UPI app with instant or manual verification.
+                </p>
+              </div>
+
+              {/* Plan Category Filter */}
+              <div style={{ display: 'flex', gap: '8px', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '4px', borderRadius: '12px' }}>
+                <button
+                  onClick={() => setPlanCategoryFilter('all')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    backgroundColor: planCategoryFilter === 'all' ? 'var(--brand-gold)' : 'transparent',
+                    color: planCategoryFilter === 'all' ? '#000000' : '#E5E7EB'
+                  }}
+                >
+                  All Plans (7)
+                </button>
+                <button
+                  onClick={() => setPlanCategoryFilter('watch_pass')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    backgroundColor: planCategoryFilter === 'watch_pass' ? 'var(--brand-gold)' : 'transparent',
+                    color: planCategoryFilter === 'watch_pass' ? '#000000' : '#E5E7EB'
+                  }}
+                >
+                  Watch Passes (4)
+                </button>
+                <button
+                  onClick={() => setPlanCategoryFilter('vip')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    backgroundColor: planCategoryFilter === 'vip' ? 'var(--brand-gold)' : 'transparent',
+                    color: planCategoryFilter === 'vip' ? '#000000' : '#E5E7EB'
+                  }}
+                >
+                  VIP Subscriptions (3)
+                </button>
+              </div>
             </div>
 
+            {/* Combined Plans Grid */}
             <div
               style={{
                 display: 'grid',
@@ -1036,7 +1117,131 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                 gap: '20px'
               }}
             >
-              {subscriptionPlans.map((plan) => {
+              {/* 1. Watch Pass Tiers */}
+              {(planCategoryFilter === 'all' || planCategoryFilter === 'watch_pass') && [
+                {
+                  id: 'PASS_24H' as const,
+                  name: '24 Hours Pass',
+                  durationLabel: '24 Hours',
+                  price: 19,
+                  badge: 'Quick Pass',
+                  features: ['24 Hours Full Catalog Access', 'HD 720p Streaming', '1 Device Supported', 'Instant Activation']
+                },
+                {
+                  id: 'PASS_3D' as const,
+                  name: '3 Days Pass',
+                  durationLabel: '3 Days',
+                  price: 29,
+                  badge: 'Weekend Pass',
+                  features: ['3 Days Full Catalog Access', 'HD 720p Streaming', '1 Device + 1 Tablet', 'Binge Weekend Access']
+                },
+                {
+                  id: 'PASS_7D' as const,
+                  name: '7 Days Pass',
+                  durationLabel: '7 Days',
+                  price: 44,
+                  badge: 'Recommended',
+                  features: ['7 Days Full Catalog Access', 'Full HD 1080p Streaming', 'Download Available', '2 Devices + TV Cast']
+                },
+                {
+                  id: 'PASS_15D' as const,
+                  name: '15 Days Pass',
+                  durationLabel: '15 Days',
+                  price: 69,
+                  badge: 'Best Value Pass',
+                  features: ['15 Days Full Catalog Access', 'Full HD 1080p Streaming', 'Ad-Free Playback', '3 Devices + TV Cast']
+                }
+              ].map(pass => {
+                const isRecommended = pass.id === 'PASS_7D';
+                const hasThisActive = userWatchPasses.activePasses.some((p: any) => (p.plan_type || p.planType) === pass.id.replace('PASS_', ''));
+
+                return (
+                  <div
+                    key={pass.id}
+                    style={{
+                      backgroundColor: 'var(--bg-surface)',
+                      borderRadius: '20px',
+                      border: isRecommended
+                        ? '2px solid #10B981'
+                        : hasThisActive
+                        ? '1.5px solid rgba(16, 185, 129, 0.4)'
+                        : '1px solid rgba(255, 255, 255, 0.08)',
+                      padding: '24px',
+                      position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      boxShadow: isRecommended ? '0 12px 30px rgba(16, 185, 129, 0.15)' : 'none'
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '-12px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        backgroundColor: '#10B981',
+                        color: '#000000',
+                        fontSize: '11px',
+                        fontWeight: 900,
+                        padding: '3px 12px',
+                        borderRadius: '12px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em'
+                      }}
+                    >
+                      {pass.badge}
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', marginTop: '4px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Zap size={14} />
+                          {pass.name}
+                        </span>
+                        {hasThisActive && (
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#4ADE80', backgroundColor: 'rgba(34, 197, 94, 0.15)', padding: '2px 8px', borderRadius: '10px' }}>
+                            Active
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '16px' }}>
+                        <span style={{ fontSize: '32px', fontWeight: 900, color: '#FFFFFF' }}>
+                          ₹{pass.price}
+                        </span>
+                        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                          / {pass.durationLabel}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+                        {pass.features.map((f, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#D1D5DB' }}>
+                            <CheckCircle2 size={15} color="#10B981" />
+                            <span>{f}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => openWatchPassModal(null, pass.id, 'pay')}
+                      className="btn btn-secondary btn-block"
+                      style={{
+                        fontWeight: 700,
+                        borderColor: 'rgba(16, 185, 129, 0.4)',
+                        color: '#FFFFFF'
+                      }}
+                    >
+                      Get {pass.name}
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* 2. VIP Subscription Tiers */}
+              {(planCategoryFilter === 'all' || planCategoryFilter === 'vip') && subscriptionPlans.map((plan) => {
                 const isCurrentActive = activeSubscription?.plan === plan.id;
                 const isPendingForThis = pendingSubscription?.plan === plan.id;
                 const isPopular = plan.id === 'MONTHLY';
@@ -1057,7 +1262,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
-                      boxShadow: isPopular ? '0 12px 30px rgba(245, 197, 24, 0.1)' : 'none'
+                      boxShadow: isPopular ? '0 12px 30px rgba(245, 197, 24, 0.15)' : 'none'
                     }}
                   >
                     {isPopular && (
@@ -1082,8 +1287,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                     )}
 
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', marginTop: '4px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Crown size={14} />
                           {plan.name}
                         </span>
                         {isCurrentActive && (
@@ -1098,18 +1304,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                           ₹{plan.priceRupees}
                         </span>
                         <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                          / {plan.durationDays === 7 ? 'week' : plan.durationDays === 30 ? 'month' : 'year'}
+                          / {plan.durationDays === 7 ? 'week' : plan.durationDays === 30 ? 'month' : plan.durationDays === 90 ? '3 months' : 'year'}
                         </span>
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#D1D5DB' }}>
                           <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
-                          <span>Full HD & 4K Streaming</span>
+                          <span>Full HD &amp; 4K Ultra HD</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#D1D5DB' }}>
                           <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
-                          <span>Unlimited movies & web series</span>
+                          <span>Unlimited movies &amp; web series</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#D1D5DB' }}>
                           <CheckCircle2 size={15} color="var(--brand-gold, #F5C518)" />
@@ -1142,7 +1348,62 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                 );
               })}
             </div>
+
+            {/* Compare All Modal Trigger */}
+            <div style={{ textAlign: 'center', marginTop: '24px' }}>
+              <button
+                onClick={() => openPlanSelector()}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(245, 197, 24, 0.3)',
+                  color: 'var(--brand-gold, #F5C518)',
+                  padding: '10px 24px',
+                  borderRadius: '12px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Sparkles size={16} />
+                <span>Open Plan Selector &amp; Promo Code Checkout</span>
+              </button>
+            </div>
           </div>
+
+          {/* Past / Expired Passes History (if any) */}
+          {userWatchPasses.expiredPasses.length > 0 && (
+            <div style={{ marginTop: '8px' }}>
+              <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#9CA3AF', marginBottom: '12px' }}>
+                Past / Expired Passes ({userWatchPasses.expiredPasses.length})
+              </h4>
+              <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
+                {userWatchPasses.expiredPasses.map((p: any) => (
+                  <div
+                    key={p.id}
+                    style={{
+                      padding: '14px 18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#FFFFFF' }}>{p.content_title || 'Catalog Pass'}</div>
+                      <div style={{ fontSize: '11px', color: '#9CA3AF' }}>Expired on {new Date(p.expires_at || p.updated_at).toLocaleDateString('en-IN')}</div>
+                    </div>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', padding: '2px 8px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
+                      EXPIRED
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Secure Guarantee Note */}
           <div
@@ -1158,7 +1419,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
           >
             <ShieldCheck size={24} color="var(--brand-gold, #F5C518)" style={{ flexShrink: 0 }} />
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-              All subscription transactions are protected by FLOPSHOW's secure manual verification. After paying via UPI QR or VPA, simply paste your 12-digit UTR reference. Our team activates your VIP pass upon receipt.
+              All subscription &amp; watch pass transactions are protected by FLOPSHOW's secure manual verification. After paying via UPI QR or VPA, simply paste your 12-digit UTR reference. Our team activates your pass upon receipt.
             </p>
           </div>
         </div>
@@ -1904,6 +2165,41 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                 </div>
               </div>
 
+              {/* Clear Search History Option */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                  paddingTop: '16px',
+                  flexWrap: 'wrap'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>Clear Search History</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Purge all saved search queries and terms from local cache
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {clearSearchSuccess && (
+                    <span style={{ fontSize: '12px', color: '#4ADE80', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircle2 size={14} /> Purged!
+                    </span>
+                  )}
+                  <button
+                    onClick={handleClearSearchHistory}
+                    className="btn btn-ghost btn-sm"
+                    style={{ color: '#F87171', border: '1px solid rgba(248, 113, 113, 0.2)' }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Clear Search History</span>
+                  </button>
+                </div>
+              </div>
+
               <div
                 style={{
                   display: 'flex',
@@ -1942,213 +2238,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
         </div>
       )}
 
-      {/* SECTION 5: WATCH PASSES */}
-      {activeSection === 'watchpasses' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Header Info */}
-          <div
-            style={{
-              backgroundColor: 'var(--bg-surface)',
-              borderRadius: '20px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              padding: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '16px'
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <Zap size={18} color="var(--brand-gold, #F5C518)" />
-                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
-                  My FLOPSHOW Watch Passes
-                </h3>
-              </div>
-              <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0, maxWidth: '620px', lineHeight: 1.5 }}>
-                Catalog-wide temporary access passes for unlimited streaming across all eligible movies and series. Separate from permanent library ownership and full catalog subscriptions.
-              </p>
-            </div>
 
-            <button
-              onClick={() => onNavigate('plans')}
-              style={{
-                padding: '10px 18px',
-                borderRadius: '10px',
-                backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                border: '1px solid rgba(245, 197, 24, 0.35)',
-                color: 'var(--brand-gold, #F5C518)',
-                fontSize: '13px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <span>Browse All Pass Plans</span>
-            </button>
-          </div>
-
-          {/* Pending Passes Alert */}
-          {userWatchPasses.pendingPasses.length > 0 && (
-            <div
-              style={{
-                backgroundColor: 'rgba(245, 197, 24, 0.08)',
-                border: '1.5px solid var(--brand-gold, #F5C518)',
-                borderRadius: '16px',
-                padding: '18px 20px'
-              }}
-            >
-              <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', marginBottom: '8px' }}>
-                Pending Verification Requests ({userWatchPasses.pendingPasses.length})
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {userWatchPasses.pendingPasses.map(p => (
-                  <div
-                    key={p.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      fontSize: '13px',
-                      color: '#E5E7EB',
-                      padding: '8px 12px',
-                      backgroundColor: 'rgba(0,0,0,0.3)',
-                      borderRadius: '8px'
-                    }}
-                  >
-                    <span><strong>{p.content_title || 'Catalog-Wide Access'}</strong> ({p.plan ? p.plan.replace('PASS_', '') : 'PASS'})</span>
-                    <span style={{ color: '#9CA3AF' }}>UTR: {p.payment_reference} • ₹{p.amount_paid}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Active Passes */}
-          <div>
-            <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', marginBottom: '14px' }}>
-              Active Watch Passes ({userWatchPasses.activePasses.length})
-            </h4>
-
-            {loadingPasses ? (
-              <div style={{ textAlign: 'center', padding: '32px', color: '#9CA3AF' }}>
-                <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-                <span>Loading your passes...</span>
-              </div>
-            ) : userWatchPasses.activePasses.length === 0 ? (
-              <div
-                style={{
-                  backgroundColor: 'var(--bg-surface)',
-                  borderRadius: '16px',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  padding: '32px',
-                  textAlign: 'center',
-                  color: '#9CA3AF'
-                }}
-              >
-                <Clock size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-                <div style={{ fontSize: '15px', fontWeight: 700, color: '#FFFFFF', marginBottom: '6px' }}>
-                  No Active Watch Passes
-                </div>
-                <p style={{ fontSize: '13px', maxWidth: '400px', margin: '0 auto 18px' }}>
-                  You don't have an active catalog pass right now. Get a 24H, 3D, 7D, or 15D Watch Pass to start streaming!
-                </p>
-                <button
-                  onClick={() => onNavigate('plans')}
-                  className="btn btn-primary btn-sm"
-                >
-                  Browse Pass Plans
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px' }}>
-                {userWatchPasses.activePasses.map(p => (
-                  <div
-                    key={p.id}
-                    style={{
-                      backgroundColor: 'var(--bg-surface)',
-                      borderRadius: '16px',
-                      border: '1.5px solid #10B981',
-                      padding: '16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between'
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34D399', textTransform: 'uppercase' }}>
-                          Active Pass ({p.plan ? p.plan.replace('PASS_', '') : 'PASS'})
-                        </span>
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#34D399' }}>
-                          {p.remainingHours > 24 ? `${p.remainingDays} days left` : `${p.remainingHours}h left`}
-                        </span>
-                      </div>
-                      <h5 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 6px' }}>
-                        {p.content_title || 'Catalog-Wide Access'}
-                      </h5>
-                      <div style={{ fontSize: '12px', color: '#9CA3AF', marginBottom: '12px' }}>
-                        Activated: {new Date(p.activated_at).toLocaleDateString('en-IN')}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => onNavigate('discover')}
-                      style={{
-                        padding: '9px',
-                        borderRadius: '8px',
-                        backgroundColor: '#10B981',
-                        color: '#0E0E12',
-                        fontWeight: 800,
-                        fontSize: '13px',
-                        border: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Watch Now
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Expired Watch Passes History */}
-          {userWatchPasses.expiredPasses.length > 0 && (
-            <div style={{ marginTop: '14px' }}>
-              <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#9CA3AF', marginBottom: '12px' }}>
-                Past / Expired Passes ({userWatchPasses.expiredPasses.length})
-              </h4>
-              <div style={{ backgroundColor: 'var(--bg-surface)', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
-                {userWatchPasses.expiredPasses.map(p => (
-                  <div
-                    key={p.id}
-                    style={{
-                      padding: '14px 18px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                      fontSize: '13px'
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#FFFFFF' }}>{p.content_title || 'Content Item'}</div>
-                      <div style={{ fontSize: '11px', color: '#9CA3AF' }}>Expired on {new Date(p.expires_at || p.updated_at).toLocaleDateString('en-IN')}</div>
-                    </div>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', padding: '2px 8px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
-                      EXPIRED
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };

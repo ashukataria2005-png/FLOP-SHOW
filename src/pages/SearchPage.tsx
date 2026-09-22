@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GENRE_LIST } from '../data/catalog';
 import { ContentItem } from '../types/content';
 import { ContentCard } from '../components/cards/ContentCard';
 import { useApp } from '../context/AppContext';
-import { Search as SearchIcon, X, Film, Tv, Gift } from 'lucide-react';
+import { Search as SearchIcon, X, Film, Tv, Gift, Clock } from 'lucide-react';
 
 interface SearchPageProps {
   onSelectItem: (item: ContentItem) => void;
@@ -11,14 +11,26 @@ interface SearchPageProps {
 }
 
 export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem, initialFilter }) => {
-  const { catalog } = useApp();
+  const { catalog, searchHistory, addSearchHistory, removeSearchHistoryItem } = useApp();
   const activeCatalog = catalog || [];
   const [query, setQuery] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+  const searchWrapperRef = useRef<HTMLDivElement>(null);
   const [typeFilter, setTypeFilter] = useState<'all' | 'movie' | 'series'>('all');
   const [selectedGenre, setSelectedGenre] = useState<string>('All');
   const [priceFilter, setPriceFilter] = useState<'all' | 'free' | 'paid'>(() => {
     return initialFilter === 'free' ? 'free' : 'all';
   });
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+        setIsFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!initialFilter) return;
@@ -82,45 +94,155 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem, initialFil
         Search FLOPSHOW
       </h1>
 
-      {/* Search Input Bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          backgroundColor: 'var(--bg-surface)',
-          border: '1.5px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: '16px',
-          padding: '0 18px',
-          height: '56px',
-          marginBottom: '20px',
-          boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4)',
-          transition: 'border-color var(--transition-fast)'
-        }}
-        className="search-input-wrapper"
-      >
-        <SearchIcon size={22} color="var(--brand-gold)" style={{ marginRight: '14px', flexShrink: 0 }} />
-        <input
-          type="text"
-          placeholder="Search by movie, series, actor, or genre..."
-          value={query}
-          onChange={e => setQuery(e.target.value)}
+      {/* Search Input Bar with Recent History Dropdown */}
+      <div ref={searchWrapperRef} style={{ position: 'relative', marginBottom: '20px' }}>
+        <div
           style={{
-            flex: 1,
-            fontSize: '16px',
-            color: '#FFFFFF',
-            outline: 'none',
-            border: 'none',
-            background: 'transparent'
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: 'var(--bg-surface)',
+            border: isFocused ? '1.5px solid var(--brand-gold, #F5C518)' : '1.5px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '16px',
+            padding: '0 18px',
+            height: '56px',
+            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4)',
+            transition: 'border-color var(--transition-fast)'
           }}
-        />
-        {query && (
-          <button
-            onClick={() => setQuery('')}
-            style={{ color: 'var(--text-muted)', padding: '4px', cursor: 'pointer' }}
-            aria-label="Clear search"
+          className="search-input-wrapper"
+        >
+          <SearchIcon size={22} color="var(--brand-gold)" style={{ marginRight: '14px', flexShrink: 0 }} />
+          <input
+            type="text"
+            placeholder="Search by movie, series, actor, or genre..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && query.trim()) {
+                addSearchHistory(query.trim());
+                setIsFocused(false);
+              }
+            }}
+            style={{
+              flex: 1,
+              fontSize: '16px',
+              color: '#FFFFFF',
+              outline: 'none',
+              border: 'none',
+              background: 'transparent'
+            }}
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              style={{ color: 'var(--text-muted)', padding: '4px', cursor: 'pointer', background: 'transparent', border: 'none' }}
+              aria-label="Clear search"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+
+        {/* Recent Search History Dropdown Overlay */}
+        {isFocused && searchHistory.length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 8px)',
+              left: 0,
+              right: 0,
+              backgroundColor: '#13131C',
+              border: '1.5px solid rgba(245, 197, 24, 0.25)',
+              borderRadius: '16px',
+              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.75), 0 0 20px rgba(245, 197, 24, 0.08)',
+              zIndex: 100,
+              overflow: 'hidden',
+              backdropFilter: 'blur(16px)'
+            }}
           >
-            <X size={18} />
-          </button>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 18px 8px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#9CA3AF', fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                <Clock size={13} color="var(--brand-gold)" />
+                <span>Recent Searches</span>
+              </div>
+              <span style={{ fontSize: '11px', color: '#6B7280' }}>
+                {searchHistory.length} saved
+              </span>
+            </div>
+
+            <div style={{ padding: '6px 0', maxHeight: '320px', overflowY: 'auto' }}>
+              {searchHistory.map((item, idx) => (
+                <div
+                  key={`${item}-${idx}`}
+                  onClick={() => {
+                    setQuery(item);
+                    addSearchHistory(item);
+                    setIsFocused(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 18px',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s ease'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                    <SearchIcon size={14} color="var(--brand-gold)" style={{ flexShrink: 0, opacity: 0.7 }} />
+                    <span style={{ fontSize: '14px', color: '#E5E7EB', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item}
+                    </span>
+                  </div>
+
+                  {/* Individual Item Deletion (✕ Button) */}
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      removeSearchHistoryItem(item);
+                    }}
+                    title={`Remove "${item}" from history`}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#9CA3AF',
+                      padding: '4px 6px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.color = '#EF4444';
+                      e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.color = '#9CA3AF';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
@@ -286,7 +408,14 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem, initialFil
           }}
         >
           {filteredItems.map(item => (
-            <ContentCard key={item.id} item={item} onSelect={onSelectItem} />
+            <ContentCard
+              key={item.id}
+              item={item}
+              onSelect={selected => {
+                if (query.trim()) addSearchHistory(query.trim());
+                onSelectItem(selected);
+              }}
+            />
           ))}
         </div>
       ) : (

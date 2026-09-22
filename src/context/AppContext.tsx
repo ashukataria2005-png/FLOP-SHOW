@@ -142,6 +142,12 @@ interface AppContextType {
   playNextEpisode: () => void;
   playPrevEpisode: () => void;
 
+  // Search History
+  searchHistory: string[];
+  addSearchHistory: (query: string) => void;
+  removeSearchHistoryItem: (query: string) => void;
+  clearSearchHistory: () => void;
+
   // Session
   sessionLoading: boolean;
 
@@ -399,6 +405,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     } catch {
       // Offline fallback
+    }
+  };
+
+  // Search History persistent state (stored in 'flops_search_history')
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('flops_search_history');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return parsed.slice(0, 10);
+      }
+    } catch {
+      // Ignore
+    }
+    return [];
+  });
+
+  const addSearchHistory = (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed.length < 2) return;
+    setSearchHistory(prev => {
+      const filtered = prev.filter(item => item.toLowerCase() !== trimmed.toLowerCase());
+      const updated = [trimmed, ...filtered].slice(0, 10);
+      try {
+        localStorage.setItem('flops_search_history', JSON.stringify(updated));
+      } catch {
+        // Ignore
+      }
+      return updated;
+    });
+  };
+
+  const removeSearchHistoryItem = (query: string) => {
+    setSearchHistory(prev => {
+      const updated = prev.filter(item => item !== query);
+      try {
+        localStorage.setItem('flops_search_history', JSON.stringify(updated));
+      } catch {
+        // Ignore
+      }
+      return updated;
+    });
+  };
+
+  const clearSearchHistory = () => {
+    setSearchHistory([]);
+    try {
+      localStorage.removeItem('flops_search_history');
+    } catch {
+      // Ignore
     }
   };
 
@@ -1338,7 +1394,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         playPrevEpisode,
         toasts,
         showToast,
-        sessionLoading
+        sessionLoading,
+        searchHistory,
+        addSearchHistory,
+        removeSearchHistoryItem,
+        clearSearchHistory
       }}
     >
       {children}

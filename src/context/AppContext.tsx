@@ -75,7 +75,7 @@ interface AppContextType {
   purchaseTarget: ContentItem | null;
   watchPassTarget: ContentItem | null;
   planSelectorTarget: ContentItem | null;
-  openPlanSelector: (item: ContentItem) => void;
+  openPlanSelector: (item?: ContentItem | null) => void;
   closePlanSelector: () => void;
   openPurchaseModal: (item: ContentItem) => void;
   closePurchaseModal: () => void;
@@ -120,8 +120,13 @@ interface AppContextType {
     submitted_at: string;
   } | null;
   hasActiveSubscription: boolean;
+  activeWatchPass: any | null;
+  activeWatchPasses: any[];
+  hasActiveWatchPass: boolean;
+  userWatchPasses: { activePasses: any[]; expiredPasses: any[]; pendingPasses: any[] };
   refreshMonetizationConfig: () => Promise<void>;
   refreshSubscriptionStatus: () => Promise<void>;
+  refreshWatchPassStatus: () => Promise<void>;
   submitSubscriptionRequest: (plan: 'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY', utr: string, userName?: string, userEmail?: string, promoCode?: string) => Promise<{ success: boolean; message: string }>;
 
   // Player State
@@ -222,8 +227,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [watchPassInitialStep, setWatchPassInitialStep] = useState<'choose' | 'pay'>('choose');
   const [planSelectorTarget, setPlanSelectorTarget] = useState<ContentItem | null>(null);
 
-  const openPlanSelector = (item: ContentItem) => {
-    setPlanSelectorTarget(item);
+  const openPlanSelector = (item?: ContentItem | null) => {
+    setPlanSelectorTarget(item || null);
     setActiveModal('plan_selector');
   };
 
@@ -300,6 +305,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [activeSubscription, setActiveSubscription] = useState<any>(null);
   const [pendingSubscription, setPendingSubscription] = useState<any>(null);
   const [hasActiveSubscription, setHasActiveSubscription] = useState<boolean>(false);
+  const [userWatchPasses, setUserWatchPasses] = useState<{ activePasses: any[]; expiredPasses: any[]; pendingPasses: any[] }>({
+    activePasses: [],
+    expiredPasses: [],
+    pendingPasses: []
+  });
+  const [activeWatchPass, setActiveWatchPass] = useState<any | null>(null);
+  const [hasActiveWatchPass, setHasActiveWatchPass] = useState<boolean>(false);
   const [subscriptionTargetPlan, setSubscriptionTargetPlan] = useState<'MONTHLY' | '3_MONTHS' | 'YEARLY' | 'WEEKLY'>('MONTHLY');
   const [subscriptionTargetStep, setSubscriptionTargetStep] = useState<'choose' | 'pay'>('choose');
 
@@ -333,18 +345,58 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const refreshWatchPassStatus = async () => {
+    if (!isAuthenticated) {
+      setUserWatchPasses({ activePasses: [], expiredPasses: [], pendingPasses: [] });
+      setActiveWatchPass(null);
+      setHasActiveWatchPass(false);
+      return;
+    }
+    try {
+      const res = await api.watchPasses.getMyPasses();
+      if (res) {
+        const active = Array.isArray(res.activePasses) ? res.activePasses : [];
+        const expired = Array.isArray(res.expiredPasses) ? res.expiredPasses : [];
+        const pending = Array.isArray(res.pendingPasses) ? res.pendingPasses : [];
+        setUserWatchPasses({ activePasses: active, expiredPasses: expired, pendingPasses: pending });
+        setActiveWatchPass(active.length > 0 ? active[0] : null);
+        setHasActiveWatchPass(active.length > 0);
+      }
+    } catch {
+      // Offline fallback
+    }
+  };
+
   const refreshSubscriptionStatus = async () => {
     if (!isAuthenticated) {
       setActiveSubscription(null);
       setPendingSubscription(null);
       setHasActiveSubscription(false);
+      setUserWatchPasses({ activePasses: [], expiredPasses: [], pendingPasses: [] });
+      setActiveWatchPass(null);
+      setHasActiveWatchPass(false);
       return;
     }
     try {
-      const status = await api.subscriptions.getMyStatus();
-      setHasActiveSubscription(Boolean(status?.hasActiveSubscription));
-      setActiveSubscription(status?.activeSubscription || null);
-      setPendingSubscription(status?.pendingSubscription || null);
+      const [statusRes, passRes] = await Promise.allSettled([
+        api.subscriptions.getMyStatus(),
+        api.watchPasses.getMyPasses()
+      ]);
+
+      if (statusRes.status === 'fulfilled' && statusRes.value) {
+        setHasActiveSubscription(Boolean(statusRes.value.hasActiveSubscription));
+        setActiveSubscription(statusRes.value.activeSubscription || null);
+        setPendingSubscription(statusRes.value.pendingSubscription || null);
+      }
+
+      if (passRes.status === 'fulfilled' && passRes.value) {
+        const active = Array.isArray(passRes.value.activePasses) ? passRes.value.activePasses : [];
+        const expired = Array.isArray(passRes.value.expiredPasses) ? passRes.value.expiredPasses : [];
+        const pending = Array.isArray(passRes.value.pendingPasses) ? passRes.value.pendingPasses : [];
+        setUserWatchPasses({ activePasses: active, expiredPasses: expired, pendingPasses: pending });
+        setActiveWatchPass(active.length > 0 ? active[0] : null);
+        setHasActiveWatchPass(active.length > 0);
+      }
     } catch {
       // Offline fallback
     }
@@ -651,6 +703,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setPurchases([]);
     setMyList([]);
     setWatchProgress([]);
+    setUserWatchPasses({ activePasses: [], expiredPasses: [], pendingPasses: [] });
+    setActiveWatchPass(null);
+    setHasActiveWatchPass(false);
     // Clear persisted per-user keys from localStorage
     saveToStorage('user', GUEST_USER);
     saveToStorage('wallet_balance', 0);
@@ -1262,8 +1317,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         activeSubscription,
         pendingSubscription,
         hasActiveSubscription,
+        activeWatchPass,
+        activeWatchPasses: userWatchPasses.activePasses,
+        hasActiveWatchPass,
+        userWatchPasses,
         refreshMonetizationConfig,
         refreshSubscriptionStatus,
+        refreshWatchPassStatus,
         submitSubscriptionRequest,
         activePlayerContent,
         activeEpisode,

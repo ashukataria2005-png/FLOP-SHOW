@@ -24,7 +24,8 @@ export const PlanSelectionModal: React.FC = () => {
     closePlanSelector,
     openPurchaseModal,
     openWatchPassModal,
-    openSubscriptionModal
+    openSubscriptionModal,
+    catalog
   } = useApp();
 
   const [activeTier, setActiveTier] = useState<'single' | 'watch_pass' | 'vip'>('single');
@@ -80,9 +81,31 @@ export const PlanSelectionModal: React.FC = () => {
     }
   }, [activeModal]);
 
-  if (activeModal !== 'plan_selector' || !planSelectorTarget) return null;
+  useEffect(() => {
+    if (activeModal === 'plan_selector' && !planSelectorTarget) {
+      setActiveTier('watch_pass');
+    }
+  }, [activeModal, planSelectorTarget]);
 
-  const item = planSelectorTarget;
+  if (activeModal !== 'plan_selector') return null;
+
+  const defaultItem: any = catalog?.[0] || {
+    id: 'catalog-all',
+    title: 'All Catalog Titles',
+    type: 'movie',
+    backdropUrl: '',
+    posterUrl: '',
+    description: 'Full access to all 300+ movies and web series on FLOPSHOW.',
+    about: 'Full catalog streaming pass',
+    rating: 9.0,
+    releaseYear: 2026,
+    language: 'Hindi & English',
+    genres: ['All Genres'],
+    price: 30
+  };
+
+  const item = planSelectorTarget || defaultItem;
+  const isGeneralMode = !planSelectorTarget;
   const isSeries = item.type === 'series';
   const ownPrice = item.price || (isSeries ? 35 : 30);
 
@@ -375,7 +398,7 @@ export const PlanSelectionModal: React.FC = () => {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
-                  Subscribe to Watch
+                  {isGeneralMode ? 'Choose Your Streaming Plan' : 'Subscribe to Watch'}
                 </h3>
                 <span
                   style={{
@@ -388,11 +411,13 @@ export const PlanSelectionModal: React.FC = () => {
                     textTransform: 'uppercase'
                   }}
                 >
-                  {item.title}
+                  {isGeneralMode ? 'All 300+ Catalog Titles' : item.title}
                 </span>
               </div>
               <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '2px 0 0' }}>
-                Single title purchase, flexible watch pass, or all-access VIP subscription.
+                {isGeneralMode
+                  ? 'Select any flexible Watch Pass or an all-access VIP subscription.'
+                  : 'Single title purchase, flexible watch pass, or all-access VIP subscription.'}
               </p>
             </div>
           </div>

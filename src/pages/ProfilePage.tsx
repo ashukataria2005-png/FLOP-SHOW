@@ -51,7 +51,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     activeSubscription,
     pendingSubscription,
     hasActiveSubscription,
-    openSubscriptionModal
+    openSubscriptionModal,
+    openPlanSelector,
+    refreshSubscriptionStatus
   } = useApp();
 
   const [activeSection, setActiveSection] = useState<'profile' | 'subscription' | 'settings' | 'watchpasses'>(() => {
@@ -134,8 +136,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
   };
 
   useEffect(() => {
-    if (activeSection === 'watchpasses') {
+    if (isAuthenticated) {
       fetchUserPasses();
+      refreshSubscriptionStatus();
     }
   }, [isAuthenticated, walletBalance, activeSection]);
 
@@ -213,32 +216,47 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     }
   };
 
-  const currentPlanName = (() => {
+  const hasAnyActivePlan = hasActiveSubscription || userWatchPasses.activePasses.length > 0;
+
+  const getPlanDisplayName = () => {
     if (hasActiveSubscription && activeSubscription) {
-      const planId = (activeSubscription as any).plan_id || (activeSubscription as any).planId;
-      if (planId === 'MONTHLY') return 'VIP Monthly';
-      if (planId === '3_MONTHS') return 'VIP 3 Months';
-      if (planId === 'YEARLY') return 'VIP Yearly (12 Months)';
-      if (planId === 'WEEKLY') return 'VIP Weekly';
-      return 'VIP Subscription';
+      const planId = (activeSubscription as any).plan || (activeSubscription as any).plan_id || (activeSubscription as any).planId;
+      if (planId === 'MONTHLY') return 'VIP Standard - 1 Month';
+      if (planId === '3_MONTHS') return 'VIP Standard - 3 Months';
+      if (planId === 'YEARLY') return 'VIP Annual Pass';
+      if (planId === 'WEEKLY') return 'VIP Weekly Pass';
+      return (activeSubscription as any).name || (planId ? `VIP ${planId}` : 'VIP Subscription');
     }
     if (userWatchPasses.activePasses.length > 0) {
       const p = userWatchPasses.activePasses[0];
       const planType = p.plan_type || p.planType;
-      if (planType === '24H') return 'Watch Pass (24H)';
+      if (planType === '24H') return 'Watch Pass (24 Hours)';
       if (planType === '3D') return 'Watch Pass (3 Days)';
       if (planType === '7D') return 'Watch Pass (7 Days)';
       if (planType === '15D') return 'Watch Pass (15 Days)';
-      return 'Watch Pass';
+      return p.title ? `Watch Pass (${p.title})` : 'Watch Pass';
     }
     if (pendingSubscription) {
-      return 'Subscription (Pending Approval)';
+      return 'VIP Subscription (Pending Approval)';
     }
     if (userWatchPasses.pendingPasses.length > 0) {
       return 'Watch Pass (Pending Approval)';
     }
-    return 'Free / Standard Plan';
-  })();
+    return 'Free Tier';
+  };
+
+  const currentPlanName = getPlanDisplayName();
+
+  const formatCountdown = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const diffMs = new Date(dateStr).getTime() - Date.now();
+    if (diffMs <= 0) return 'Expired';
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    if (days > 0) return `${days}d ${hours}h remaining`;
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m remaining`;
+  };
 
   return (
     <div style={{ padding: '24px 20px', maxWidth: '840px', margin: '0 auto' }}>
@@ -274,7 +292,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
           <span>Account Profile</span>
         </button>
 
-        {/* VIP Subscription Tab */}
+        {/* Active Subscriptions Tab */}
         <button
           onClick={() => setActiveSection('subscription')}
           style={{
@@ -293,8 +311,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
           }}
         >
           <Crown size={16} />
-          <span>VIP Subscription</span>
-          {hasActiveSubscription ? (
+          <span>Active Subscriptions</span>
+          {hasAnyActivePlan ? (
             <span
               style={{
                 padding: '2px 8px',
@@ -307,7 +325,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
             >
               ACTIVE
             </span>
-          ) : pendingSubscription ? (
+          ) : (pendingSubscription || userWatchPasses.pendingPasses.length > 0) ? (
             <span
               style={{
                 padding: '2px 8px',
@@ -543,15 +561,21 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
             )}
           </div>
 
-          {/* Subscription Shortcut Strip */}
+          {/* Active Subscriptions Shortcut Strip */}
           <div
-            onClick={() => setActiveSection('subscription')}
+            onClick={() => {
+              if (!hasAnyActivePlan) {
+                openPlanSelector();
+              } else {
+                setActiveSection('subscription');
+              }
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              backgroundColor: hasActiveSubscription ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 166, 35, 0.08)',
-              border: `1px solid ${hasActiveSubscription ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 166, 35, 0.3)'}`,
+              backgroundColor: hasAnyActivePlan ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 166, 35, 0.08)',
+              border: `1px solid ${hasAnyActivePlan ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 166, 35, 0.3)'}`,
               borderRadius: '16px',
               padding: '18px 20px',
               marginBottom: '24px',
@@ -565,29 +589,62 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                   width: '42px',
                   height: '42px',
                   borderRadius: '50%',
-                  backgroundColor: hasActiveSubscription ? '#10B981' : 'var(--brand-gold)',
+                  backgroundColor: hasAnyActivePlan ? '#10B981' : 'var(--brand-gold)',
                   color: '#0E0E12',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
               >
-                <Crown size={22} />
+                {hasActiveSubscription ? <Crown size={22} /> : userWatchPasses.activePasses.length > 0 ? <Zap size={22} /> : <Crown size={22} />}
               </div>
               <div>
-                <span style={{ fontSize: '12px', color: hasActiveSubscription ? '#10B981' : 'var(--brand-gold)', fontWeight: 700, textTransform: 'uppercase' }}>
-                  VIP Subscription Status
+                <span style={{ fontSize: '12px', color: hasAnyActivePlan ? '#10B981' : 'var(--brand-gold)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  Active Subscriptions
                 </span>
-                <div style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF' }}>
-                  {hasActiveSubscription ? `${activeSubscription?.plan} Plan Active` : pendingSubscription ? 'Payment Verification Pending' : 'No Active Subscription'}
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF' }}>
+                  {hasAnyActivePlan
+                    ? `${currentPlanName} Active`
+                    : (pendingSubscription || userWatchPasses.pendingPasses.length > 0)
+                    ? 'Payment Verification Pending'
+                    : 'No active plans currently. Explore passes & subscriptions.'}
                 </div>
+                {hasAnyActivePlan && (
+                  <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    {hasActiveSubscription && activeSubscription && (
+                      <>
+                        <span>Expires: {new Date(activeSubscription.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        <span style={{ color: '#10B981', fontWeight: 600 }}>({formatCountdown(activeSubscription.end_date)})</span>
+                      </>
+                    )}
+                    {!hasActiveSubscription && userWatchPasses.activePasses.length > 0 && (
+                      <>
+                        <span>Expires: {new Date(userWatchPasses.activePasses[0].expires_at || userWatchPasses.activePasses[0].expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        <span style={{ color: '#10B981', fontWeight: 600 }}>({formatCountdown(userWatchPasses.activePasses[0].expires_at || userWatchPasses.activePasses[0].expiresAt)})</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '13px', color: hasActiveSubscription ? '#10B981' : 'var(--brand-gold)', fontWeight: 600 }}>
-                {hasActiveSubscription ? 'View Plan Details →' : 'View Plans →'}
-              </span>
+              {hasAnyActivePlan ? (
+                <span style={{ fontSize: '13px', color: '#10B981', fontWeight: 600 }}>
+                  View Plan Details →
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openPlanSelector();
+                  }}
+                  className="btn btn-primary btn-sm"
+                  style={{ fontWeight: 700 }}
+                >
+                  View Plans →
+                </button>
+              )}
             </div>
           </div>
 
@@ -698,23 +755,23 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
         </>
       )}
 
-      {/* SECTION: VIP SUBSCRIPTION PASS & PLANS */}
+      {/* SECTION: ACTIVE SUBSCRIPTIONS & PLANS */}
       {activeSection === 'subscription' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           {/* Main Status Hero Card */}
           <div
             style={{
-              background: hasActiveSubscription
+              background: hasAnyActivePlan
                 ? 'linear-gradient(135deg, #2A1F0D 0%, #17141D 50%, #0E0E14 100%)'
                 : 'linear-gradient(135deg, #1C1914 0%, #151318 50%, #0E0E14 100%)',
-              border: hasActiveSubscription
+              border: hasAnyActivePlan
                 ? '1.5px solid rgba(245, 197, 24, 0.5)'
                 : '1.5px solid rgba(255, 255, 255, 0.1)',
               borderRadius: '24px',
               padding: 'clamp(24px, 4vw, 36px)',
               position: 'relative',
               overflow: 'hidden',
-              boxShadow: hasActiveSubscription
+              boxShadow: hasAnyActivePlan
                 ? '0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(245, 197, 24, 0.15)'
                 : '0 16px 40px rgba(0, 0, 0, 0.5)'
             }}
@@ -728,7 +785,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                 width: '220px',
                 height: '220px',
                 borderRadius: '50%',
-                background: hasActiveSubscription
+                background: hasAnyActivePlan
                   ? 'radial-gradient(circle, rgba(245, 197, 24, 0.28) 0%, transparent 70%)'
                   : 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)',
                 pointerEvents: 'none'
@@ -739,10 +796,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--brand-gold, #F5C518)' }}>
                 <Crown size={20} />
                 <span style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                  FLOPSHOW VIP Pass
+                  Active Subscriptions
                 </span>
               </div>
-              {hasActiveSubscription ? (
+              {hasAnyActivePlan ? (
                 <span
                   style={{
                     backgroundColor: 'rgba(34, 197, 94, 0.15)',
@@ -760,7 +817,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
                   <CheckCircle2 size={12} />
                   ACTIVE
                 </span>
-              ) : pendingSubscription ? (
+              ) : (pendingSubscription || userWatchPasses.pendingPasses.length > 0) ? (
                 <span
                   style={{
                     backgroundColor: 'rgba(234, 179, 8, 0.15)',
@@ -794,40 +851,147 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
               )}
             </div>
 
-            {hasActiveSubscription && activeSubscription ? (
+            {hasAnyActivePlan ? (
               <div>
-                <h1 style={{ fontSize: 'clamp(26px, 4vw, 36px)', fontWeight: 900, color: '#FFFFFF', marginBottom: '8px' }}>
-                  {activeSubscription.plan.toUpperCase()} PASS
+                <h1 style={{ fontSize: 'clamp(24px, 4vw, 32px)', fontWeight: 900, color: '#FFFFFF', marginBottom: '16px' }}>
+                  Your Active Access Plans
                 </h1>
-                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-                  Unlimited streaming of all movies and web series unlocked.
-                </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#D1D5DB', fontSize: '13px' }}>
-                    <Calendar size={16} color="var(--brand-gold)" />
-                    <span>Valid until: <strong>{new Date(activeSubscription.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#D1D5DB', fontSize: '13px' }}>
-                    <Clock size={16} color="var(--brand-gold)" />
-                    <span>Days remaining: <strong>{activeSubscription.daysRemaining} days</strong></span>
-                  </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
+                  {/* VIP Subscription if active */}
+                  {hasActiveSubscription && activeSubscription && (
+                    <div
+                      style={{
+                        backgroundColor: 'rgba(245, 197, 24, 0.08)',
+                        border: '1px solid rgba(245, 197, 24, 0.3)',
+                        borderRadius: '16px',
+                        padding: '18px 20px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <Crown size={20} color="var(--brand-gold)" />
+                          <span style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF' }}>
+                            {activeSubscription.plan === 'MONTHLY' ? 'VIP Standard - 1 Month' : activeSubscription.plan === '3_MONTHS' ? 'VIP Standard - 3 Months' : activeSubscription.plan === 'YEARLY' ? 'VIP Annual Pass' : `${activeSubscription.plan} Pass`}
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            padding: '3px 10px',
+                            borderRadius: '9999px',
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                            color: '#10B981',
+                            fontSize: '12px',
+                            fontWeight: 800
+                          }}
+                        >
+                          ACTIVE VIP
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                        Unlimited streaming of all movies and web series unlocked. Full HD & 4K streaming.
+                      </p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13px', color: '#D1D5DB' }}>
+                        {activeSubscription.start_date && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Calendar size={15} color="var(--brand-gold)" />
+                            <span>Started: <strong>{new Date(activeSubscription.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Calendar size={15} color="var(--brand-gold)" />
+                          <span>Valid until: <strong>{new Date(activeSubscription.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Clock size={15} color="var(--brand-gold)" />
+                          <span>Countdown: <strong style={{ color: '#10B981' }}>{formatCountdown(activeSubscription.end_date)}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active Watch Passes */}
+                  {userWatchPasses.activePasses.map((p: any, idx: number) => {
+                    const passTitle = p.title || (p.plan_type === '24H' ? 'Watch Pass (24 Hours)' : p.plan_type === '3D' ? 'Watch Pass (3 Days)' : p.plan_type === '7D' ? 'Watch Pass (7 Days)' : p.plan_type === '15D' ? 'Watch Pass (15 Days)' : 'Watch Pass');
+                    const expStr = p.expires_at || p.expiresAt;
+                    const startStr = p.created_at || p.createdAt || p.start_date || p.startsAt;
+                    return (
+                      <div
+                        key={p.id || idx}
+                        style={{
+                          backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                          borderRadius: '16px',
+                          padding: '18px 20px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <Zap size={20} color="#10B981" />
+                            <span style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF' }}>
+                              {passTitle}
+                            </span>
+                          </div>
+                          <span
+                            style={{
+                              padding: '3px 10px',
+                              borderRadius: '9999px',
+                              backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                              color: '#10B981',
+                              fontSize: '12px',
+                              fontWeight: 800
+                            }}
+                          >
+                            ACTIVE PASS
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13px', color: '#D1D5DB' }}>
+                          {startStr && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Calendar size={15} color="#10B981" />
+                              <span>Started: <strong>{new Date(startStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>
+                            </div>
+                          )}
+                          {expStr && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Calendar size={15} color="#10B981" />
+                              <span>Valid until: <strong>{new Date(expStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></span>
+                            </div>
+                          )}
+                          {expStr && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Clock size={15} color="#10B981" />
+                              <span>Countdown: <strong style={{ color: '#10B981' }}>{formatCountdown(expStr)}</strong></span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <button
-                  onClick={() => openSubscriptionModal('MONTHLY', 'choose')}
-                  className="btn btn-primary"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontWeight: 700 }}
-                >
-                  <Sparkles size={16} />
-                  <span>Renew or Extend Pass</span>
-                </button>
+
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => openPlanSelector()}
+                    className="btn btn-primary"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontWeight: 700 }}
+                  >
+                    <Sparkles size={16} />
+                    <span>Renew or Explore Other Plans</span>
+                  </button>
+                </div>
               </div>
-            ) : pendingSubscription ? (
+            ) : pendingSubscription || userWatchPasses.pendingPasses.length > 0 ? (
               <div>
                 <h1 style={{ fontSize: 'clamp(22px, 3.5vw, 30px)', fontWeight: 900, color: '#FACC15', marginBottom: '8px' }}>
                   Payment Verification Underway
                 </h1>
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '18px', maxWidth: '600px' }}>
-                  Your request for the <strong>{pendingSubscription.plan.toUpperCase()}</strong> plan (₹{pendingSubscription.amount_paid}) with UTR reference <code style={{ color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{pendingSubscription.payment_reference}</code> has been submitted. Our administrators are verifying your transaction. Access will automatically activate once approved.
+                  {pendingSubscription ? (
+                    <>Your request for the <strong>{pendingSubscription.plan.toUpperCase()}</strong> plan (₹{pendingSubscription.amount_paid}) with UTR reference <code style={{ color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{pendingSubscription.payment_reference}</code> has been submitted. Our administrators are verifying your transaction.</>
+                  ) : (
+                    <>Your watch pass payment request is currently being verified by our administrators. Access will activate automatically once approved.</>
+                  )}
                 </p>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#FACC15', backgroundColor: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.25)', padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600 }}>
                   <Clock size={15} />
@@ -837,18 +1001,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
             ) : (
               <div>
                 <h1 style={{ fontSize: 'clamp(24px, 4vw, 34px)', fontWeight: 900, color: '#FFFFFF', marginBottom: '8px' }}>
-                  Subscribe for Unlimited OTT Streaming
+                  No active plans currently. Explore passes &amp; subscriptions.
                 </h1>
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px', maxWidth: '600px' }}>
-                  Switch to an all-inclusive VIP pass to stream every blockbuster, exclusive original, and full web series season with zero per-content charges.
+                  Unlock all 300+ blockbuster movies, exclusive web series originals, and full seasons with an all-inclusive VIP pass or single-event watch passes.
                 </p>
                 <button
-                  onClick={() => openSubscriptionModal('MONTHLY', 'choose')}
+                  onClick={() => openPlanSelector()}
                   className="btn btn-primary"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontWeight: 700, fontSize: '15px' }}
                 >
                   <Crown size={18} />
-                  <span>Choose Your Plan</span>
+                  <span>View Plans</span>
                 </button>
               </div>
             )}

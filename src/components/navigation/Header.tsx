@@ -1,7 +1,7 @@
 import React from 'react';
 import { Logo } from '../common/Logo';
 import { useApp } from '../../context/AppContext';
-import { Search, Compass, Bookmark, Crown, Zap, Gift } from 'lucide-react';
+import { Search, Compass, Bookmark, Crown, Zap, Gift, Sparkles } from 'lucide-react';
 
 interface HeaderProps {
   currentTab: string;
@@ -11,10 +11,11 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
   const {
     user,
-    monetizationMode,
     hasActiveSubscription,
     activeSubscription,
-    openSubscriptionModal
+    hasActiveWatchPass,
+    activeWatchPass,
+    openPlanSelector
   } = useApp();
 
   const handleHomeNavigation = () => {
@@ -138,60 +139,153 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
       </nav>
 
       {/* Right Action Icons: Subscription pill & Avatar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        {/* Bonus / Rewards Pill */}
-        <button
-          onClick={() => onNavigate('bonus')}
-          title="Bonus & Rewards Hub"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '6px 12px',
-            borderRadius: 'var(--radius-pill)',
-            backgroundColor: currentTab === 'bonus' ? 'rgba(245, 197, 24, 0.25)' : 'rgba(245, 197, 24, 0.12)',
-            border: '1px solid rgba(245, 197, 24, 0.35)',
-            color: 'var(--brand-gold)',
-            fontSize: '13px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            transition: 'all var(--transition-fast)'
-          }}
-        >
-          <Gift size={14} />
-          <span>Bonus</span>
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Dynamic Plan Badge (Replaces duplicate Bonus button) */}
+        {(() => {
+          if (hasActiveSubscription && activeSubscription) {
+            const planLabel = activeSubscription.plan === 'MONTHLY'
+              ? 'MONTHLY VIP'
+              : activeSubscription.plan === '3_MONTHS'
+              ? '3M VIP'
+              : activeSubscription.plan === 'YEARLY'
+              ? 'ANNUAL VIP'
+              : activeSubscription.plan === 'WEEKLY'
+              ? 'WEEKLY VIP'
+              : 'VIP MEMBER';
 
-        {/* Mode B: Subscription Badge / CTA */}
-        {monetizationMode === 'SUBSCRIPTION' && (
-          <button
-            onClick={() => {
-              if (hasActiveSubscription) {
-                onNavigate('profile', 'subscription');
-              } else {
-                openSubscriptionModal();
-              }
-            }}
-            title={hasActiveSubscription ? 'Active Subscription' : 'Subscribe to FLOPSHOW'}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-pill)',
-              backgroundColor: hasActiveSubscription ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 166, 35, 0.15)',
-              border: `1px solid ${hasActiveSubscription ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 166, 35, 0.4)'}`,
-              color: hasActiveSubscription ? '#10B981' : 'var(--brand-gold)',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all var(--transition-fast)'
-            }}
-          >
-            <Crown size={14} />
-            <span>{hasActiveSubscription ? (activeSubscription?.plan ? `${activeSubscription.plan}` : 'VIP Active') : 'Subscribe'}</span>
-          </button>
-        )}
+            return (
+              <button
+                onClick={() => openPlanSelector()}
+                title="Active VIP Subscription - Click to view plans & details"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-pill)',
+                  background: 'linear-gradient(135deg, rgba(245, 197, 24, 0.22) 0%, rgba(168, 85, 247, 0.22) 100%)',
+                  border: '1.5px solid var(--brand-gold, #F5C518)',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(245, 197, 24, 0.25)',
+                  transition: 'all var(--transition-fast)'
+                }}
+              >
+                <Crown size={14} color="var(--brand-gold, #F5C518)" />
+                <span>{planLabel}</span>
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: '#10B981',
+                    boxShadow: '0 0 6px #10B981',
+                    marginLeft: '2px'
+                  }}
+                />
+              </button>
+            );
+          }
+
+          if (hasActiveWatchPass && activeWatchPass) {
+            const passName = activeWatchPass.plan === 'PASS_24H'
+              ? '24H PASS'
+              : activeWatchPass.plan === 'PASS_3D'
+              ? '3D PASS'
+              : activeWatchPass.plan === 'PASS_7D'
+              ? '7D PASS'
+              : activeWatchPass.plan === 'PASS_15D'
+              ? '15D PASS'
+              : activeWatchPass.plan === 'PASS_30D'
+              ? '30D PASS'
+              : 'WATCH PASS';
+
+            return (
+              <button
+                onClick={() => openPlanSelector()}
+                title="Active Watch Pass - Click to view plans & details"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-pill)',
+                  backgroundColor: 'rgba(16, 185, 129, 0.16)',
+                  border: '1.5px solid rgba(16, 185, 129, 0.6)',
+                  color: '#34D399',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 10px rgba(16, 185, 129, 0.2)',
+                  transition: 'all var(--transition-fast)'
+                }}
+              >
+                <Zap size={14} color="#10B981" />
+                <span>{passName}</span>
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: '#10B981',
+                    boxShadow: '0 0 6px #10B981',
+                    marginLeft: '2px'
+                  }}
+                />
+              </button>
+            );
+          }
+
+          // Free Tier (Default / No Active Plan)
+          return (
+            <button
+              onClick={() => openPlanSelector()}
+              title="Free Tier - Click to explore streaming passes & VIP subscriptions"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#E5E7EB',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = 'rgba(245, 197, 24, 0.6)';
+                e.currentTarget.style.color = 'var(--brand-gold, #F5C518)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                e.currentTarget.style.color = '#E5E7EB';
+              }}
+            >
+              <Sparkles size={13} color="var(--brand-gold, #F5C518)" />
+              <span>FREE TIER</span>
+              <span
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  color: 'var(--brand-gold, #F5C518)',
+                  backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                  padding: '1px 5px',
+                  borderRadius: '4px',
+                  marginLeft: '2px'
+                }}
+              >
+                UPGRADE
+              </span>
+            </button>
+          );
+        })()}
 
         {/* User Avatar Circle */}
         <button

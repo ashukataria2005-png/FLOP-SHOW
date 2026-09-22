@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'USER' CHECK(role IN ('USER', 'ADMIN')),
   status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'SUSPENDED', 'PENDING')),
+  is_super_admin INTEGER NOT NULL DEFAULT 0,
+  permissions TEXT NOT NULL DEFAULT '[]',
+  last_login_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   CONSTRAINT uq_users_email UNIQUE (email)

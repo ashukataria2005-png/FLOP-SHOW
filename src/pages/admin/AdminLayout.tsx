@@ -52,12 +52,14 @@ interface NavItem {
   id: string;
   label: string;
   icon: any;
+  permission?: string;
 }
 
 interface NavGroup {
   id: string;
   title: string;
   icon: any;
+  permission?: string;
   items: NavItem[];
 }
 
@@ -67,118 +69,139 @@ const navGroups: NavGroup[] = [
     id: 'group-dashboard',
     title: 'DASHBOARD',
     icon: LayoutDashboard,
+    permission: 'analytics',
     items: [
-      { id: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard }
+      { id: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'analytics' }
     ]
   },
-  // 2. Payments
+  // 2. Administrators (Super Admin Only)
+  {
+    id: 'group-administrators',
+    title: 'ADMIN TEAM',
+    icon: ShieldCheck,
+    permission: 'SUPER_ADMIN',
+    items: [
+      { id: 'admin-administrators', label: 'Administrators', icon: ShieldCheck, permission: 'SUPER_ADMIN' }
+    ]
+  },
+  // 3. Payments
   {
     id: 'group-payments',
     title: 'PAYMENTS',
     icon: QrCode,
+    permission: 'payments',
     items: [
-      { id: 'admin-upi-settings', label: 'UPI Settings', icon: QrCode },
-      { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck }
+      { id: 'admin-upi-settings', label: 'UPI Settings', icon: QrCode, permission: 'payments' },
+      { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck, permission: 'payments' }
     ]
   },
-  // 3. Content Catalog
+  // 4. Content Catalog
   {
     id: 'group-content',
     title: 'CONTENT / CATALOG',
     icon: Film,
+    permission: 'catalog',
     items: [
-      { id: 'admin-content', label: 'Catalog & Media', icon: Film },
-      { id: 'admin-free-content', label: 'Free Content Manager', icon: Gift },
-      { id: 'admin-quick-add', label: 'Quick Add / Auto Import', icon: Sparkles },
-      { id: 'admin-genres', label: 'Genres & Categories', icon: Tag }
+      { id: 'admin-content', label: 'Catalog & Media', icon: Film, permission: 'catalog' },
+      { id: 'admin-free-content', label: 'Free Content Manager', icon: Gift, permission: 'catalog' },
+      { id: 'admin-quick-add', label: 'Quick Add / Auto Import', icon: Sparkles, permission: 'catalog' },
+      { id: 'admin-genres', label: 'Genres & Categories', icon: Tag, permission: 'catalog' }
     ]
   },
-  // 4. Home Page
+  // 5. Home Page
   {
     id: 'group-homepage',
     title: 'HOME PAGE',
     icon: Crown,
+    permission: 'catalog',
     items: [
-      { id: 'admin-hero', label: 'Hero Banner', icon: Crown },
-      { id: 'admin-trending', label: 'Trending #1', icon: TrendingUp },
-      { id: 'admin-spotlight', label: 'Cinematic Spotlight', icon: Sparkles }
+      { id: 'admin-hero', label: 'Hero Banner', icon: Crown, permission: 'catalog' },
+      { id: 'admin-trending', label: 'Trending #1', icon: TrendingUp, permission: 'catalog' },
+      { id: 'admin-spotlight', label: 'Cinematic Spotlight', icon: Sparkles, permission: 'catalog' }
     ]
   },
-
-  // 5. Plans & Pricing
+  // 6. Plans & Pricing
   {
     id: 'group-pricing',
     title: 'PLANS & PRICING',
     icon: Tag,
+    permission: 'monetization',
     items: [
-      { id: 'admin-pricing', label: 'Plans & Pricing', icon: Tag }
+      { id: 'admin-pricing', label: 'Plans & Pricing', icon: Tag, permission: 'monetization' }
     ]
   },
-  // 6. Bonus & Promo Codes (Task 3B)
+  // 7. Bonus & Promo Codes
   {
     id: 'group-promos',
     title: 'PROMOS & REWARDS',
     icon: Gift,
+    permission: 'promos',
     items: [
-      { id: 'admin-promos', label: 'Bonus & Promo Codes', icon: Gift }
+      { id: 'admin-promos', label: 'Bonus & Promo Codes', icon: Gift, permission: 'promos' }
     ]
   },
-  // 7. Analytics & Access Passes
+  // 8. Analytics & Access Passes
   {
     id: 'group-analytics',
     title: 'ANALYTICS & PASSES',
     icon: TrendingUp,
+    permission: 'analytics',
     items: [
-      { id: 'admin-analytics', label: 'Analytics', icon: TrendingUp },
-      { id: 'admin-analytics-movie', label: 'Per-Movie / Series', icon: Film },
-      { id: 'admin-watch-pass', label: 'Watch Passes', icon: Zap },
-      { id: 'admin-analytics-vip', label: 'VIP Plans', icon: Crown }
+      { id: 'admin-analytics', label: 'Analytics', icon: TrendingUp, permission: 'analytics' },
+      { id: 'admin-analytics-movie', label: 'Per-Movie / Series', icon: Film, permission: 'analytics' },
+      { id: 'admin-watch-pass', label: 'Watch Passes', icon: Zap, permission: 'analytics' },
+      { id: 'admin-analytics-vip', label: 'VIP Plans', icon: Crown, permission: 'analytics' }
     ]
   },
-  // 8. Ads
+  // 9. Ads
   {
     id: 'group-ads',
     title: 'ADS',
     icon: Megaphone,
+    permission: 'catalog',
     items: [
-      { id: 'admin-ads', label: 'Advertisement / Ads', icon: Megaphone }
+      { id: 'admin-ads', label: 'Advertisement / Ads', icon: Megaphone, permission: 'catalog' }
     ]
   },
-  // 9. Users
+  // 10. Users
   {
     id: 'group-users',
     title: 'USERS',
     icon: Users,
+    permission: 'users',
     items: [
-      { id: 'admin-users', label: 'User Management', icon: Users }
+      { id: 'admin-users', label: 'User Management', icon: Users, permission: 'users' }
     ]
   },
-  // 10. Transactions
+  // 11. Transactions
   {
     id: 'group-finance',
     title: 'TRANSACTIONS / FINANCE',
     icon: CreditCard,
+    permission: 'analytics',
     items: [
-      { id: 'admin-finance', label: 'Finance Overview', icon: Wallet },
-      { id: 'admin-transactions', label: 'All Transactions', icon: CreditCard }
+      { id: 'admin-finance', label: 'Finance Overview', icon: Wallet, permission: 'analytics' },
+      { id: 'admin-transactions', label: 'All Transactions', icon: CreditCard, permission: 'analytics' }
     ]
   },
-  // 11. Settings (Duplicate admin-design removed - Task 2)
+  // 12. Settings
   {
     id: 'group-settings',
     title: 'SETTINGS',
     icon: Sliders,
+    permission: 'settings',
     items: [
-      { id: 'admin-settings', label: 'General Settings', icon: Sliders }
+      { id: 'admin-settings', label: 'General Settings', icon: Sliders, permission: 'settings' }
     ]
   },
-  // 12. Reset
+  // 13. Reset
   {
     id: 'group-reset',
     title: 'SYSTEM / RESET',
     icon: RotateCcw,
+    permission: 'settings',
     items: [
-      { id: 'admin-reset', label: 'Reset Analytics & Financials', icon: RotateCcw }
+      { id: 'admin-reset', label: 'Reset Analytics & Financials', icon: RotateCcw, permission: 'settings' }
     ]
   }
 ];
@@ -235,6 +258,57 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
   const isAdmin = Boolean(user && user.role === 'ADMIN');
 
+  // RBAC permissions and dynamic navigation calculation
+  const isSuperAdmin = Boolean(
+    user?.is_super_admin === true ||
+    (user as any)?.is_super_admin === 1 ||
+    (user?.email && user?.email.toLowerCase() === 'ashukataria2005@gmail.com')
+  );
+
+  const userPermissions = Array.isArray(user?.permissions) ? user.permissions : [];
+
+  const hasPermission = (perm?: string) => {
+    if (isSuperAdmin) return true;
+    if (!perm) return true;
+    if (perm === 'SUPER_ADMIN') return false;
+    return userPermissions.includes(perm);
+  };
+
+  const authorizedNavGroups = navGroups
+    .filter(group => hasPermission(group.permission))
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => hasPermission(item.permission || group.permission))
+    }))
+    .filter(group => group.items.length > 0);
+
+  const authorizedTabIds = authorizedNavGroups.flatMap(g => g.items.map(i => i.id));
+
+  // Enforce frontend permission guard: redirect unauthorized routes to primary authorized tab
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (isSuperAdmin) return;
+    if (authorizedTabIds.length === 0) return;
+
+    if (currentTab === 'admin') {
+      onNavigateTab(authorizedTabIds[0]);
+      return;
+    }
+
+    if (currentTab === 'admin-editor') {
+      if (!userPermissions.includes('catalog')) {
+        showToast('Access Denied: You do not have permission to edit catalog content.', 'error');
+        onNavigateTab(authorizedTabIds[0]);
+      }
+      return;
+    }
+
+    if (!authorizedTabIds.includes(currentTab)) {
+      showToast('Access Denied: You do not have permission to view that module.', 'error');
+      onNavigateTab(authorizedTabIds[0]);
+    }
+  }, [currentTab, isAdmin, isSuperAdmin, authorizedTabIds.join(',')]);
+
   // Auto-restore admin session silently on mount if device is remembered
   useEffect(() => {
     if (!isAdmin && quickLoginData?.token && !useStandardLogin && !isQuickLoggingIn) {
@@ -267,10 +341,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         setQuickLoginData(qData);
       }
 
-      login(data.user.id, data.user.name, data.user.email, 'ADMIN', 0);
+      login(data.user.id, data.user.name, data.user.email, 'ADMIN', 0, {
+        is_super_admin: data.user.is_super_admin,
+        permissions: data.user.permissions,
+        status: data.user.status,
+        last_login_at: data.user.last_login_at
+      });
       showToast(`Admin signed in: ${data.user.name}`, 'success');
       if (currentTab === 'admin') {
-        onNavigateTab('admin-dashboard');
+        const dest = data.user.is_super_admin ? 'admin-dashboard' : (authorizedTabIds[0] || 'admin-dashboard');
+        onNavigateTab(dest);
       }
     } catch (err: any) {
       setLoginError(err.message || 'Invalid Admin ID or Admin Password.');
@@ -299,10 +379,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         setQuickLoginData(updatedQuick);
         adminTokenStorage.set(res.token);
 
-        login(res.user.id, res.user.name, res.user.email, 'ADMIN', 0);
+        login(res.user.id, res.user.name, res.user.email, 'ADMIN', 0, {
+          is_super_admin: res.user.is_super_admin,
+          permissions: res.user.permissions,
+          status: res.user.status,
+          last_login_at: res.user.last_login_at
+        });
         showToast(`Welcome back, ${res.user.name}! (One-Click Quick Login)`, 'success');
         if (currentTab === 'admin') {
-          onNavigateTab('admin-dashboard');
+          const dest = res.user.is_super_admin ? 'admin-dashboard' : (authorizedTabIds[0] || 'admin-dashboard');
+          onNavigateTab(dest);
         }
       } else {
         throw new Error('Quick login rejected: Administrator privileges required.');
@@ -790,13 +876,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   }
 
   // Authenticated Admin Shell
-  const allNavItems = navGroups.flatMap(group => group.items);
+  const allNavItems = authorizedNavGroups.flatMap(group => group.items);
   const activeNavItem = allNavItems.find(item => item.id === currentTab);
   const currentSectionLabel = activeNavItem
     ? activeNavItem.label
     : currentTab === 'admin-editor'
       ? 'Content Editor'
-      : 'Admin Dashboard';
+      : (authorizedNavGroups[0]?.items[0]?.label || 'Admin Dashboard');
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-primary, #07070A)', color: '#FFFFFF' }}>
@@ -895,6 +981,20 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           <div className="admin-header-user" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#9CA3AF' }}>
             <ShieldCheck size={16} color="var(--brand-gold, #F5C518)" />
             <span>{user.name || user.email || 'Admin'}</span>
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: 800,
+                padding: '2px 7px',
+                borderRadius: '6px',
+                backgroundColor: isSuperAdmin ? 'rgba(245, 197, 24, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                color: isSuperAdmin ? 'var(--brand-gold, #F5C518)' : '#60A5FA',
+                border: isSuperAdmin ? '1px solid rgba(245, 197, 24, 0.35)' : '1px solid rgba(59, 130, 246, 0.35)',
+                letterSpacing: '0.04em'
+              }}
+            >
+              {isSuperAdmin ? 'SUPER ADMIN' : 'SUB-ADMIN'}
+            </span>
           </div>
 
           {quickLoginData && (
@@ -1063,7 +1163,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               </div>
 
               <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {navGroups.map(group => {
+                {authorizedNavGroups.map(group => {
                   const GroupIcon = group.icon;
                   const isExpanded = expandedGroupId === group.id;
                   const hasActiveChild = group.items.some(item => item.id === currentTab);
@@ -1226,8 +1326,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
                 <ShieldCheck size={18} color="var(--brand-gold, #F5C518)" />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#FFFFFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {user.name || 'Admin'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#FFFFFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {user.name || 'Admin'}
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '9px',
+                        fontWeight: 800,
+                        padding: '1px 5px',
+                        borderRadius: '4px',
+                        backgroundColor: isSuperAdmin ? 'rgba(245, 197, 24, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                        color: isSuperAdmin ? 'var(--brand-gold, #F5C518)' : '#60A5FA',
+                        border: isSuperAdmin ? '1px solid rgba(245, 197, 24, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)'
+                      }}
+                    >
+                      {isSuperAdmin ? 'SUPER' : 'SUB'}
+                    </span>
                   </div>
                   <div style={{ fontSize: '11px', color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {user.email || 'Administrator'}

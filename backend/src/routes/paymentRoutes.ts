@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { paymentRequestService } from '../services/paymentRequestService.js';
 import { requireAuth, AuthenticatedRequest } from '../middlewares/authMiddleware.js';
-import { requireAdmin } from '../middlewares/adminMiddleware.js';
+import { requireAdmin, requirePermission } from '../middlewares/adminMiddleware.js';
 
 export const paymentRouter = Router();
 
@@ -67,7 +67,7 @@ paymentRouter.get('/my-requests', requireAuth, async (req: AuthenticatedRequest,
 // ============================================================================
 
 // Admin metrics
-paymentRouter.get('/admin/metrics', requireAuth, requireAdmin, async (_req, res, next) => {
+paymentRouter.get('/admin/metrics', requireAuth, requirePermission('payments'), async (_req, res, next) => {
   try {
     const metrics = await paymentRequestService.getMetrics();
     res.json(metrics);
@@ -77,7 +77,7 @@ paymentRouter.get('/admin/metrics', requireAuth, requireAdmin, async (_req, res,
 });
 
 // Admin list all requests (filter by status: PENDING, APPROVED, REJECTED, ALL)
-paymentRouter.get('/admin/requests', requireAuth, requireAdmin, async (req, res, next) => {
+paymentRouter.get('/admin/requests', requireAuth, requirePermission('payments'), async (req, res, next) => {
   try {
     const status = (req.query.status as string) || 'ALL';
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
@@ -89,7 +89,7 @@ paymentRouter.get('/admin/requests', requireAuth, requireAdmin, async (req, res,
 });
 
 // Admin get payment configuration
-paymentRouter.get('/admin/settings', requireAuth, requireAdmin, async (_req, res, next) => {
+paymentRouter.get('/admin/settings', requireAuth, requirePermission('payments'), async (_req, res, next) => {
   try {
     const config = await paymentRequestService.getPublicPaymentConfig();
     res.json(config);
@@ -99,7 +99,7 @@ paymentRouter.get('/admin/settings', requireAuth, requireAdmin, async (_req, res
 });
 
 // Admin update payment configuration
-paymentRouter.post('/admin/settings', requireAuth, requireAdmin, async (req, res, next) => {
+paymentRouter.post('/admin/settings', requireAuth, requirePermission('payments'), async (req, res, next) => {
   try {
     const { upiId, merchantName, approvalMode } = req.body;
     // Only pass 'enabled' when it is explicitly provided; otherwise undefined preserves existing value.
@@ -121,7 +121,7 @@ paymentRouter.post('/admin/settings', requireAuth, requireAdmin, async (req, res
 });
 
 // Admin approve payment request and atomically credit wallet
-paymentRouter.post('/admin/requests/:id/approve', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+paymentRouter.post('/admin/requests/:id/approve', requireAuth, requirePermission('payments'), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const id = String(req.params.id);
     const { adminNote } = req.body;
@@ -136,7 +136,7 @@ paymentRouter.post('/admin/requests/:id/approve', requireAuth, requireAdmin, asy
 });
 
 // Admin reject payment request
-paymentRouter.post('/admin/requests/:id/reject', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+paymentRouter.post('/admin/requests/:id/reject', requireAuth, requirePermission('payments'), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const id = String(req.params.id);
     const { adminNote } = req.body;

@@ -702,7 +702,36 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 15 };
+    // Apply incremental 020_sub_admin_roles for PostgreSQL if not already applied
+    const subAdminMigrationVersion = '020_sub_admin_roles';
+    if (!appliedSet.has(subAdminMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 020_sub_admin_roles...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin INTEGER NOT NULL DEFAULT 0;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions TEXT NOT NULL DEFAULT '[]';
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TEXT;
+
+          UPDATE users 
+          SET is_super_admin = 1, 
+              permissions = '["analytics","monetization","promos","payments","catalog","users","settings"]'
+          WHERE role = 'ADMIN' OR LOWER(email) = 'ashukataria2005@gmail.com';
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${subAdminMigrationVersion}', '020_sub_admin_roles.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('020_sub_admin_roles.sql');
+        console.log('✓ [PostgreSQL] Migration 020_sub_admin_roles applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 16 };
   } finally {
     client.release();
     await pool.end();

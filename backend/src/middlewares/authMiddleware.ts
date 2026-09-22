@@ -5,6 +5,8 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   role: 'USER' | 'ADMIN';
+  is_super_admin?: boolean;
+  permissions?: string[];
 }
 
 export interface AuthenticatedRequest extends Request {

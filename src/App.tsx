@@ -31,6 +31,7 @@ import { AdminMonetizationPage } from './pages/admin/AdminMonetizationPage';
 import { AdminWatchPassPage } from './pages/admin/AdminWatchPassPage';
 import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage';
 import { AdminPlansPricingPage } from './pages/admin/AdminPlansPricingPage';
+import { AdminAdministratorsPage } from './pages/admin/AdminAdministratorsPage';
 import { PurchaseModal } from './components/purchase/PurchaseModal';
 import { SubscriptionModal } from './components/subscription/SubscriptionModal';
 import { WatchPassModal } from './components/watchpass/WatchPassModal';
@@ -381,7 +382,8 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-reset' && <AdminResetPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-pricing', 'admin-promos', 'admin-monetization', 'admin-analytics', 'admin-analytics-movie', 'admin-analytics-vip', 'admin-watch-pass', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-settings', 'admin-reset'].includes(currentTab) && (
+          {currentTab === 'admin-administrators' && <AdminAdministratorsPage onNavigateTab={handleNavigate} />}
+          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-pricing', 'admin-promos', 'admin-monetization', 'admin-analytics', 'admin-analytics-movie', 'admin-analytics-vip', 'admin-watch-pass', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-settings', 'admin-reset', 'admin-administrators'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>

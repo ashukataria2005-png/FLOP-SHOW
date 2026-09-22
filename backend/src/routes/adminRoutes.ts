@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { adminService } from '../services/adminService.js';
 import { mediaService } from '../services/mediaService.js';
-import { requireAuth } from '../middlewares/authMiddleware.js';
-import { requireAdmin } from '../middlewares/adminMiddleware.js';
+import { requireAuth, AuthenticatedRequest } from '../middlewares/authMiddleware.js';
+import { requireAdmin, requireSuperAdmin, requirePermission, requireAnyPermission } from '../middlewares/adminMiddleware.js';
 import { uploadMediaMiddleware, isVideoFile, isImageFile } from '../middlewares/uploadMiddleware.js';
 import { metadataImportService } from '../services/metadataImportService.js';
 import { cloudinaryService, isCloudinaryConfigured, cleanupLocalFile } from '../services/cloudinaryService.js';
@@ -10,10 +12,14 @@ import { vcdnService } from '../services/vcdnService.js';
 import { isVcdnConfigured } from '../config/env.js';
 import { contentRepository } from '../repositories/contentRepository.js';
 import { mediaRepository } from '../repositories/mediaRepository.js';
+import { userRepository } from '../repositories/userRepository.js';
 import { promoService } from '../services/promoService.js';
+import { ALL_ADMIN_PERMISSIONS } from '../services/authService.js';
 import { getAdapter } from '../db/adapter.js';
 
 export const adminRouter = Router();
+
+const param = (p: string | string[] | undefined): string => (Array.isArray(p) ? p[0] : p || '');
 
 // Protect ALL admin routes with Auth + Admin Role Check
 adminRouter.use(requireAuth);
@@ -22,7 +28,7 @@ adminRouter.use(requireAdmin);
 // ----------------------------------------------------------------------------
 // 1. DASHBOARD & STATS
 // ----------------------------------------------------------------------------
-adminRouter.get('/dashboard', async (req, res, next) => {
+adminRouter.get('/dashboard', requirePermission('analytics'), async (req, res, next) => {
   try {
     const tzOffset = req.query.tzOffset ? parseInt(req.query.tzOffset as string, 10) : undefined;
     const stats = await adminService.getDashboardStats(tzOffset);
@@ -32,7 +38,7 @@ adminRouter.get('/dashboard', async (req, res, next) => {
   }
 });
 
-adminRouter.get('/today-details', async (req, res, next) => {
+adminRouter.get('/today-details', requirePermission('analytics'), async (req, res, next) => {
   try {
     const type = String(req.query.type || 'revenue');
     const tzOffset = req.query.tzOffset ? parseInt(req.query.tzOffset as string, 10) : undefined;
@@ -45,7 +51,7 @@ adminRouter.get('/today-details', async (req, res, next) => {
 
 
 // Unified analytics: all-time breakdown across all hybrid categories
-adminRouter.get('/analytics', async (req, res, next) => {
+adminRouter.get('/analytics', requirePermission('analytics'), async (req, res, next) => {
   try {
     const filter = ((req.query.filter as string) || 'ALL').toUpperCase() as any;
     const data = await adminService.getUnifiedAnalytics(filter);
@@ -56,7 +62,7 @@ adminRouter.get('/analytics', async (req, res, next) => {
 });
 
 // Daily analytics: today figures for each hybrid category
-adminRouter.get('/daily-analytics', async (req, res, next) => {
+adminRouter.get('/daily-analytics', requirePermission('analytics'), async (req, res, next) => {
   try {
     const filter = ((req.query.filter as string) || 'ALL').toUpperCase() as any;
     const tzOffset = req.query.tzOffset ? parseInt(req.query.tzOffset as string, 10) : undefined;
@@ -66,7 +72,7 @@ adminRouter.get('/daily-analytics', async (req, res, next) => {
     next(err);
   }
 });
-adminRouter.get('/users', async (_req, res, next) => {
+adminRouter.get('/users', requirePermission('users'), async (_req, res, next) => {
   try {
     const users = await adminService.getAllUsers();
     res.json({ count: users.length, users });
@@ -75,7 +81,7 @@ adminRouter.get('/users', async (_req, res, next) => {
   }
 });
 
-adminRouter.get(['/promos/redemptions', '/promo-redemptions'], async (req, res, next) => {
+adminRouter.get(['/promos/redemptions', '/promo-redemptions'], requirePermission('promos'), async (req, res, next) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
     const redemptions = await promoService.getAllRedemptionsAdmin(limit);
@@ -85,7 +91,7 @@ adminRouter.get(['/promos/redemptions', '/promo-redemptions'], async (req, res, 
   }
 });
 
-adminRouter.delete('/users', async (req, res, next) => {
+adminRouter.delete('/users', requirePermission('users'), async (req, res, next) => {
   try {
     const { userIds } = req.body;
     const currentAdminId = (req as any).user?.id;
@@ -105,7 +111,7 @@ adminRouter.delete('/users', async (req, res, next) => {
 });
 
 
-adminRouter.get('/transactions', async (req, res, next) => {
+adminRouter.get('/transactions', requirePermission('analytics'), async (req, res, next) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
     const transactions = await adminService.getAllTransactions(limit);
@@ -115,7 +121,7 @@ adminRouter.get('/transactions', async (req, res, next) => {
   }
 });
 
-adminRouter.get('/purchases', async (req, res, next) => {
+adminRouter.get('/purchases', requirePermission('analytics'), async (req, res, next) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
@@ -126,55 +132,55 @@ adminRouter.get('/purchases', async (req, res, next) => {
   }
 });
 
-adminRouter.patch('/users/:id/status', async (req, res, next) => {
+adminRouter.patch('/users/:id/status', requirePermission('users'), async (req, res, next) => {
   try {
     const { status } = req.body;
     if (!status || !['ACTIVE', 'SUSPENDED'].includes(status)) {
       res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Status must be ACTIVE or SUSPENDED.' } });
       return;
     }
-    await adminService.updateUserStatus(req.params.id, status);
+    await adminService.updateUserStatus(param(req.params.id), status);
     res.json({ success: true, message: `User status updated to ${status}.` });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.get('/users/:id/purchases', async (req, res, next) => {
+adminRouter.get('/users/:id/purchases', requirePermission('users'), async (req, res, next) => {
   try {
-    const purchases = await adminService.getUserPurchases(req.params.id);
+    const purchases = await adminService.getUserPurchases(param(req.params.id));
     res.json({ count: purchases.length, purchases });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.get('/users/:id/transactions', async (req, res, next) => {
+adminRouter.get('/users/:id/transactions', requirePermission('users'), async (req, res, next) => {
   try {
-    const transactions = await adminService.getUserTransactions(req.params.id);
+    const transactions = await adminService.getUserTransactions(param(req.params.id));
     res.json({ count: transactions.length, transactions });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.get('/users/:id', async (req, res, next) => {
+adminRouter.get('/users/:id', requirePermission('users'), async (req, res, next) => {
   try {
-    const user = await adminService.getUserDetails(req.params.id);
+    const user = await adminService.getUserDetails(param(req.params.id));
     res.json({ success: true, user });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.post('/users/:id/reset-password', async (req, res, next) => {
+adminRouter.post('/users/:id/reset-password', requirePermission('users'), async (req, res, next) => {
   try {
     const { newPassword } = req.body;
     if (!newPassword) {
       res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'New password is required.' } });
       return;
     }
-    await adminService.resetUserPassword(req.params.id, newPassword);
+    await adminService.resetUserPassword(param(req.params.id), newPassword);
     res.json({ success: true, message: 'User password reset successfully.' });
   } catch (err) {
     next(err);
@@ -184,7 +190,7 @@ adminRouter.post('/users/:id/reset-password', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 // 2. FILE UPLOADS (Videos & Images)
 // ----------------------------------------------------------------------------
-adminRouter.post('/upload', (req: Request, res: Response, next) => {
+adminRouter.post('/upload', requirePermission('catalog'), (req: Request, res: Response, next) => {
   uploadMediaMiddleware.single('file')(req, res, async (err: any) => {
     if (err) {
       if (err.name === 'MulterError') {
@@ -239,9 +245,9 @@ adminRouter.post('/upload', (req: Request, res: Response, next) => {
 // ----------------------------------------------------------------------------
 // 2B. VCDN STATUS CHECK & REAL-TIME SYNC
 // ----------------------------------------------------------------------------
-adminRouter.get('/media/vcdn/status/:id', async (req, res, next) => {
+adminRouter.get('/media/vcdn/status/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
-    const videoId = req.params.id;
+    const videoId = param(req.params.id);
     if (!isVcdnConfigured()) {
       return res.status(400).json({
         error: { code: 'VCDN_NOT_CONFIGURED', message: 'VCDN_API_KEY is not configured.' },
@@ -270,7 +276,7 @@ adminRouter.get('/media/vcdn/status/:id', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 // 3. CONTENT MANAGEMENT & TRENDING #1
 // ----------------------------------------------------------------------------
-adminRouter.get('/content', async (req, res, next) => {
+adminRouter.get('/content', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { status, type, genre, featured, trending, search, sortBy, limit, offset, all } = req.query;
     const isAll = all === 'true' || all === '1';
@@ -294,7 +300,7 @@ adminRouter.get('/content', async (req, res, next) => {
   }
 });
 
-adminRouter.post('/content', async (req, res, next) => {
+adminRouter.post('/content', requirePermission('catalog'), async (req, res, next) => {
   try {
     const contentId = await adminService.createContent(req.body);
     res.status(201).json({
@@ -307,18 +313,18 @@ adminRouter.post('/content', async (req, res, next) => {
   }
 });
 
-adminRouter.put('/content/:id', async (req, res, next) => {
+adminRouter.put('/content/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
-    await adminService.updateContent(req.params.id, req.body);
+    await adminService.updateContent(param(req.params.id), req.body);
     res.json({ success: true, message: `Content ${req.params.id} updated successfully.` });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.delete('/content/:id', async (req, res, next) => {
+adminRouter.delete('/content/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
-    const content = await contentRepository.findByIdOrSlug(req.params.id);
+    const content = await contentRepository.findByIdOrSlug(param(req.params.id));
     if (content?.vcdn_video_id) {
       const referencedElsewhere = await contentRepository.isVcdnVideoReferencedElsewhere(content.vcdn_video_id, content.id);
       if (!referencedElsewhere) {
@@ -327,14 +333,14 @@ adminRouter.delete('/content/:id', async (req, res, next) => {
         });
       }
     }
-    await adminService.deleteContent(req.params.id);
+    await adminService.deleteContent(param(req.params.id));
     res.json({ success: true, message: `Content ${req.params.id} deleted successfully.` });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.patch('/content/:id/status', async (req, res, next) => {
+adminRouter.patch('/content/:id/status', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { status } = req.body;
     if (!status || !['DRAFT', 'PUBLISHED', 'ARCHIVED'].includes(status)) {
@@ -343,14 +349,14 @@ adminRouter.patch('/content/:id/status', async (req, res, next) => {
       });
       return;
     }
-    await adminService.updateStatus(req.params.id, status);
+    await adminService.updateStatus(param(req.params.id), status);
     res.json({ success: true, message: `Status of ${req.params.id} set to ${status}.` });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.patch('/content/:id/price', async (req, res, next) => {
+adminRouter.patch('/content/:id/price', requireAnyPermission('monetization', 'catalog'), async (req, res, next) => {
   try {
     const { priceRupees, customPriceRupees } = req.body;
     if (priceRupees === undefined || isNaN(Number(priceRupees))) {
@@ -362,7 +368,7 @@ adminRouter.patch('/content/:id/price', async (req, res, next) => {
     const resolvedCustom = customPriceRupees !== undefined
       ? (customPriceRupees === null || customPriceRupees === '' ? null : Number(customPriceRupees))
       : undefined;
-    await adminService.updatePrice(req.params.id, Number(priceRupees), resolvedCustom);
+    await adminService.updatePrice(param(req.params.id), Number(priceRupees), resolvedCustom);
     res.json({ success: true, message: `Price of ${req.params.id} updated to ₹${priceRupees}.` });
   } catch (err) {
     next(err);
@@ -370,11 +376,11 @@ adminRouter.patch('/content/:id/price', async (req, res, next) => {
 });
 
 // TRENDING #1 CONTROL
-adminRouter.patch('/content/:id/trending', async (req, res, next) => {
+adminRouter.patch('/content/:id/trending', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { position } = req.body;
     const parsedPosition = position === null || position === '' ? null : Number(position);
-    await adminService.setTrendingPosition(req.params.id, parsedPosition);
+    await adminService.setTrendingPosition(param(req.params.id), parsedPosition);
     res.json({
       success: true,
       message:
@@ -390,7 +396,7 @@ adminRouter.patch('/content/:id/trending', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 // 3B. QUICK ADD & AUTO IMPORT (Online Metadata Providers)
 // ----------------------------------------------------------------------------
-adminRouter.get('/auto-import/search', async (req, res, next) => {
+adminRouter.get('/auto-import/search', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { query, year, type } = req.query;
     if (!query || typeof query !== 'string' || query.trim() === '') {
@@ -406,7 +412,7 @@ adminRouter.get('/auto-import/search', async (req, res, next) => {
   }
 });
 
-adminRouter.get('/auto-import/details', async (req, res, next) => {
+adminRouter.get('/auto-import/details', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { providerId, type } = req.query;
     if (!providerId || typeof providerId !== 'string') {
@@ -421,7 +427,7 @@ adminRouter.get('/auto-import/details', async (req, res, next) => {
   }
 });
 
-adminRouter.post('/auto-import/import', async (req, res, next) => {
+adminRouter.post('/auto-import/import', requirePermission('catalog'), async (req, res, next) => {
   try {
     const result = await metadataImportService.importContent(req.body);
     res.status(201).json({
@@ -437,7 +443,7 @@ adminRouter.post('/auto-import/import', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 // 4. MEDIA MANAGEMENT (Attached to Movie or Episode)
 // ----------------------------------------------------------------------------
-adminRouter.post('/media', async (req, res, next) => {
+adminRouter.post('/media', requirePermission('catalog'), async (req, res, next) => {
   try {
     const {
       contentId, episodeId, mediaType, sourceType, url, mimeType,
@@ -493,27 +499,28 @@ adminRouter.post('/media', async (req, res, next) => {
   }
 });
 
-adminRouter.get('/content/:id/media', async (req, res, next) => {
+adminRouter.get('/content/:id/media', requirePermission('catalog'), async (req, res, next) => {
   try {
-    const media = await mediaService.getAllMediaForContent(req.params.id);
+    const media = await mediaService.getAllMediaForContent(param(req.params.id));
     res.json({ count: media.length, media });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.get('/episodes/:episodeId/media', async (req, res, next) => {
+adminRouter.get('/episodes/:episodeId/media', requirePermission('catalog'), async (req, res, next) => {
   try {
-    const media = await mediaService.getAllMediaForEpisode(req.params.episodeId);
+    const media = await mediaService.getAllMediaForEpisode(param(req.params.episodeId));
     res.json({ count: media.length, media });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.delete('/media/:id', async (req, res, next) => {
+adminRouter.delete('/media/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
-    const media = await mediaRepository.findById(req.params.id);
+    const id = param(req.params.id);
+    const media = await mediaRepository.findById(id);
     if (media?.vcdn_video_id) {
       const referencedElsewhere = await mediaRepository.isVcdnVideoReferencedElsewhere(media.vcdn_video_id, media.id);
       if (!referencedElsewhere) {
@@ -522,7 +529,7 @@ adminRouter.delete('/media/:id', async (req, res, next) => {
         });
       }
     }
-    await mediaService.deleteMedia(req.params.id);
+    await mediaService.deleteMedia(id);
     res.json({ success: true, message: 'Media record deleted.' });
   } catch (err) {
     next(err);
@@ -532,7 +539,7 @@ adminRouter.delete('/media/:id', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 // 5. GENRES, SEASONS & EPISODES
 // ----------------------------------------------------------------------------
-adminRouter.get('/genres', async (_req, res, next) => {
+adminRouter.get('/genres', requirePermission('catalog'), async (_req, res, next) => {
   try {
     const genres = await adminService.getAllGenresWithCounts();
     res.json({ count: genres.length, genres });
@@ -541,7 +548,7 @@ adminRouter.get('/genres', async (_req, res, next) => {
   }
 });
 
-adminRouter.post('/genres', async (req, res, next) => {
+adminRouter.post('/genres', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { name, slug } = req.body;
     if (!name) {
@@ -555,30 +562,30 @@ adminRouter.post('/genres', async (req, res, next) => {
   }
 });
 
-adminRouter.put('/genres/:id', async (req, res, next) => {
+adminRouter.put('/genres/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { name, slug } = req.body;
     if (!name) {
       res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Genre name is required.' } });
       return;
     }
-    await adminService.updateGenre(req.params.id, name, slug);
+    await adminService.updateGenre(param(req.params.id), name, slug);
     res.json({ success: true, message: 'Genre updated.' });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.delete('/genres/:id', async (req, res, next) => {
+adminRouter.delete('/genres/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
-    await adminService.deleteGenre(req.params.id);
+    await adminService.deleteGenre(param(req.params.id));
     res.json({ success: true, message: 'Genre safely deleted.' });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.post('/content/:id/seasons', async (req, res, next) => {
+adminRouter.post('/content/:id/seasons', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { seasonNumber, title } = req.body;
     if (!seasonNumber || !title) {
@@ -587,33 +594,33 @@ adminRouter.post('/content/:id/seasons', async (req, res, next) => {
       });
       return;
     }
-    const seasonId = await adminService.createSeason(req.params.id, Number(seasonNumber), title);
+    const seasonId = await adminService.createSeason(param(req.params.id), Number(seasonNumber), title);
     res.status(201).json({ success: true, message: 'Season created.', seasonId });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.put('/seasons/:id', async (req, res, next) => {
+adminRouter.put('/seasons/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { title, seasonNumber } = req.body;
-    await adminService.updateSeason(req.params.id, title, seasonNumber);
+    await adminService.updateSeason(param(req.params.id), title, seasonNumber);
     res.json({ success: true, message: 'Season updated.' });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.delete('/seasons/:id', async (req, res, next) => {
+adminRouter.delete('/seasons/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
-    await adminService.deleteSeason(req.params.id);
+    await adminService.deleteSeason(param(req.params.id));
     res.json({ success: true, message: 'Season deleted.' });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.post('/seasons/:seasonId/episodes', async (req, res, next) => {
+adminRouter.post('/seasons/:seasonId/episodes', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { episodeNumber, title, videoUrl, description, thumbnail, duration, durationSeconds } = req.body;
     if (!episodeNumber || !title) {
@@ -623,7 +630,7 @@ adminRouter.post('/seasons/:seasonId/episodes', async (req, res, next) => {
       return;
     }
 
-    const episodeId = await adminService.createEpisode(req.params.seasonId, {
+    const episodeId = await adminService.createEpisode(param(req.params.seasonId), {
       episodeNumber: Number(episodeNumber),
       title,
       videoUrl: videoUrl || '',
@@ -639,19 +646,20 @@ adminRouter.post('/seasons/:seasonId/episodes', async (req, res, next) => {
   }
 });
 
-adminRouter.put('/episodes/:id', async (req, res, next) => {
+adminRouter.put('/episodes/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
-    await adminService.updateEpisode(req.params.id, req.body);
+    await adminService.updateEpisode(param(req.params.id), req.body);
     res.json({ success: true, message: 'Episode updated.' });
   } catch (err) {
     next(err);
   }
 });
 
-adminRouter.delete('/episodes/:id', async (req, res, next) => {
+adminRouter.delete('/episodes/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
+    const epId = param(req.params.id);
     const db = getAdapter();
-    const { rows } = await db.query('SELECT * FROM episodes WHERE id = ?', [req.params.id]);
+    const { rows } = await db.query('SELECT * FROM episodes WHERE id = ?', [epId]);
     const ep = rows[0] as any;
     if (ep?.vcdn_video_id) {
       const referencedElsewhere = await contentRepository.isVcdnVideoReferencedElsewhere(ep.vcdn_video_id, undefined, ep.id);
@@ -661,7 +669,7 @@ adminRouter.delete('/episodes/:id', async (req, res, next) => {
         });
       }
     }
-    await adminService.deleteEpisode(req.params.id);
+    await adminService.deleteEpisode(epId);
     res.json({ success: true, message: 'Episode deleted.' });
   } catch (err) {
     next(err);
@@ -671,7 +679,7 @@ adminRouter.delete('/episodes/:id', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 // 6. APPLICATION SETTINGS
 // ----------------------------------------------------------------------------
-adminRouter.get('/settings', async (_req, res, next) => {
+adminRouter.get('/settings', requirePermission('settings'), async (_req, res, next) => {
   try {
     const settings = await adminService.getSettings();
     res.json({ success: true, settings });
@@ -680,7 +688,7 @@ adminRouter.get('/settings', async (_req, res, next) => {
   }
 });
 
-adminRouter.put('/settings', async (req, res, next) => {
+adminRouter.put('/settings', requirePermission('settings'), async (req, res, next) => {
   try {
     const { settings } = req.body;
     if (!settings || typeof settings !== 'object') {
@@ -698,7 +706,7 @@ adminRouter.put('/settings', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 // 7. DEDICATED HOME HERO CONTROL
 // ----------------------------------------------------------------------------
-adminRouter.get('/hero', async (_req, res, next) => {
+adminRouter.get('/hero', requirePermission('catalog'), async (_req, res, next) => {
   try {
     const hero = await adminService.getHero();
     res.json({ success: true, hero });
@@ -707,7 +715,7 @@ adminRouter.get('/hero', async (_req, res, next) => {
   }
 });
 
-adminRouter.put('/hero', async (req, res, next) => {
+adminRouter.put('/hero', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { contentId } = req.body;
     await adminService.setHero(contentId ?? null);
@@ -725,7 +733,7 @@ adminRouter.put('/hero', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 // 7B. DEDICATED CINEMATIC SPOTLIGHT CONTROL
 // ----------------------------------------------------------------------------
-adminRouter.get('/spotlight', async (_req, res, next) => {
+adminRouter.get('/spotlight', requirePermission('catalog'), async (_req, res, next) => {
   try {
     const spotlight = await adminService.getSpotlight();
     const spotlights = await adminService.getSpotlights();
@@ -735,7 +743,7 @@ adminRouter.get('/spotlight', async (_req, res, next) => {
   }
 });
 
-adminRouter.get('/spotlights', async (_req, res, next) => {
+adminRouter.get('/spotlights', requirePermission('catalog'), async (_req, res, next) => {
   try {
     const spotlights = await adminService.getSpotlights();
     res.json({ success: true, spotlights });
@@ -744,7 +752,7 @@ adminRouter.get('/spotlights', async (_req, res, next) => {
   }
 });
 
-adminRouter.put('/spotlight', async (req, res, next) => {
+adminRouter.put('/spotlight', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { contentId, contentIds } = req.body;
     if (Array.isArray(contentIds)) {
@@ -767,7 +775,7 @@ adminRouter.put('/spotlight', async (req, res, next) => {
   }
 });
 
-adminRouter.put('/spotlights', async (req, res, next) => {
+adminRouter.put('/spotlights', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { contentIds } = req.body;
     const ids = Array.isArray(contentIds) ? contentIds : [];
@@ -783,7 +791,7 @@ adminRouter.put('/spotlights', async (req, res, next) => {
   }
 });
 
-adminRouter.post('/spotlights/add', async (req, res, next) => {
+adminRouter.post('/spotlights/add', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { contentId } = req.body;
     if (!contentId) {
@@ -801,9 +809,9 @@ adminRouter.post('/spotlights/add', async (req, res, next) => {
   }
 });
 
-adminRouter.delete('/spotlights/:id', async (req, res, next) => {
+adminRouter.delete('/spotlights/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const id = param(req.params.id);
     await adminService.removeSpotlight(id);
     const spotlights = await adminService.getSpotlights();
     res.json({
@@ -819,7 +827,7 @@ adminRouter.delete('/spotlights/:id', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 // 8. ADVERTISEMENT CONFIGURATION & MEDIA LIBRARY
 // ----------------------------------------------------------------------------
-adminRouter.get('/ads', async (_req, res, next) => {
+adminRouter.get('/ads', requirePermission('catalog'), async (_req, res, next) => {
   try {
     const ads = await adminService.getAdsConfig();
     res.json({ success: true, ads });
@@ -828,7 +836,7 @@ adminRouter.get('/ads', async (_req, res, next) => {
   }
 });
 
-adminRouter.put('/ads', async (req, res, next) => {
+adminRouter.put('/ads', requirePermission('catalog'), async (req, res, next) => {
   try {
     const ads = await adminService.updateAdsConfig(req.body);
     res.json({ success: true, message: 'Advertisement configuration saved successfully.', ads });
@@ -837,7 +845,7 @@ adminRouter.put('/ads', async (req, res, next) => {
   }
 });
 
-adminRouter.get('/ads/library', async (req, res, next) => {
+adminRouter.get('/ads/library', requirePermission('catalog'), async (req, res, next) => {
   try {
     const type = req.query.type as ('IMAGE' | 'VIDEO') | undefined;
     const items = await adminService.getAdMediaLibrary(type);
@@ -847,7 +855,7 @@ adminRouter.get('/ads/library', async (req, res, next) => {
   }
 });
 
-adminRouter.post('/ads/library', async (req, res, next) => {
+adminRouter.post('/ads/library', requirePermission('catalog'), async (req, res, next) => {
   try {
     const { items } = req.body;
     if (!Array.isArray(items)) {
@@ -860,7 +868,7 @@ adminRouter.post('/ads/library', async (req, res, next) => {
   }
 });
 
-adminRouter.post('/ads/library/upload', (req: Request, res: Response, next) => {
+adminRouter.post('/ads/library/upload', requirePermission('catalog'), (req: Request, res: Response, next) => {
   uploadMediaMiddleware.array('files', 15)(req, res, async (err: any) => {
     if (err) {
       return res.status(400).json({ error: { code: 'UPLOAD_ERROR', message: err.message || 'File upload error.' } });
@@ -928,9 +936,9 @@ adminRouter.post('/ads/library/upload', (req: Request, res: Response, next) => {
   });
 });
 
-adminRouter.delete('/ads/library/:id', async (req, res, next) => {
+adminRouter.delete('/ads/library/:id', requirePermission('catalog'), async (req, res, next) => {
   try {
-    await adminService.deleteAdMediaItem(req.params.id);
+    await adminService.deleteAdMediaItem(param(req.params.id));
     const library = await adminService.getAdMediaLibrary();
     res.json({ success: true, message: 'Media item deleted from library.', library });
   } catch (err) {
@@ -941,7 +949,7 @@ adminRouter.delete('/ads/library/:id', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 // 9. FINANCIAL ANALYTICS RESET (RESET PLATFORM REVENUE & TRANSACTION COUNTERS ONLY)
 // ----------------------------------------------------------------------------
-adminRouter.post('/reset-financial-analytics', async (_req, res, next) => {
+adminRouter.post('/reset-financial-analytics', requirePermission('settings'), async (_req, res, next) => {
   try {
     const result = await adminService.resetFinancialAnalytics();
     res.json(result);
@@ -953,7 +961,7 @@ adminRouter.post('/reset-financial-analytics', async (_req, res, next) => {
 // ----------------------------------------------------------------------------
 // 9B. COMPLETE SYSTEM FINANCIAL/TRANSACTION PURGE & RESET
 // ----------------------------------------------------------------------------
-adminRouter.post('/reset-financials', async (req, res, next) => {
+adminRouter.post('/reset-financials', requirePermission('settings'), async (req, res, next) => {
   try {
     const confirmation = req.body?.confirmation;
     if (confirmation !== 'CONFIRM') {
@@ -971,7 +979,7 @@ adminRouter.post('/reset-financials', async (req, res, next) => {
 // ----------------------------------------------------------------------------
 // 9C. ADMIN PROMO CODES MANAGEMENT
 // ----------------------------------------------------------------------------
-adminRouter.get('/promos', async (_req, res, next) => {
+adminRouter.get('/promos', requirePermission('promos'), async (_req, res, next) => {
   try {
     const promos = await promoService.getAllPromoCodesAdmin();
     res.json({ success: true, promos });
@@ -980,7 +988,7 @@ adminRouter.get('/promos', async (_req, res, next) => {
   }
 });
 
-adminRouter.post('/promos', async (req, res, next) => {
+adminRouter.post('/promos', requirePermission('promos'), async (req, res, next) => {
   try {
     const promo = await promoService.createPromoCodeAdmin(req.body);
     res.status(201).json({ success: true, message: 'Promo code created successfully.', promo });
@@ -989,7 +997,7 @@ adminRouter.post('/promos', async (req, res, next) => {
   }
 });
 
-adminRouter.put('/promos/:id', async (req, res, next) => {
+adminRouter.put('/promos/:id', requirePermission('promos'), async (req, res, next) => {
   try {
     const promoId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const promo = await promoService.updatePromoCodeAdmin(promoId, req.body);
@@ -999,7 +1007,7 @@ adminRouter.put('/promos/:id', async (req, res, next) => {
   }
 });
 
-adminRouter.patch('/promos/:id/status', async (req, res, next) => {
+adminRouter.patch('/promos/:id/status', requirePermission('promos'), async (req, res, next) => {
   try {
     const promoId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const { status } = req.body;
@@ -1010,7 +1018,7 @@ adminRouter.patch('/promos/:id/status', async (req, res, next) => {
   }
 });
 
-adminRouter.delete('/promos/:id', async (req, res, next) => {
+adminRouter.delete('/promos/:id', requirePermission('promos'), async (req, res, next) => {
   try {
     const promoId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     await promoService.deletePromoCodeAdmin(promoId);
@@ -1019,6 +1027,251 @@ adminRouter.delete('/promos/:id', async (req, res, next) => {
     next(err);
   }
 });
+// ----------------------------------------------------------------------------
+// 10. SUB-ADMIN / ROLE-BASED ACCESS CONTROL (SUPER ADMIN ONLY)
+// ----------------------------------------------------------------------------
+adminRouter.get('/sub-admins', requireSuperAdmin, async (_req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const rawAdmins = await userRepository.listAdmins();
+    const admins = rawAdmins.map(admin => {
+      const isSuper = Boolean(
+        admin.is_super_admin === 1 ||
+        admin.is_super_admin === true ||
+        (admin.email && admin.email.toLowerCase() === 'ashukataria2005@gmail.com')
+      );
+      let perms: string[] = [];
+      if (isSuper) {
+        perms = [...ALL_ADMIN_PERMISSIONS];
+      } else if (admin.permissions) {
+        try {
+          perms = typeof admin.permissions === 'string' ? JSON.parse(admin.permissions) : (admin.permissions as any);
+          if (!Array.isArray(perms)) perms = [];
+        } catch {
+          perms = [];
+        }
+      }
+      return {
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+        status: admin.status,
+        is_super_admin: isSuper,
+        permissions: perms,
+        last_login_at: admin.last_login_at || null,
+        created_at: admin.created_at,
+        updated_at: admin.updated_at,
+      };
+    });
+
+    res.json({ success: true, admins });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/sub-admins', requireSuperAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const { name, email, password, permissions, status } = req.body;
+    const cleanName = (name || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPassword = password || '';
+
+    if (!cleanName) {
+      return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Name is required.' } });
+    }
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'A valid email address is required.' } });
+    }
+
+    if (!cleanPassword || cleanPassword.length < 6) {
+      return res.status(400).json({
+        error: { code: 'INVALID_INPUT', message: 'Password must be at least 6 characters long.' }
+      });
+    }
+
+    const existing = await userRepository.findByEmail(cleanEmail);
+    if (existing) {
+      return res.status(409).json({
+        error: { code: 'USER_EXISTS', message: 'An account with this email address already exists.' }
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(cleanPassword, salt);
+    const id = `admin-${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+
+    const perms = Array.isArray(permissions)
+      ? permissions.filter(p => ALL_ADMIN_PERMISSIONS.includes(p))
+      : [];
+
+    await userRepository.createAdmin({
+      id,
+      name: cleanName,
+      email: cleanEmail,
+      passwordHash,
+      isSuperAdmin: false,
+      permissions: perms,
+      status: status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE',
+      now,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Sub-Admin "${cleanName}" created successfully.`,
+      admin: {
+        id,
+        name: cleanName,
+        email: cleanEmail,
+        role: 'ADMIN',
+        status: status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE',
+        is_super_admin: false,
+        permissions: perms,
+        last_login_at: null,
+        created_at: now,
+        updated_at: now,
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.put('/sub-admins/:id', requireSuperAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const id = param(req.params.id);
+    const { name, permissions, password, status } = req.body;
+
+    const existing = await userRepository.findById(id);
+    if (!existing || existing.role !== 'ADMIN') {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Administrator not found.' } });
+    }
+
+    const isSuper = Boolean(
+      existing.is_super_admin === 1 ||
+      existing.is_super_admin === true ||
+      (existing.email && existing.email.toLowerCase() === 'ashukataria2005@gmail.com')
+    );
+
+    let passwordHash: string | undefined;
+    if (password && password.trim()) {
+      if (password.trim().length < 6) {
+        return res.status(400).json({
+          error: { code: 'INVALID_INPUT', message: 'Password must be at least 6 characters long.' }
+        });
+      }
+      const salt = await bcrypt.genSalt(10);
+      passwordHash = await bcrypt.hash(password.trim(), salt);
+    }
+
+    let perms = isSuper ? [...ALL_ADMIN_PERMISSIONS] : undefined;
+    if (!isSuper && Array.isArray(permissions)) {
+      perms = permissions.filter(p => ALL_ADMIN_PERMISSIONS.includes(p));
+    }
+
+    const now = new Date().toISOString();
+    await userRepository.updateAdmin(id, {
+      name: name ? name.trim() : undefined,
+      permissions: perms,
+      passwordHash,
+      status: isSuper ? 'ACTIVE' : (status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE'),
+      now,
+    });
+
+    const updated = await userRepository.findById(id);
+    res.json({
+      success: true,
+      message: 'Administrator updated successfully.',
+      admin: updated ? {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        role: updated.role,
+        status: updated.status,
+        is_super_admin: isSuper,
+        permissions: perms || [],
+        last_login_at: updated.last_login_at || null,
+        created_at: updated.created_at,
+        updated_at: updated.updated_at,
+      } : null
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/sub-admins/:id/status', requireSuperAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const id = param(req.params.id);
+    const { status } = req.body;
+
+    const existing = await userRepository.findById(id);
+    if (!existing || existing.role !== 'ADMIN') {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Administrator not found.' } });
+    }
+
+    const isSuper = Boolean(
+      existing.is_super_admin === 1 ||
+      existing.is_super_admin === true ||
+      (existing.email && existing.email.toLowerCase() === 'ashukataria2005@gmail.com')
+    );
+
+    if (isSuper) {
+      return res.status(400).json({
+        error: { code: 'FORBIDDEN', message: 'Super Administrator accounts cannot be suspended.' }
+      });
+    }
+
+    const newStatus = status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE';
+    const now = new Date().toISOString();
+    await userRepository.setAdminStatus(id, newStatus, now);
+
+    res.json({
+      success: true,
+      message: `Administrator status set to ${newStatus}.`,
+      status: newStatus,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.delete('/sub-admins/:id', requireSuperAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const id = param(req.params.id);
+
+    if (req.user?.id === id) {
+      return res.status(400).json({
+        error: { code: 'FORBIDDEN', message: 'You cannot delete your own administrator account.' }
+      });
+    }
+
+    const existing = await userRepository.findById(id);
+    if (!existing || existing.role !== 'ADMIN') {
+      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Administrator not found.' } });
+    }
+
+    const isSuper = Boolean(
+      existing.is_super_admin === 1 ||
+      existing.is_super_admin === true ||
+      (existing.email && existing.email.toLowerCase() === 'ashukataria2005@gmail.com')
+    );
+
+    if (isSuper) {
+      return res.status(400).json({
+        error: { code: 'FORBIDDEN', message: 'Super Administrator accounts cannot be deleted.' }
+      });
+    }
+
+    await userRepository.deleteAdmin(id);
+    res.json({ success: true, message: `Administrator "${existing.name}" deleted successfully.` });
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 async function uploadSingleMediaFile(file: Express.Multer.File): Promise<{
   url: string;

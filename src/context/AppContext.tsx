@@ -43,7 +43,7 @@ interface AppContextType {
   // User & Auth
   user: User;
   isAuthenticated: boolean;
-  login: (userId: string, name: string, email: string, role?: 'USER' | 'ADMIN', walletBalance?: number) => void;
+  login: (userId: string, name: string, email: string, role?: 'USER' | 'ADMIN', walletBalance?: number, extraFields?: { is_super_admin?: boolean; permissions?: string[]; status?: 'ACTIVE' | 'SUSPENDED'; last_login_at?: string | null }) => void;
   signup: (userId: string, name: string, email: string, walletBalance?: number) => void;
   logout: () => void;
   updateProfile: (name: string, email: string) => void;
@@ -512,13 +512,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Validate token with backend and restore user session
       api.auth.me().then(({ user: serverUser, wallet: serverWallet }) => {
         if (serverUser) {
+          const isSuper = Boolean(
+            serverUser.is_super_admin === 1 ||
+            serverUser.is_super_admin === true ||
+            (serverUser.email && serverUser.email.toLowerCase() === 'ashukataria2005@gmail.com')
+          );
+          const perms = Array.isArray(serverUser.permissions)
+            ? serverUser.permissions
+            : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
+
           const restoredUser: User = {
             id: serverUser.id,
             name: serverUser.name,
             email: serverUser.email,
             avatarInitials: (serverUser.name || '').trim().split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U',
             joinedDate: serverUser.createdAt ? new Date(serverUser.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : formatCurrentDate(),
-            role: serverUser.role
+            role: serverUser.role,
+            is_super_admin: isSuper,
+            permissions: perms,
+            status: serverUser.status || 'ACTIVE',
+            last_login_at: serverUser.last_login_at || null,
           };
           setUser(restoredUser);
           saveToStorage('user', restoredUser);
@@ -543,13 +556,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           try {
             const refreshed = await api.auth.refresh();
             if (refreshed?.user) {
+              const isSuper = Boolean(
+                refreshed.user.is_super_admin === 1 ||
+                refreshed.user.is_super_admin === true ||
+                (refreshed.user.email && refreshed.user.email.toLowerCase() === 'ashukataria2005@gmail.com')
+              );
+              const perms = Array.isArray(refreshed.user.permissions)
+                ? refreshed.user.permissions
+                : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
+
               const restoredUser: User = {
                 id: refreshed.user.id,
                 name: refreshed.user.name,
                 email: refreshed.user.email,
                 avatarInitials: (refreshed.user.name || '').trim().split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U',
                 joinedDate: refreshed.user.createdAt ? new Date(refreshed.user.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : formatCurrentDate(),
-                role: refreshed.user.role
+                role: refreshed.user.role,
+                is_super_admin: isSuper,
+                permissions: perms,
+                status: refreshed.user.status || 'ACTIVE',
+                last_login_at: refreshed.user.last_login_at || null,
               };
               setUser(restoredUser);
               saveToStorage('user', restoredUser);
@@ -569,13 +595,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             try {
               const res = await api.auth.adminQuickLogin();
               if (res?.user && res.user.role === 'ADMIN') {
+                const isSuper = Boolean(
+                  res.user.is_super_admin === 1 ||
+                  res.user.is_super_admin === true ||
+                  (res.user.email && res.user.email.toLowerCase() === 'ashukataria2005@gmail.com')
+                );
+                const perms = Array.isArray(res.user.permissions)
+                  ? res.user.permissions
+                  : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
+
                 const restoredAdmin: User = {
                   id: res.user.id,
                   name: res.user.name,
                   email: res.user.email,
-                  avatarInitials: 'AK',
+                  avatarInitials: (res.user.name || '').trim().split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'AK',
                   joinedDate: formatCurrentDate(),
-                  role: 'ADMIN'
+                  role: 'ADMIN',
+                  is_super_admin: isSuper,
+                  permissions: perms,
+                  status: res.user.status || 'ACTIVE',
+                  last_login_at: res.user.last_login_at || null,
                 };
                 setUser(restoredAdmin);
                 saveToStorage('user', restoredAdmin);
@@ -611,13 +650,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (hasAdminQuick) {
         api.auth.adminQuickLogin().then(res => {
           if (res?.user && res.user.role === 'ADMIN') {
+            const isSuper = Boolean(
+              res.user.is_super_admin === 1 ||
+              res.user.is_super_admin === true ||
+              (res.user.email && res.user.email.toLowerCase() === 'ashukataria2005@gmail.com')
+            );
+            const perms = Array.isArray(res.user.permissions)
+              ? res.user.permissions
+              : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
+
             const restoredAdmin: User = {
               id: res.user.id,
               name: res.user.name,
               email: res.user.email,
-              avatarInitials: 'AK',
+              avatarInitials: (res.user.name || '').trim().split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'AK',
               joinedDate: formatCurrentDate(),
-              role: 'ADMIN'
+              role: 'ADMIN',
+              is_super_admin: isSuper,
+              permissions: perms,
+              status: res.user.status || 'ACTIVE',
+              last_login_at: res.user.last_login_at || null,
             };
             setUser(restoredAdmin);
             saveToStorage('user', restoredAdmin);
@@ -715,15 +767,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Auth actions
-  const login = (userId: string, name: string, email: string, role: 'USER' | 'ADMIN' = 'USER', serverWalletBalance?: number) => {
+  const login = (
+    userId: string,
+    name: string,
+    email: string,
+    role: 'USER' | 'ADMIN' = 'USER',
+    serverWalletBalance?: number,
+    extraFields?: {
+      is_super_admin?: boolean;
+      permissions?: string[];
+      status?: 'ACTIVE' | 'SUSPENDED';
+      last_login_at?: string | null;
+    }
+  ) => {
     const initials = name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
+    const isSuper = Boolean(
+      extraFields?.is_super_admin === true ||
+      (email && email.toLowerCase() === 'ashukataria2005@gmail.com')
+    );
+    const perms = Array.isArray(extraFields?.permissions)
+      ? extraFields!.permissions
+      : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : (role === 'ADMIN' ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []));
+
     const newUser: User = {
       id: userId,   // Real backend UUID — never a client-generated timestamp ID
       name,
       email,
       avatarInitials: initials,
       joinedDate: formatCurrentDate(),
-      role
+      role,
+      is_super_admin: isSuper,
+      permissions: perms,
+      status: extraFields?.status || 'ACTIVE',
+      last_login_at: extraFields?.last_login_at || null,
     };
     setUser(newUser);
     // Persist the real user so a browser refresh restores it correctly

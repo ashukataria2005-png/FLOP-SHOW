@@ -3,7 +3,7 @@ import { paymentRequestService } from '../services/paymentRequestService.js';
 import { subscriptionService } from '../services/subscriptionService.js';
 import { subscriptionRepository } from '../repositories/subscriptionRepository.js';
 import { requireAuth, AuthenticatedRequest } from '../middlewares/authMiddleware.js';
-import { requireAdmin } from '../middlewares/adminMiddleware.js';
+import { requireAdmin, requirePermission } from '../middlewares/adminMiddleware.js';
 
 export const subscriptionRouter = Router();
 
@@ -84,7 +84,7 @@ subscriptionRouter.get('/my-history', requireAuth, async (req: AuthenticatedRequ
 // ============================================================================
 
 // Admin: list all subscription requests / records
-subscriptionRouter.get('/admin/requests', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+subscriptionRouter.get('/admin/requests', requireAuth, requirePermission('payments'), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const statusFilter = req.query.status as any;
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
@@ -96,7 +96,7 @@ subscriptionRouter.get('/admin/requests', requireAuth, requireAdmin, async (req:
 });
 
 // Admin: approve pending subscription
-subscriptionRouter.post('/admin/approve', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+subscriptionRouter.post('/admin/approve', requireAuth, requirePermission('payments'), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { subscriptionId, adminNote } = req.body;
     if (!subscriptionId) {
@@ -116,7 +116,7 @@ subscriptionRouter.post('/admin/approve', requireAuth, requireAdmin, async (req:
 });
 
 // Admin: reject pending subscription
-subscriptionRouter.post('/admin/reject', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+subscriptionRouter.post('/admin/reject', requireAuth, requirePermission('payments'), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { subscriptionId, adminNote } = req.body;
     if (!subscriptionId) {
@@ -136,7 +136,7 @@ subscriptionRouter.post('/admin/reject', requireAuth, requireAdmin, async (req: 
 });
 
 // Admin: directly grant an active subscription to a user
-subscriptionRouter.post('/admin/grant', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+subscriptionRouter.post('/admin/grant', requireAuth, requirePermission('payments'), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { userId, plan, adminNote } = req.body;
     if (!userId || !plan) {

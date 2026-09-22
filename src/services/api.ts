@@ -1396,6 +1396,77 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload)
       });
+    },
+
+    subAdmins: {
+      async list() {
+        return request<{
+          count: number;
+          admins: Array<{
+            id: string;
+            name: string;
+            email: string;
+            role: string;
+            status: 'ACTIVE' | 'SUSPENDED';
+            is_super_admin: boolean;
+            permissions: string[];
+            last_login_at: string | null;
+            created_at: string;
+            updated_at: string;
+          }>;
+        }>('/admin/sub-admins');
+      },
+
+      async create(data: { name: string; email: string; password?: string; permissions: string[] }) {
+        return request<{
+          success: boolean;
+          message: string;
+          admin: {
+            id: string;
+            name: string;
+            email: string;
+            role: string;
+            status: string;
+            is_super_admin: boolean;
+            permissions: string[];
+            created_at: string;
+          };
+        }>('/admin/sub-admins', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+      },
+
+      async update(id: string, data: { name?: string; password?: string; permissions?: string[]; status?: 'ACTIVE' | 'SUSPENDED' }) {
+        return request<{
+          success: boolean;
+          message: string;
+          admin: any;
+        }>(`/admin/sub-admins/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data)
+        });
+      },
+
+      async setStatus(id: string, status: 'ACTIVE' | 'SUSPENDED') {
+        return request<{
+          success: boolean;
+          message: string;
+          status: 'ACTIVE' | 'SUSPENDED';
+        }>(`/admin/sub-admins/${id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status })
+        });
+      },
+
+      async delete(id: string) {
+        return request<{
+          success: boolean;
+          message: string;
+        }>(`/admin/sub-admins/${id}`, {
+          method: 'DELETE'
+        });
+      }
     }
   },
 

@@ -5,6 +5,10 @@ export interface User {
   avatarInitials: string;
   joinedDate: string;
   role?: 'USER' | 'ADMIN';
+  is_super_admin?: boolean;
+  permissions?: string[];
+  status?: 'ACTIVE' | 'SUSPENDED';
+  last_login_at?: string | null;
 }
 
 export interface WatchProgress {

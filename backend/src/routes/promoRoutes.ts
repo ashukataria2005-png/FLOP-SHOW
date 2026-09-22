@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth, optionalAuth, AuthenticatedRequest } from '../middlewares/authMiddleware.js';
-import { requireAdmin } from '../middlewares/adminMiddleware.js';
+import { requireAdmin, requirePermission } from '../middlewares/adminMiddleware.js';
 import { promoService } from '../services/promoService.js';
 
 export const promoRouter = Router();
@@ -59,7 +59,7 @@ promoRouter.post('/validate', optionalAuth, async (req: AuthenticatedRequest, re
  * GET /api/promos/admin/redemptions
  * Requirement 4: List all promo redemptions audit history
  */
-promoRouter.get(['/admin/redemptions', '/redemptions'], requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+promoRouter.get(['/admin/redemptions', '/redemptions'], requireAuth, requirePermission('promos'), async (req: AuthenticatedRequest, res, next) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
     const redemptions = await promoService.getAllRedemptionsAdmin(limit);
@@ -73,7 +73,7 @@ promoRouter.get(['/admin/redemptions', '/redemptions'], requireAuth, requireAdmi
  * GET /api/promos/admin/all & /api/admin/promos
  * List all created promo codes with status, usage counts, and expiry
  */
-promoRouter.get(['/admin/all', '/admin'], requireAuth, requireAdmin, async (_req, res, next) => {
+promoRouter.get(['/admin/all', '/admin'], requireAuth, requirePermission('promos'), async (_req, res, next) => {
   try {
     const promos = await promoService.getAllPromoCodesAdmin();
     res.json({ success: true, promos });
@@ -86,7 +86,7 @@ promoRouter.get(['/admin/all', '/admin'], requireAuth, requireAdmin, async (_req
  * POST /api/promos/admin/create & /api/admin/promos
  * Create a new promo code
  */
-promoRouter.post(['/admin/create', '/admin'], requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+promoRouter.post(['/admin/create', '/admin'], requireAuth, requirePermission('promos'), async (req: AuthenticatedRequest, res, next) => {
   try {
     const {
       code,
@@ -98,7 +98,10 @@ promoRouter.post(['/admin/create', '/admin'], requireAuth, requireAdmin, async (
       discount_enabled,
       discount_percent,
       max_uses,
-      is_lifetime
+      is_lifetime,
+      reward_type,
+      bonus_coins,
+      pass_plan
     } = req.body;
 
     const promo = await promoService.createPromoCodeAdmin({
@@ -123,7 +126,7 @@ promoRouter.post(['/admin/create', '/admin'], requireAuth, requireAdmin, async (
  * PUT /api/promos/admin/:id & /api/admin/promos/:id
  * Requirement 1: Update promo code cleanly even if live/active
  */
-promoRouter.put(['/admin/:id', '/:id'], requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+promoRouter.put(['/admin/:id', '/:id'], requireAuth, requirePermission('promos'), async (req: AuthenticatedRequest, res, next) => {
   try {
     const promoId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const {
@@ -164,7 +167,7 @@ promoRouter.put(['/admin/:id', '/:id'], requireAuth, requireAdmin, async (req: A
  * PATCH /api/promos/admin/:id/status
  * Enable / disable promo code
  */
-promoRouter.patch(['/admin/:id/status', '/:id/status'], requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+promoRouter.patch(['/admin/:id/status', '/:id/status'], requireAuth, requirePermission('promos'), async (req: AuthenticatedRequest, res, next) => {
   try {
     const { status } = req.body;
     if (status !== 'ACTIVE' && status !== 'DISABLED') {
@@ -182,7 +185,7 @@ promoRouter.patch(['/admin/:id/status', '/:id/status'], requireAuth, requireAdmi
  * DELETE /api/promos/admin/:id & /api/admin/promos/:id
  * Delete promo code
  */
-promoRouter.delete(['/admin/:id', '/:id'], requireAuth, requireAdmin, async (req: AuthenticatedRequest, res, next) => {
+promoRouter.delete(['/admin/:id', '/:id'], requireAuth, requirePermission('promos'), async (req: AuthenticatedRequest, res, next) => {
   try {
     const promoId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     await promoService.deletePromoCodeAdmin(promoId);

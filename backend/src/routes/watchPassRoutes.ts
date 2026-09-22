@@ -3,7 +3,7 @@ import { watchPassService } from '../services/watchPassService.js';
 import { paymentRequestService } from '../services/paymentRequestService.js';
 import { paymentRequestRepository } from '../repositories/paymentRequestRepository.js';
 import { requireAuth, AuthenticatedRequest } from '../middlewares/authMiddleware.js';
-import { requireAdmin } from '../middlewares/adminMiddleware.js';
+import { requireAdmin, requirePermission } from '../middlewares/adminMiddleware.js';
 import { adminService } from '../services/adminService.js';
 
 export const watchPassRouter = Router();
@@ -88,7 +88,7 @@ watchPassRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRe
 // ============================================================================
 
 // Admin: list watch passes
-watchPassRouter.get('/admin/requests', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+watchPassRouter.get('/admin/requests', requireAuth, requirePermission('payments'), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const statusFilter = req.query.status as any;
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
@@ -100,7 +100,7 @@ watchPassRouter.get('/admin/requests', requireAuth, requireAdmin, async (req: Au
 });
 
 // Admin: approve pending pass (centralized through paymentRequestService)
-watchPassRouter.post('/admin/approve', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+watchPassRouter.post('/admin/approve', requireAuth, requirePermission('payments'), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { passId, adminNote } = req.body;
     if (!passId) {
@@ -131,7 +131,7 @@ watchPassRouter.post('/admin/approve', requireAuth, requireAdmin, async (req: Au
 });
 
 // Admin: reject pending pass (centralized through paymentRequestService)
-watchPassRouter.post('/admin/reject', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+watchPassRouter.post('/admin/reject', requireAuth, requirePermission('payments'), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { passId, adminNote } = req.body;
     if (!passId) {
@@ -162,7 +162,7 @@ watchPassRouter.post('/admin/reject', requireAuth, requireAdmin, async (req: Aut
 });
 
 // Admin: update plan prices
-watchPassRouter.post('/admin/plans', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+watchPassRouter.post('/admin/plans', requireAuth, requirePermission('monetization'), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { price24h, price3d, price7d, price30d } = req.body;
 
@@ -186,7 +186,7 @@ watchPassRouter.post('/admin/plans', requireAuth, requireAdmin, async (req: Auth
 });
 
 // Admin: separated watch pass analytics
-watchPassRouter.get('/admin/analytics', requireAuth, requireAdmin, async (_req, res, next) => {
+watchPassRouter.get('/admin/analytics', requireAuth, requirePermission('analytics'), async (_req, res, next) => {
   try {
     const analytics = await watchPassService.getAnalytics();
     res.json(analytics);

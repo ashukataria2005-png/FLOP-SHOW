@@ -31,9 +31,9 @@ export const adminAccountService = {
       const ashu = ashuRows[0] as any;
       canonicalAdminId = ashu.id;
       adminEmail = ashu.email;
-      // Guarantee role is ADMIN and status is ACTIVE
+      // Guarantee role is ADMIN, is_super_admin is 1, and all permissions are granted
       await db.run(
-        `UPDATE users SET role = 'ADMIN', status = 'ACTIVE', updated_at = ? WHERE id = ?;`,
+        `UPDATE users SET role = 'ADMIN', status = 'ACTIVE', is_super_admin = 1, permissions = '["analytics","monetization","promos","payments","catalog","users","settings"]', updated_at = ? WHERE id = ?;`,
         [now, canonicalAdminId]
       );
     } else {

@@ -6,6 +6,16 @@ import { walletRepository } from '../repositories/walletRepository.js';
 import { getAdapter } from '../db/adapter.js';
 import { config } from '../config/env.js';
 
+export const ALL_ADMIN_PERMISSIONS: string[] = [
+  'analytics',
+  'monetization',
+  'promos',
+  'payments',
+  'catalog',
+  'users',
+  'settings',
+];
+
 export interface SafeUser {
   id: string;
   name: string;
@@ -13,11 +23,37 @@ export interface SafeUser {
   phone?: string | null;
   role: 'USER' | 'ADMIN';
   status: 'ACTIVE' | 'SUSPENDED' | 'PENDING';
+  is_super_admin?: boolean;
+  permissions?: string[];
+  last_login_at?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export function toSafeUser(user: UserRecord): SafeUser {
+  let isSuperAdmin = false;
+  let perms: string[] = [];
+
+  if (user.role === 'ADMIN') {
+    isSuperAdmin = Boolean(
+      user.is_super_admin === 1 ||
+      user.is_super_admin === true ||
+      (user.email && user.email.toLowerCase() === 'ashukataria2005@gmail.com') ||
+      (config.adminId && user.email && user.email.toLowerCase() === config.adminId.toLowerCase())
+    );
+
+    if (isSuperAdmin) {
+      perms = [...ALL_ADMIN_PERMISSIONS];
+    } else if (user.permissions) {
+      try {
+        perms = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions as any);
+        if (!Array.isArray(perms)) perms = [];
+      } catch {
+        perms = [];
+      }
+    }
+  }
+
   return {
     id: user.id,
     name: user.name,
@@ -25,6 +61,9 @@ export function toSafeUser(user: UserRecord): SafeUser {
     phone: user.phone || null,
     role: user.role,
     status: user.status,
+    is_super_admin: isSuperAdmin,
+    permissions: perms,
+    last_login_at: user.last_login_at || null,
     createdAt: user.created_at,
     updatedAt: user.updated_at,
   };
@@ -191,65 +230,106 @@ export const authService = {
     }
 
     const db = getAdapter();
-    const { rows: adminRows } = await db.query(
-      "SELECT id, name, email, password_hash, role, status, created_at, updated_at FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE' LIMIT 1"
-    );
 
-    if (adminRows.length === 0) {
-      const err = new Error('No active administrator account is configured in the database.');
-      (err as any).statusCode = 503;
-      throw err;
-    }
-
-    const dbAdmin = adminRows[0] as any;
-
-    const matchesId =
+    // Check if logging in as root super admin via config ID/alias
+    const isRootAdminInput =
       cleanId.toLowerCase() === config.adminId.toLowerCase() ||
-      cleanId.toLowerCase() === dbAdmin.email.toLowerCase() ||
+      cleanId.toLowerCase() === 'admin' ||
       cleanId.toLowerCase() === 'ashukataria2005@gmail.com';
 
-    let matchesPassword = Boolean(
-      config.adminPassword && cleanPassword === config.adminPassword
-    );
+    let targetAdmin: any = null;
 
-    if (!matchesPassword && dbAdmin.password_hash) {
-      matchesPassword = await bcrypt.compare(cleanPassword, dbAdmin.password_hash);
+    if (isRootAdminInput) {
+      // Find root admin in database
+      const { rows } = await db.query(
+        "SELECT * FROM users WHERE role = 'ADMIN' AND (is_super_admin = 1 OR LOWER(email) = 'ashukataria2005@gmail.com') LIMIT 1"
+      );
+      if (rows.length > 0) {
+        targetAdmin = rows[0];
+      } else {
+        // Fall back to first active admin
+        const { rows: firstAdmin } = await db.query(
+          "SELECT * FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE' LIMIT 1"
+        );
+        if (firstAdmin.length > 0) targetAdmin = firstAdmin[0];
+      }
+    } else {
+      // Find sub-admin by email or ID
+      const { rows } = await db.query(
+        "SELECT * FROM users WHERE role = 'ADMIN' AND (LOWER(email) = ? OR id = ?) LIMIT 1",
+        [cleanId.toLowerCase(), cleanId]
+      );
+      if (rows.length > 0) targetAdmin = rows[0];
     }
 
-    if (!matchesId || !matchesPassword) {
+    if (!targetAdmin) {
       const err = new Error('Invalid Admin ID or Admin Password.');
       (err as any).statusCode = 401;
       throw err;
     }
 
-    const adminUser: SafeUser = {
-      id: dbAdmin.id,
-      name: dbAdmin.name || 'Ashu Kataria',
-      email: dbAdmin.email,
-      role: 'ADMIN',
-      status: 'ACTIVE',
-      createdAt: dbAdmin.created_at || new Date().toISOString(),
-      updatedAt: dbAdmin.updated_at || new Date().toISOString(),
-    };
+    if (targetAdmin.status !== 'ACTIVE') {
+      const err = new Error(`Administrator account is ${targetAdmin.status.toLowerCase()}. Access denied.`);
+      (err as any).statusCode = 403;
+      throw err;
+    }
 
-    const token = authService.generateToken(adminUser);
-    return { user: adminUser, token };
+    // Validate password:
+    // If root admin and password matches config.adminPassword, accept.
+    let passwordMatches = Boolean(
+      (isRootAdminInput || targetAdmin.is_super_admin === 1) &&
+      config.adminPassword &&
+      cleanPassword === config.adminPassword
+    );
+
+    if (!passwordMatches && targetAdmin.password_hash) {
+      passwordMatches = await bcrypt.compare(cleanPassword, targetAdmin.password_hash);
+    }
+
+    if (!passwordMatches) {
+      const err = new Error('Invalid Admin ID or Admin Password.');
+      (err as any).statusCode = 401;
+      throw err;
+    }
+
+    // Update last_login_at
+    const now = new Date().toISOString();
+    await userRepository.updateLastLogin(targetAdmin.id, now);
+    targetAdmin.last_login_at = now;
+
+    const safeUser = toSafeUser(targetAdmin);
+    const token = authService.generateToken(safeUser);
+    return { user: safeUser, token };
   },
 
   generateToken(user: SafeUser): string {
     return jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        is_super_admin: Boolean(user.is_super_admin),
+        permissions: user.permissions || [],
+      },
       config.jwtSecret,
       { expiresIn: config.jwtExpiresIn as any }
     );
   },
 
-  verifyToken(token: string): { id: string; email: string; role: 'USER' | 'ADMIN' } {
+  verifyToken(token: string): {
+    id: string;
+    email: string;
+    role: 'USER' | 'ADMIN';
+    is_super_admin?: boolean;
+    permissions?: string[];
+  } {
     try {
       return jwt.verify(token, config.jwtSecret) as {
         id: string;
         email: string;
         role: 'USER' | 'ADMIN';
+        is_super_admin?: boolean;
+        permissions?: string[];
       };
     } catch (err) {
       const error = new Error('Invalid or expired authentication token.');

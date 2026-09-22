@@ -140,6 +140,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
     if (canWatch) {
       startPlaying(currentItem);
     } else {
+      showToast('Subscribe or get a Watch Pass to watch this title', 'info');
       openPlanSelector(currentItem);
     }
   };
@@ -148,6 +149,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
     if (canWatch) {
       startPlaying(currentItem, episode);
     } else {
+      showToast('Subscribe or get a Watch Pass to watch this title', 'info');
       openPlanSelector(currentItem);
     }
   };

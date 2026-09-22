@@ -14,11 +14,49 @@ contentRouter.get('/featured', async (_req, res, next) => {
   }
 });
 
-// GET /api/content/genres
-contentRouter.get('/genres', async (_req, res, next) => {
+// GET /api/content/genres & /api/content/categories
+const getGenresHandler = async (_req: any, res: any, next: any) => {
   try {
     const genres = await contentService.getGenres();
-    res.json({ genres });
+    res.json({ genres, categories: genres });
+  } catch (err) {
+    next(err);
+  }
+};
+contentRouter.get('/genres', getGenresHandler);
+contentRouter.get('/categories', getGenresHandler);
+
+// GET /api/content/movies
+contentRouter.get('/movies', async (req, res, next) => {
+  try {
+    const genre = req.query.genre as string | undefined;
+    const isAll = req.query.all === 'true' || req.query.all === '1';
+    const limit = isAll ? 2000 : (req.query.limit ? parseInt(req.query.limit as string, 10) : undefined);
+    const items = await contentService.listPublished({
+      type: 'MOVIE',
+      genreSlug: genre,
+      limit,
+      all: isAll,
+    });
+    res.json({ count: items.length, items });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/content/series
+contentRouter.get('/series', async (req, res, next) => {
+  try {
+    const genre = req.query.genre as string | undefined;
+    const isAll = req.query.all === 'true' || req.query.all === '1';
+    const limit = isAll ? 2000 : (req.query.limit ? parseInt(req.query.limit as string, 10) : undefined);
+    const items = await contentService.listPublished({
+      type: 'SERIES',
+      genreSlug: genre,
+      limit,
+      all: isAll,
+    });
+    res.json({ count: items.length, items });
   } catch (err) {
     next(err);
   }

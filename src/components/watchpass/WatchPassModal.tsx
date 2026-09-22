@@ -114,7 +114,8 @@ export const WatchPassModal: React.FC = () => {
     isAuthenticated,
     openAuthModal,
     showToast,
-    user
+    user,
+    refreshSubscriptionStatus
   } = useApp();
 
   const [plans, setPlans] = useState<WatchPassPlanTemplate[]>(DEFAULT_PLANS);
@@ -248,6 +249,7 @@ export const WatchPassModal: React.FC = () => {
         sessionStorage.removeItem('flops_applied_promo');
         showToast('Watch Pass request submitted! Catalog-wide access will activate upon admin approval.', 'success');
         closeWatchPassModal();
+        refreshSubscriptionStatus().catch(() => {});
       } else {
         setErrorMessage(res?.message || 'Failed to submit Watch Pass request.');
       }

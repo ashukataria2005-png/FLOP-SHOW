@@ -214,7 +214,38 @@ export function createServer(): Express {
 
   // Mount API modules
   app.use('/api/auth', authRouter);
+
+  // 100% Public Catalog & Media Browsing Endpoints (accessible to Guests, New Users, Old Users, Subscribers)
   app.use('/api/content', contentRouter);
+  app.use('/api/catalog', contentRouter);
+  app.use('/api/media', mediaRouter);
+
+  // Direct public aliases for discovery
+  app.get('/api/movies', (req, res, next) => {
+    req.url = '/movies' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+    contentRouter(req, res, next);
+  });
+  app.get('/api/series', (req, res, next) => {
+    req.url = '/series' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+    contentRouter(req, res, next);
+  });
+  app.get('/api/categories', (req, res, next) => {
+    req.url = '/categories' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+    contentRouter(req, res, next);
+  });
+  app.get('/api/hero', (req, res, next) => {
+    req.url = '/hero' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+    contentRouter(req, res, next);
+  });
+  app.get('/api/spotlight', (req, res, next) => {
+    req.url = '/spotlight' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+    contentRouter(req, res, next);
+  });
+  app.get('/api/spotlights', (req, res, next) => {
+    req.url = '/spotlights' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+    contentRouter(req, res, next);
+  });
+
   app.use('/api/purchases', purchaseRouter);
   app.use('/api/wallet', walletRouter);
   app.use('/api/library', libraryRouter);
@@ -223,7 +254,6 @@ export function createServer(): Express {
   app.post('/api/admin-login', handleAdminLogin);
 
   app.use('/api/admin', adminRouter);
-  app.use('/api/media', mediaRouter);
   app.use('/api/payments', paymentRouter);
   app.use('/api/webhooks', webhookRouter);
   app.use('/api/monetization', monetizationRouter);

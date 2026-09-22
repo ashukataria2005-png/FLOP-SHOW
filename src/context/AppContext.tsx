@@ -664,6 +664,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const token = tokenStorage.get();
         if (token) {
           api.auth.refresh().catch(() => {});
+          refreshSubscriptionStatus().catch(() => {});
+          syncPurchases().catch(() => {});
         }
       }
     };
@@ -675,6 +677,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isAuthenticated]);
+
+  // Real-time entitlement polling:
+  // When a user has a pending subscription or watch pass request,
+  // poll every 5 seconds so access activates immediately on admin approval without reload
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const hasPending = Boolean(pendingSubscription || (userWatchPasses?.pendingPasses && userWatchPasses.pendingPasses.length > 0));
+    if (!hasPending) return;
+
+    const pollTimer = setInterval(async () => {
+      try {
+        await refreshSubscriptionStatus();
+        await syncPurchases();
+      } catch {
+        // Ignore polling errors
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(pollTimer);
+    };
+  }, [isAuthenticated, Boolean(pendingSubscription), userWatchPasses?.pendingPasses?.length]);
+
+  // Auto-dismiss paywall modal and toast when subscription/pass activates in real time
+  useEffect(() => {
+    if (isAuthenticated && (hasActiveSubscription || hasActiveWatchPass)) {
+      if (activeModal === 'subscription' || activeModal === 'watchpass' || activeModal === 'plan_selector') {
+        setActiveModal(null);
+        showToast('Your access is now ACTIVE! Enjoy full catalog streaming.', 'success');
+      }
+    }
+  }, [hasActiveSubscription, hasActiveWatchPass]);
 
   // Sync user-specific data to localStorage (only when authenticated, so guest state doesn't overwrite)
   useEffect(() => { if (isAuthenticated) saveToStorage('purchases', purchases); }, [purchases, isAuthenticated]);
@@ -1137,14 +1171,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       } catch (err: any) {
         if (err?.code === 'SUBSCRIPTION_REQUIRED' || (monetizationMode === 'SUBSCRIPTION' && (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403))) {
-          openSubscriptionModal();
+          showToast('Subscribe or get a Watch Pass to watch this title', 'info');
+          openPlanSelector(content);
           return;
         }
         if (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403) {
-          // skipOwnershipCheck is set when called immediately after a purchase (before React re-renders
-          // the purchases state), so we trust the caller that the content is now owned.
           if (!skipOwnershipCheck && !isOwned(content.id) && !content.isFree) {
-            openPurchaseModal(content);
+            showToast('Subscribe or get a Watch Pass to watch this title', 'info');
+            openPlanSelector(content);
             return;
           }
         }
@@ -1203,14 +1237,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       } catch (err: any) {
         if (err?.code === 'SUBSCRIPTION_REQUIRED' || (monetizationMode === 'SUBSCRIPTION' && (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403))) {
-          openSubscriptionModal();
+          showToast('Subscribe or get a Watch Pass to watch this title', 'info');
+          openPlanSelector(content);
           return;
         }
         if (err?.code === 'PURCHASE_REQUIRED' || err?.status === 403) {
-          // skipOwnershipCheck is set when called immediately after a purchase (before React re-renders
-          // the purchases state), so we trust the caller that the content is now owned.
           if (!skipOwnershipCheck && !isOwned(content.id) && !content.isFree) {
-            openPurchaseModal(content);
+            showToast('Subscribe or get a Watch Pass to watch this title', 'info');
+            openPlanSelector(content);
             return;
           }
         }

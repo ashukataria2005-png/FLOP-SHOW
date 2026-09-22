@@ -66,8 +66,8 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     return () => { mounted = false; };
   }, [activeCatalog.length]);
 
-  // Home Hero: dedicated hero item set by admin, or first featured item
-  const heroItem = activeCatalog.find(item => item.isHero) || dedicatedHero || undefined;
+  // Home Hero: dedicated hero item set by admin, or first featured item, or premier catalog item
+  const heroItem = activeCatalog.find(item => item.isHero) || dedicatedHero || activeCatalog.find(item => item.isFeatured) || activeCatalog[0] || undefined;
 
   // ── In-progress: items currently being watched (with completion threshold & deduplication) ───
   const inProgressItems = React.useMemo(() => {

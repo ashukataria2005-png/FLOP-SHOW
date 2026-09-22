@@ -166,10 +166,10 @@ export const contentRepository = {
     }
 
     if (filters.status && filters.status !== 'ALL') {
-      whereConditions.push('c.status = ?');
-      whereParams.push(filters.status);
+      whereConditions.push('(c.status = ? OR (c.status IS NULL AND ? = \'PUBLISHED\'))');
+      whereParams.push(filters.status, filters.status);
     } else if (!filters.status) {
-      whereConditions.push("c.status = 'PUBLISHED'");
+      whereConditions.push("(c.status = 'PUBLISHED' OR c.status IS NULL OR c.status = 'ACTIVE' OR LOWER(c.status) = 'published' OR c.status = '')");
     }
 
     if (filters.type) {
@@ -279,7 +279,7 @@ export const contentRepository = {
   ): Promise<ContentRecord[]> {
     const db = getAdapter();
     const joinParams: (string | number)[] = [];
-    const whereConditions: string[] = ["UPPER(c.status) = 'PUBLISHED'"];
+    const whereConditions: string[] = ["(c.status = 'PUBLISHED' OR c.status IS NULL OR c.status = 'ACTIVE' OR LOWER(c.status) = 'published' OR c.status = '')"];
     const whereParams: (string | number)[] = [];
 
     let genreJoin = '';
@@ -766,17 +766,35 @@ export const contentRepository = {
       const heroId = (settingRows[0] as { value: string } | undefined)?.value?.trim();
       if (heroId) {
         const item = await contentRepository.findByIdOrSlug(heroId);
-        if (item && item.status === 'PUBLISHED') {
+        if (item && (!item.status || item.status.toUpperCase() === 'PUBLISHED' || item.status.toUpperCase() === 'ACTIVE')) {
           return item;
         }
       }
 
       // Fallback: is_hero = 1
       const { rows } = await db.query(
-        `SELECT * FROM content WHERE is_hero = 1 AND status = 'PUBLISHED' LIMIT 1;`
+        `SELECT * FROM content 
+         WHERE is_hero = 1 AND (status = 'PUBLISHED' OR status IS NULL OR status = 'ACTIVE' OR LOWER(status) = 'published' OR status = '') 
+         LIMIT 1;`
       );
       if (rows[0]) {
         const row = rows[0] as ContentRecord;
+        const defaultPrices = await getDefaultPrices();
+        return resolveContentPricing({
+          ...row,
+          genres: await contentRepository.getGenresForContent(row.id),
+        }, defaultPrices);
+      }
+
+      // Further fallback: Return top featured or highest priority published title
+      const { rows: fallbackRows } = await db.query(
+        `SELECT * FROM content 
+         WHERE (status = 'PUBLISHED' OR status IS NULL OR status = 'ACTIVE' OR LOWER(status) = 'published' OR status = '')
+         ORDER BY featured DESC, display_priority DESC, created_at DESC 
+         LIMIT 1;`
+      );
+      if (fallbackRows[0]) {
+        const row = fallbackRows[0] as ContentRecord;
         const defaultPrices = await getDefaultPrices();
         return resolveContentPricing({
           ...row,
@@ -855,11 +873,28 @@ export const contentRepository = {
 
       for (const id of uniqueIds) {
         const item = await contentRepository.findByIdOrSlug(id);
-        if (item && item.status?.toUpperCase() === 'PUBLISHED') {
+        if (item && (!item.status || item.status.toUpperCase() === 'PUBLISHED' || item.status.toUpperCase() === 'ACTIVE')) {
           if (!item.genres || item.genres.length === 0) {
             item.genres = await contentRepository.getGenresForContent(item.id);
           }
           items.push(item);
+        }
+      }
+
+      // If no valid spotlights configured, fallback to top featured/priority titles
+      if (items.length === 0) {
+        const { rows: fallbackRows } = await db.query(
+          `SELECT * FROM content 
+           WHERE (status = 'PUBLISHED' OR status IS NULL OR status = 'ACTIVE' OR LOWER(status) = 'published' OR status = '')
+           ORDER BY featured DESC, display_priority DESC, created_at DESC 
+           LIMIT 4;`
+        );
+        const defaultPrices = await getDefaultPrices();
+        for (const row of (fallbackRows as ContentRecord[])) {
+          items.push(await resolveContentPricing({
+            ...row,
+            genres: await contentRepository.getGenresForContent(row.id),
+          }, defaultPrices));
         }
       }
 

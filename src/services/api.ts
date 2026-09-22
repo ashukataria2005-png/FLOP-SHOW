@@ -1546,6 +1546,19 @@ export const api = {
           body: JSON.stringify({ ids })
         });
       }
+    },
+
+    security: {
+      async updateCredentials(data: { currentPassword?: string; newPassword?: string; email?: string }) {
+        return request<{
+          success: boolean;
+          message: string;
+          admin?: any;
+        }>('/admin/security/credentials', {
+          method: 'PUT',
+          body: JSON.stringify(data)
+        });
+      }
     }
   },
 

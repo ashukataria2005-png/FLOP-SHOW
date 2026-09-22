@@ -74,14 +74,15 @@ const navGroups: NavGroup[] = [
       { id: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'analytics' }
     ]
   },
-  // 2. Administrators (Super Admin Only)
+  // 2. Administrators & Security (Super Admin Only)
   {
     id: 'group-administrators',
-    title: 'ADMIN TEAM',
+    title: 'ADMIN TEAM & SECURITY',
     icon: ShieldCheck,
     permission: 'SUPER_ADMIN',
     items: [
-      { id: 'admin-administrators', label: 'Administrators', icon: ShieldCheck, permission: 'SUPER_ADMIN' }
+      { id: 'admin-administrators', label: 'Administrators', icon: ShieldCheck, permission: 'SUPER_ADMIN' },
+      { id: 'admin-security', label: 'Admin Security', icon: KeyRound, permission: 'SUPER_ADMIN' }
     ]
   },
   // 3. Payments
@@ -305,7 +306,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             );
             const perms = Array.isArray(res.admin.permissions)
               ? res.admin.permissions
-              : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
+              : (isSuper ? ['*'] : []);
 
             const verifiedAdmin: AdminSessionUser = {
               id: res.admin.id,
@@ -365,7 +366,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     if (isSuperAdmin) return true;
     if (!perm) return true;
     if (perm === 'SUPER_ADMIN') return false;
-    return userPermissions.includes(perm);
+    return userPermissions.includes('*') || userPermissions.includes(perm);
   };
 
   const authorizedNavGroups = navGroups
@@ -440,7 +441,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       );
       const perms = Array.isArray(data.user.permissions)
         ? data.user.permissions
-        : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
+        : (isSuper ? ['*'] : []);
 
       const sessionAdmin: AdminSessionUser = {
         id: data.user.id,
@@ -495,7 +496,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         );
         const perms = Array.isArray(res.user.permissions)
           ? res.user.permissions
-          : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
+          : (isSuper ? ['*'] : []);
 
         const sessionAdmin: AdminSessionUser = {
           id: res.user.id,

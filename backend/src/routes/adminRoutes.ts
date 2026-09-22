@@ -9,7 +9,7 @@ import { uploadMediaMiddleware, isVideoFile, isImageFile } from '../middlewares/
 import { metadataImportService } from '../services/metadataImportService.js';
 import { cloudinaryService, isCloudinaryConfigured, cleanupLocalFile } from '../services/cloudinaryService.js';
 import { vcdnService } from '../services/vcdnService.js';
-import { isVcdnConfigured } from '../config/env.js';
+import { isVcdnConfigured, config } from '../config/env.js';
 import { contentRepository } from '../repositories/contentRepository.js';
 import { mediaRepository } from '../repositories/mediaRepository.js';
 import { userRepository } from '../repositories/userRepository.js';
@@ -1057,14 +1057,10 @@ adminRouter.get('/sub-admins', requireSuperAdmin, async (_req: AuthenticatedRequ
   try {
     const rawAdmins = await userRepository.listAdmins();
     const admins = rawAdmins.map(admin => {
-      const isSuper = Boolean(
-        admin.is_super_admin === 1 ||
-        admin.is_super_admin === true ||
-        (admin.email && admin.email.toLowerCase() === 'ashukataria2005@gmail.com')
-      );
+      const isSuper = isSuperAdminUser(admin);
       let perms: string[] = [];
       if (isSuper) {
-        perms = [...ALL_ADMIN_PERMISSIONS];
+        perms = ['*'];
       } else if (admin.permissions) {
         try {
           perms = typeof admin.permissions === 'string' ? JSON.parse(admin.permissions) : (admin.permissions as any);
@@ -1172,11 +1168,7 @@ adminRouter.put('/sub-admins/:id', requireSuperAdmin, async (req: AuthenticatedR
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Administrator not found.' } });
     }
 
-    const isSuper = Boolean(
-      existing.is_super_admin === 1 ||
-      existing.is_super_admin === true ||
-      (existing.email && existing.email.toLowerCase() === 'ashukataria2005@gmail.com')
-    );
+    const isSuper = isSuperAdminUser(existing);
 
     let passwordHash: string | undefined;
     if (password && password.trim()) {
@@ -1235,11 +1227,7 @@ adminRouter.patch('/sub-admins/:id/status', requireSuperAdmin, async (req: Authe
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Administrator not found.' } });
     }
 
-    const isSuper = Boolean(
-      existing.is_super_admin === 1 ||
-      existing.is_super_admin === true ||
-      (existing.email && existing.email.toLowerCase() === 'ashukataria2005@gmail.com')
-    );
+    const isSuper = isSuperAdminUser(existing);
 
     if (isSuper) {
       return res.status(400).json({
@@ -1321,6 +1309,91 @@ adminRouter.delete('/sub-admins/:id', requireSuperAdmin, async (req: Authenticat
 
     await userRepository.deleteAdmin(id);
     res.json({ success: true, message: `Administrator "${existing.name}" deleted successfully.` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ----------------------------------------------------------------------------
+// 11. ADMIN SECURITY & MASTER CREDENTIALS (SUPER ADMIN ONLY)
+// ----------------------------------------------------------------------------
+adminRouter.put('/security/credentials', requireSuperAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const { currentPassword, newPassword, email } = req.body;
+    const currentAdmin = req.user;
+    if (!currentAdmin) {
+      return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Not authenticated.' } });
+    }
+
+    // Verify current password if changing password
+    if (newPassword && typeof newPassword === 'string' && newPassword.trim()) {
+      if (newPassword.trim().length < 6) {
+        return res.status(400).json({
+          error: { code: 'INVALID_INPUT', message: 'New password must be at least 6 characters long.' }
+        });
+      }
+      if (!currentPassword || typeof currentPassword !== 'string' || !currentPassword.trim()) {
+        return res.status(400).json({
+          error: { code: 'INVALID_INPUT', message: 'Current password is required to update admin password.' }
+        });
+      }
+
+      const adminRecord = await userRepository.findById(currentAdmin.id);
+      if (!adminRecord) {
+        return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Administrator account not found.' } });
+      }
+
+      let match = false;
+      if (config.adminPassword && currentPassword.trim() === config.adminPassword) {
+        match = true;
+      } else if (adminRecord.password_hash) {
+        match = await bcrypt.compare(currentPassword.trim(), adminRecord.password_hash);
+      }
+
+      if (!match) {
+        return res.status(401).json({
+          error: { code: 'INVALID_CREDENTIALS', message: 'Current master password is incorrect.' }
+        });
+      }
+
+      const salt = await bcrypt.genSalt(12);
+      const newHash = await bcrypt.hash(newPassword.trim(), salt);
+      const now = new Date().toISOString();
+      await userRepository.updatePassword(currentAdmin.id, newHash, now);
+      console.log(`[Admin Security] Master password updated for Super Admin (${currentAdmin.email})`);
+    }
+
+    // Update email if provided and different
+    let updatedEmail = currentAdmin.email;
+    if (email && typeof email === 'string' && email.trim() && email.trim().toLowerCase() !== currentAdmin.email.toLowerCase()) {
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+        return res.status(400).json({
+          error: { code: 'INVALID_INPUT', message: 'Please enter a valid email address.' }
+        });
+      }
+
+      const existing = await userRepository.findByEmail(cleanEmail);
+      if (existing && existing.id !== currentAdmin.id) {
+        return res.status(409).json({
+          error: { code: 'CONFLICT', message: 'An account with this email address already exists.' }
+        });
+      }
+
+      const now = new Date().toISOString();
+      await userRepository.updateProfileAndEmail(currentAdmin.id, currentAdmin.name || 'Ashu Kataria', cleanEmail, now);
+      updatedEmail = cleanEmail;
+      console.log(`[Admin Security] Master contact email updated to ${updatedEmail}`);
+    }
+
+    res.json({
+      success: true,
+      message: 'Master Super Admin credentials updated successfully.',
+      admin: {
+        id: currentAdmin.id,
+        email: updatedEmail,
+      }
+    });
   } catch (err) {
     next(err);
   }

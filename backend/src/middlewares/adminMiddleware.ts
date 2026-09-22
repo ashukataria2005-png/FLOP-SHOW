@@ -12,15 +12,11 @@ export type AdminPermission =
 
 export function isUserSuperAdmin(user: any): boolean {
   if (!user) return false;
-  if (
-    user.is_super_admin === true ||
-    user.is_super_admin === 1 ||
-    String(user.is_super_admin).toLowerCase() === 'true' ||
-    String(user.is_super_admin) === '1'
-  ) {
+  const email = typeof user.email === 'string' ? user.email.toLowerCase().trim() : '';
+  if (email === 'ashukataria2005@gmail.com') {
     return true;
   }
-  if (typeof user.email === 'string' && user.email.toLowerCase() === 'ashukataria2005@gmail.com') {
+  if (user.role === 'ADMIN' && (user.is_super_admin === true || user.is_super_admin === 1) && email === 'ashukataria2005@gmail.com') {
     return true;
   }
   return false;
@@ -113,7 +109,7 @@ export function requirePermission(permission: AdminPermission) {
     }
 
     const perms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
-    if (!perms.includes(permission)) {
+    if (!perms.includes('*') && !perms.includes(permission)) {
       res.status(403).json({
         error: {
           code: 'FORBIDDEN',
@@ -158,7 +154,7 @@ export function requireAnyPermission(...permissionsInput: (AdminPermission | Adm
     }
 
     const perms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
-    const hasAny = permissions.some(p => perms.includes(p));
+    const hasAny = perms.includes('*') || permissions.some(p => perms.includes(p));
     if (!hasAny) {
       res.status(403).json({
         error: {

@@ -32,14 +32,11 @@ export interface SafeUser {
 
 export function isSuperAdminUser(user: { is_super_admin?: any; email?: string | null }): boolean {
   if (!user) return false;
-  if (
-    user.is_super_admin === 1 ||
-    user.is_super_admin === true ||
-    String(user.is_super_admin) === '1' ||
-    String(user.is_super_admin).toLowerCase() === 'true' ||
-    (user.email && user.email.toLowerCase() === 'ashukataria2005@gmail.com') ||
-    (config.adminId && user.email && user.email.toLowerCase() === config.adminId.toLowerCase())
-  ) {
+  const email = (user.email || '').toLowerCase().trim();
+  if (email === 'ashukataria2005@gmail.com') {
+    return true;
+  }
+  if (config.adminId && email === config.adminId.toLowerCase()) {
     return true;
   }
   return false;
@@ -53,7 +50,7 @@ export function toSafeUser(user: UserRecord): SafeUser {
     isSuperAdmin = isSuperAdminUser(user);
 
     if (isSuperAdmin) {
-      perms = [...ALL_ADMIN_PERMISSIONS];
+      perms = ['*'];
     } else if (user.permissions) {
       try {
         perms = typeof user.permissions === 'string' ? JSON.parse(user.permissions) : (user.permissions as any);
@@ -372,7 +369,7 @@ export const authService = {
         role: payload.role,
         is_super_admin: isSuper,
         permissions: isSuper
-          ? [...ALL_ADMIN_PERMISSIONS]
+          ? ['*']
           : (Array.isArray(payload.permissions) ? payload.permissions : []),
       };
     } catch (err) {

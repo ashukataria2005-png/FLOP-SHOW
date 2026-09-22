@@ -32,6 +32,7 @@ import { AdminWatchPassPage } from './pages/admin/AdminWatchPassPage';
 import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage';
 import { AdminPlansPricingPage } from './pages/admin/AdminPlansPricingPage';
 import { AdminAdministratorsPage } from './pages/admin/AdminAdministratorsPage';
+import { AdminSecurityPage } from './pages/admin/AdminSecurityPage';
 import { PurchaseModal } from './components/purchase/PurchaseModal';
 import { SubscriptionModal } from './components/subscription/SubscriptionModal';
 import { WatchPassModal } from './components/watchpass/WatchPassModal';
@@ -125,6 +126,12 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   if (cleanPath === '/admin/settings') {
     return { tab: 'admin-settings' };
   }
+  if (cleanPath === '/admin/administrators' || cleanPath === '/admin/team') {
+    return { tab: 'admin-administrators' };
+  }
+  if (cleanPath === '/admin/security' || cleanPath === '/admin/admin-security') {
+    return { tab: 'admin-security' };
+  }
   if (cleanPath === '/admin/reset') {
     return { tab: 'admin-reset' };
   }
@@ -210,6 +217,10 @@ export function tabToPath(tab: string, param?: string): string {
       return '/admin/settings';
     case 'admin-reset':
       return '/admin/reset';
+    case 'admin-administrators':
+      return '/admin/administrators';
+    case 'admin-security':
+      return '/admin/security';
     case 'bonus':
       return '/bonus';
     case 'search':
@@ -232,9 +243,7 @@ export function tabToPath(tab: string, param?: string): string {
 
 const AppContent: React.FC = () => {
   const {
-    user,
-    isAuthenticated,
-    sessionLoading,
+    user: _user,
     toasts,
     activeMediaSource,
     closePlayer,
@@ -244,7 +253,6 @@ const AppContent: React.FC = () => {
     playNextEpisode,
     playPrevEpisode
   } = useApp();
-  const isAdmin = Boolean(user && user.role === 'ADMIN');
 
   const [currentTab, setCurrentTab] = useState<string>(() => {
     const initial = pathToTab(window.location.pathname);
@@ -271,39 +279,10 @@ const AppContent: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }, [currentTab, selectedItem]);
 
-  // Route security: Only redirect unauthenticated non-admins once the initial session loading has completed
-  useEffect(() => {
-    const hasAdminDeviceAuth = Boolean(
-      localStorage.getItem('flopshow_admin_quick_login') ||
-      localStorage.getItem('flopshow_admin_token')
-    );
-    if (!sessionLoading && currentTab.startsWith('admin') && currentTab !== 'admin' && (!isAuthenticated || !isAdmin) && !hasAdminDeviceAuth) {
-      setCurrentTab('admin');
-      window.history.replaceState(null, '', '/admin');
-    }
-  }, [currentTab, isAuthenticated, isAdmin, sessionLoading]);
-
-  // If authenticated as admin and on /admin, redirect/open the Admin Dashboard
-  useEffect(() => {
-    if (currentTab === 'admin' && isAuthenticated && isAdmin) {
-      setCurrentTab('admin-dashboard');
-      window.history.replaceState(null, '', '/admin/dashboard');
-    }
-  }, [currentTab, isAuthenticated, isAdmin]);
-
   // Sync state when user navigates using browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
       const route = pathToTab(window.location.pathname);
-      const hasAdminDeviceAuth = Boolean(
-        localStorage.getItem('flopshow_admin_quick_login') ||
-        localStorage.getItem('flopshow_admin_token')
-      );
-      if (!sessionLoading && route.tab.startsWith('admin') && route.tab !== 'admin' && (!isAuthenticated || !isAdmin) && !hasAdminDeviceAuth) {
-        setCurrentTab('admin');
-        window.history.replaceState(null, '', '/admin');
-        return;
-      }
       setCurrentTab(route.tab);
       setAdminParam(route.param);
       setSelectedItem(null);
@@ -311,7 +290,7 @@ const AppContent: React.FC = () => {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [isAuthenticated, isAdmin, sessionLoading]);
+  }, []);
 
   const handleNavigate = (tab: string, param?: string) => {
     if (tab === 'details' && !param) return;
@@ -383,7 +362,8 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-reset' && <AdminResetPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-administrators' && <AdminAdministratorsPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-pricing', 'admin-promos', 'admin-monetization', 'admin-analytics', 'admin-analytics-movie', 'admin-analytics-vip', 'admin-watch-pass', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-settings', 'admin-reset', 'admin-administrators'].includes(currentTab) && (
+          {currentTab === 'admin-security' && <AdminSecurityPage onNavigateTab={handleNavigate} />}
+          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-pricing', 'admin-promos', 'admin-monetization', 'admin-analytics', 'admin-analytics-movie', 'admin-analytics-vip', 'admin-watch-pass', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-settings', 'admin-reset', 'admin-administrators', 'admin-security'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>

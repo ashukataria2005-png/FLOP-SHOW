@@ -83,6 +83,13 @@ export const config = {
   cineproBaseUrl: process.env.CINEPRO_BASE_URL?.trim() || 'https://cinepro-core-lgqf.onrender.com',
   cineproApiKey: process.env.CINEPRO_API_KEY?.trim() || '',
   cineproTimeoutMs: process.env.CINEPRO_TIMEOUT_MS ? parseInt(process.env.CINEPRO_TIMEOUT_MS, 10) : 20000,
+  // Telegram Payment Alert & 1-Click Bot Integration
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN?.trim() || '',
+  telegramAdminChatId: process.env.TELEGRAM_ADMIN_CHAT_ID?.trim() || '',
+  backendBaseUrl:
+    process.env.BACKEND_BASE_URL?.trim() ||
+    process.env.RENDER_EXTERNAL_URL?.trim() ||
+    'https://flop-show-4a14.onrender.com',
 };
 
 export function isVcdnConfigured(): boolean {
@@ -94,6 +101,10 @@ export function isCineproConfigured(): boolean {
     (config.cineproApiKey && config.cineproApiKey.length > 0) ||
     Boolean(config.cineproBaseUrl && config.cineproBaseUrl.trim().length > 0)
   );
+}
+
+export function isTelegramConfigured(): boolean {
+  return Boolean(config.telegramBotToken && config.telegramAdminChatId);
 }
 
 

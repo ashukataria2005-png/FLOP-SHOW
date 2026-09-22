@@ -14,6 +14,7 @@ import { watchPassRepository, WatchPassPlan } from '../repositories/watchPassRep
 import { subscriptionService } from './subscriptionService.js';
 import { watchPassService } from './watchPassService.js';
 import { promoService } from './promoService.js';
+import { telegramService } from './telegramService.js';
 
 export interface PublicPaymentConfig {
   upiId: string;
@@ -96,6 +97,7 @@ export const paymentRequestService = {
       planId?: string | null;
       planName?: string | null;
       promoCode?: string | null;
+      screenshotUrl?: string | null;
     }
   ): Promise<PaymentRequestRecord> {
     const { upiId, upiEnabled } = await this.getPublicPaymentConfig();
@@ -257,6 +259,21 @@ export const paymentRequestService = {
         console.error('[Automatic Approval] Error auto-approving payment request:', autoErr);
       }
     }
+
+    // TRIGGER TELEGRAM INSTANT PAYMENT ALERT WITH 1-CLICK APPROVE/REJECT BOT
+    telegramService.sendPaymentAlert({
+      paymentId: created.id,
+      userName: created.user_name || data.userName,
+      userEmail: created.user_email || data.userEmail,
+      amountRupees: Math.round(created.amount / 100),
+      productType: created.product_type,
+      planName: created.plan_name,
+      utr: created.utr,
+      submittedAt: created.submitted_at,
+      screenshotUrl: data.screenshotUrl || null,
+    }).catch(err => {
+      console.error('[Telegram Alert] Error sending instant payment alert:', err?.message || err);
+    });
 
     return created;
   },

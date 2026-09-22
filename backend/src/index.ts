@@ -2,6 +2,7 @@ import { createServer } from './server.js';
 import { runMigrationsAsync } from './db/migrator.js';
 import { seedDatabase } from './db/seed.js';
 import { config } from './config/env.js';
+import { telegramService } from './services/telegramService.js';
 
 async function start() {
   try {
@@ -29,6 +30,11 @@ async function start() {
       console.log(`  Health check: http://${displayHost}:${config.port}/api/health`);
       console.log(`  Content catalog: http://${displayHost}:${config.port}/api/content`);
       console.log('------------------------------------------------------------');
+
+      // Auto-register Telegram Instant Payment Alert Webhook (1-Click Bot)
+      telegramService.autoRegisterWebhook().catch(tgErr => {
+        console.warn('[Telegram Bot] Auto webhook registration warning:', tgErr?.message || tgErr);
+      });
     });
 
     // Graceful shutdown

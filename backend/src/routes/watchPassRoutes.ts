@@ -48,7 +48,7 @@ watchPassRouter.get('/my-passes', requireAuth, async (req: AuthenticatedRequest,
 // Submit manual UPI Watch Pass purchase request with UTR (Creates unified payment request)
 watchPassRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
-    const { contentId, plan, utr, paymentReference, userName, userEmail, promoCode } = req.body;
+    const { contentId, plan, utr, paymentReference, userName, userEmail, promoCode, screenshotUrl, screenshot } = req.body;
     const finalUtr = utr || paymentReference;
 
     if (!plan || !finalUtr) {
@@ -66,6 +66,7 @@ watchPassRouter.post('/submit-request', requireAuth, async (req: AuthenticatedRe
       userName: userName || (req.user as any)?.name,
       userEmail: userEmail || req.user!.email,
       promoCode: promoCode || null,
+      screenshotUrl: screenshotUrl || screenshot || null,
     });
 
     const isApproved = payReq.status === 'APPROVED';

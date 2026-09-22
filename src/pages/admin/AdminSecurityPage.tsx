@@ -191,23 +191,77 @@ export const AdminSecurityPage: React.FC<AdminSecurityPageProps> = () => {
   const subAdminsCount = admins.filter(a => !a.is_super_admin && a.email.toLowerCase() !== 'ashukataria2005@gmail.com').length;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 text-white">
-      {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/10">
+    <div
+      style={{
+        maxWidth: '1280px',
+        margin: '0 auto',
+        padding: '24px 16px 80px',
+        color: '#FFFFFF',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '24px',
+        boxSizing: 'border-box',
+        width: '100%'
+      }}
+    >
+      {/* 1. Header Section */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px',
+          padding: '24px',
+          borderRadius: '20px',
+          background: 'linear-gradient(135deg, rgba(245, 166, 35, 0.08) 0%, rgba(18, 18, 26, 0.9) 60%, rgba(18, 18, 26, 0.95) 100%)',
+          border: '1px solid rgba(245, 166, 35, 0.25)',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', zIndex: 1 }}>
+          <div
+            style={{
+              padding: '12px',
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, #F5A623 0%, #D97706 100%)',
+              color: '#000000',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 16px rgba(245, 166, 35, 0.3)'
+            }}
+          >
             <KeyRound size={26} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#FFFFFF', margin: 0, letterSpacing: '-0.02em' }}>
                 Admin Security & Credentials
               </h1>
-              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  padding: '3px 9px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(245, 166, 35, 0.15)',
+                  color: '#F5A623',
+                  border: '1px solid rgba(245, 166, 35, 0.35)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
                 <ShieldCheck size={12} /> Root Protected
               </span>
             </div>
-            <p className="text-sm text-neutral-400 mt-0.5">
+            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0' }}>
               Manage master Super Admin access keys and overview/revoke team credentials.
             </p>
           </div>
@@ -216,111 +270,265 @@ export const AdminSecurityPage: React.FC<AdminSecurityPageProps> = () => {
         <button
           onClick={fetchAdmins}
           disabled={loadingAdmins}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-300 font-semibold text-sm transition-all shadow-sm hover:text-white"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 18px',
+            borderRadius: '12px',
+            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            color: '#D1D5DB',
+            fontWeight: 600,
+            fontSize: '13px',
+            cursor: loadingAdmins ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s ease'
+          }}
         >
-          <RefreshCw size={16} className={loadingAdmins ? 'animate-spin' : ''} />
+          <RefreshCw size={15} className={loadingAdmins ? 'animate-spin' : ''} />
           <span>Refresh Data</span>
         </button>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-neutral-900/60 border border-white/10 rounded-2xl p-5 shadow-sm backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Master Super Admin</span>
-            <Crown size={20} className="text-amber-400" />
+      {/* 2. Metrics Row */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '16px'
+        }}
+      >
+        {/* Metric 1: Root Super Admin */}
+        <div
+          style={{
+            backgroundColor: '#12121A',
+            border: '1px solid rgba(245, 166, 35, 0.25)',
+            borderRadius: '16px',
+            padding: '20px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9CA3AF' }}>
+              Master Super Admin
+            </span>
+            <Crown size={20} style={{ color: '#F5A623' }} />
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-lg font-black text-amber-400 truncate">ashukataria2005@gmail.com</span>
+          <div style={{ marginTop: '12px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 900, color: '#F5A623', wordBreak: 'break-all' }}>
+              ashukataria2005@gmail.com
+            </div>
+            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '6px 0 0' }}>
+              Immutable Root Owner • Wildcard [*] Access
+            </p>
           </div>
-          <p className="text-xs text-neutral-400 mt-1">Immutable Root Owner • Wildcard [*] Access</p>
         </div>
 
-        <div className="bg-neutral-900/60 border border-white/10 rounded-2xl p-5 shadow-sm backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Active Sub-Admins</span>
-            <Users size={20} className="text-blue-400" />
+        {/* Metric 2: Active Sub-Admins */}
+        <div
+          style={{
+            backgroundColor: '#12121A',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
+            borderRadius: '16px',
+            padding: '20px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9CA3AF' }}>
+              Active Sub-Admins
+            </span>
+            <Users size={20} style={{ color: '#3B82F6' }} />
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-white">{subAdminsCount}</span>
-            <span className="text-xs text-neutral-400">accounts</span>
+          <div style={{ marginTop: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+              <span style={{ fontSize: '28px', fontWeight: 900, color: '#FFFFFF' }}>{subAdminsCount}</span>
+              <span style={{ fontSize: '13px', color: '#9CA3AF' }}>delegated accounts</span>
+            </div>
+            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '6px 0 0' }}>
+              Assigned module roles with revoked root access
+            </p>
           </div>
-          <p className="text-xs text-neutral-400 mt-1">Delegated team members with restricted roles</p>
         </div>
 
-        <div className="bg-neutral-900/60 border border-white/10 rounded-2xl p-5 shadow-sm backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Total Admin Accounts</span>
-            <ShieldCheck size={20} className="text-emerald-400" />
+        {/* Metric 3: Total Accounts */}
+        <div
+          style={{
+            backgroundColor: '#12121A',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
+            borderRadius: '16px',
+            padding: '20px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#9CA3AF' }}>
+              Verified Administrators
+            </span>
+            <ShieldCheck size={20} style={{ color: '#10B981' }} />
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-emerald-400">{totalAdmins}</span>
-            <span className="text-xs text-neutral-400">({activeAdmins} active)</span>
+          <div style={{ marginTop: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+              <span style={{ fontSize: '28px', fontWeight: 900, color: '#10B981' }}>{totalAdmins}</span>
+              <span style={{ fontSize: '13px', color: '#9CA3AF' }}>({activeAdmins} active)</span>
+            </div>
+            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '6px 0 0' }}>
+              Clean registry • 0 dummy or test accounts
+            </p>
           </div>
-          <p className="text-xs text-neutral-400 mt-1">Fully purged of all dummy & test credentials</p>
         </div>
       </div>
 
-      {/* SECTION A: Super Admin Master Credentials Manager */}
-      <div className="bg-neutral-900/70 border border-white/10 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-sm relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+      {/* 3. SECTION A: Super Admin Master Credentials Manager */}
+      <div
+        style={{
+          backgroundColor: '#12121A',
+          border: '1px solid rgba(245, 166, 35, 0.2)',
+          borderRadius: '20px',
+          padding: '28px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+          position: 'relative'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            paddingBottom: '16px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
+          }}
+        >
+          <div
+            style={{
+              padding: '10px',
+              borderRadius: '12px',
+              backgroundColor: 'rgba(245, 166, 35, 0.12)',
+              border: '1px solid rgba(245, 166, 35, 0.3)',
+              color: '#F5A623',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
             <Lock size={20} />
           </div>
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-              Master Super Admin Credentials
-              <span className="text-xs font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                Master Super Admin Credentials
+              </h2>
+              <span
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  backgroundColor: 'rgba(245, 166, 35, 0.2)',
+                  color: '#F5A623',
+                  border: '1px solid rgba(245, 166, 35, 0.35)'
+                }}
+              >
                 Owner Only
               </span>
-            </h2>
-            <p className="text-xs sm:text-sm text-neutral-400">
+            </div>
+            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '2px 0 0' }}>
               Update your master login password and primary root notification email.
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleUpdateCredentials} className="space-y-6 max-w-2xl">
+        <form onSubmit={handleUpdateCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '18px', maxWidth: '780px' }}>
           {/* Email Field */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-neutral-300 mb-2">
-              Primary Super Admin Email
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#D1D5DB', marginBottom: '8px' }}>
+              Primary Super Admin Contact Email
             </label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <Mail size={16} style={{ position: 'absolute', left: '14px', color: '#9CA3AF', pointerEvents: 'none' }} />
               <input
                 type="email"
                 value={adminEmail}
                 onChange={e => setAdminEmail(e.target.value)}
                 placeholder="ashukataria2005@gmail.com"
-                className="w-full pl-10 pr-4 py-3 bg-neutral-950/80 border border-white/10 rounded-xl text-white placeholder-neutral-500 text-sm focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 transition-all"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px 12px 40px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '12px',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                  transition: 'all 0.2s ease'
+                }}
               />
             </div>
-            <p className="text-xs text-neutral-400 mt-1.5">
-              This email is granted absolute master bypass privileges across all administrative operations.
+            <p style={{ fontSize: '12px', color: '#6B7280', margin: '6px 0 0' }}>
+              This email is recognized as the sole master owner with full administrative bypass privileges.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+          {/* Password Fields Grid */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '14px',
+              paddingTop: '6px'
+            }}
+          >
             {/* Current Password */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-300 mb-2">
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#D1D5DB', marginBottom: '8px' }}>
                 Current Password
               </label>
-              <div className="relative">
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input
                   type={showCurrentPass ? 'text' : 'password'}
                   value={currentPassword}
                   onChange={e => setCurrentPassword(e.target.value)}
                   placeholder="Enter current password"
-                  className="w-full pl-3.5 pr-10 py-3 bg-neutral-950/80 border border-white/10 rounded-xl text-white placeholder-neutral-500 text-sm focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 transition-all"
+                  style={{
+                    width: '100%',
+                    padding: '12px 38px 12px 14px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '12px',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPass(!showCurrentPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition-colors"
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    background: 'none',
+                    border: 'none',
+                    color: '#9CA3AF',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
                 >
                   {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -329,21 +537,41 @@ export const AdminSecurityPage: React.FC<AdminSecurityPageProps> = () => {
 
             {/* New Password */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-300 mb-2">
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#D1D5DB', marginBottom: '8px' }}>
                 New Password
               </label>
-              <div className="relative">
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input
                   type={showNewPass ? 'text' : 'password'}
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
                   placeholder="Min. 6 characters"
-                  className="w-full pl-3.5 pr-10 py-3 bg-neutral-950/80 border border-white/10 rounded-xl text-white placeholder-neutral-500 text-sm focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 transition-all"
+                  style={{
+                    width: '100%',
+                    padding: '12px 38px 12px 14px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '12px',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPass(!showNewPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition-colors"
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    background: 'none',
+                    border: 'none',
+                    color: '#9CA3AF',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
                 >
                   {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -352,21 +580,41 @@ export const AdminSecurityPage: React.FC<AdminSecurityPageProps> = () => {
 
             {/* Confirm New Password */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-neutral-300 mb-2">
-                Confirm Password
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#D1D5DB', marginBottom: '8px' }}>
+                Confirm New Password
               </label>
-              <div className="relative">
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input
                   type={showConfirmPass ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   placeholder="Re-type new password"
-                  className="w-full pl-3.5 pr-10 py-3 bg-neutral-950/80 border border-white/10 rounded-xl text-white placeholder-neutral-500 text-sm focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/40 transition-all"
+                  style={{
+                    width: '100%',
+                    padding: '12px 38px 12px 14px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '12px',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    outline: 'none'
+                  }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPass(!showConfirmPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition-colors"
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    background: 'none',
+                    border: 'none',
+                    color: '#9CA3AF',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
                 >
                   {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -374,20 +622,36 @@ export const AdminSecurityPage: React.FC<AdminSecurityPageProps> = () => {
             </div>
           </div>
 
-          <div className="pt-2 flex items-center justify-end">
+          {/* Submit Action */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '6px' }}>
             <button
               type="submit"
               disabled={isUpdatingCredentials}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-neutral-950 font-bold text-sm transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #F5A623 0%, #D97706 100%)',
+                color: '#000000',
+                fontWeight: 800,
+                fontSize: '14px',
+                border: 'none',
+                cursor: isUpdatingCredentials ? 'not-allowed' : 'pointer',
+                boxShadow: '0 4px 16px rgba(245, 166, 35, 0.3)',
+                transition: 'all 0.2s ease',
+                opacity: isUpdatingCredentials ? 0.6 : 1
+              }}
             >
               {isUpdatingCredentials ? (
                 <>
-                  <Loader2 size={18} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin" />
                   <span>Updating Master Credentials...</span>
                 </>
               ) : (
                 <>
-                  <ShieldCheck size={18} />
+                  <ShieldCheck size={16} />
                   <span>Update Master Credentials</span>
                 </>
               )}
@@ -396,166 +660,334 @@ export const AdminSecurityPage: React.FC<AdminSecurityPageProps> = () => {
         </form>
       </div>
 
-      {/* SECTION B: All Admins & Sub-Admins Overview & Deletion */}
-      <div className="bg-neutral-900/70 border border-white/10 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
-              <Users size={20} />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-bold text-white">
-                All Active Administrative Accounts
-              </h2>
-              <p className="text-xs sm:text-sm text-neutral-400">
-                Audit credentials, toggle sub-admin active states, and purge unauthorized users with 1 click.
-              </p>
-            </div>
+      {/* 4. SECTION B: All Admins & Sub-Admins Overview & Deletion */}
+      <div
+        style={{
+          backgroundColor: '#12121A',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '20px',
+          padding: '28px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            paddingBottom: '16px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
+          }}
+        >
+          <div
+            style={{
+              padding: '10px',
+              borderRadius: '12px',
+              backgroundColor: 'rgba(59, 130, 246, 0.12)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              color: '#3B82F6',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <Users size={20} />
+          </div>
+          <div>
+            <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+              All Active Administrative Accounts
+            </h2>
+            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '2px 0 0' }}>
+              Audit credentials, toggle sub-admin active states, and purge unauthorized users with 1 click.
+            </p>
           </div>
         </div>
 
         {loadingAdmins ? (
-          <div className="py-16 text-center">
-            <Loader2 size={32} className="animate-spin mx-auto text-amber-400 mb-3" />
-            <p className="text-sm text-neutral-400">Loading administrator registry...</p>
+          <div style={{ padding: '60px 0', textAlign: 'center' }}>
+            <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px', color: '#F5A623' }} />
+            <p style={{ fontSize: '14px', color: '#9CA3AF' }}>Loading administrator registry...</p>
           </div>
         ) : admins.length === 0 ? (
-          <div className="py-12 text-center text-neutral-400">
-            <ShieldAlert size={40} className="mx-auto text-neutral-500 mb-2" />
+          <div style={{ padding: '40px 0', textAlign: 'center', color: '#9CA3AF' }}>
+            <ShieldAlert size={40} style={{ margin: '0 auto 8px', color: '#6B7280' }} />
             <p>No administrators found.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div style={{ overflowX: 'auto', width: '100%' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
-                <tr className="border-b border-white/10 text-[11px] font-bold uppercase tracking-wider text-neutral-400">
-                  <th className="pb-3 pl-2">Administrator</th>
-                  <th className="pb-3 px-3">Role & Authority</th>
-                  <th className="pb-3 px-3">Permissions Scope</th>
-                  <th className="pb-3 px-3">Account Status</th>
-                  <th className="pb-3 pr-2 text-right">Security Actions</th>
+                <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#9CA3AF', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <th style={{ padding: '12px 16px 12px 8px' }}>Administrator</th>
+                  <th style={{ padding: '12px 16px' }}>Role & Authority</th>
+                  <th style={{ padding: '12px 16px' }}>Permissions Scope</th>
+                  <th style={{ padding: '12px 16px' }}>Account Status</th>
+                  <th style={{ padding: '12px 8px 12px 16px', textAlign: 'right' }}>Security Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 text-sm">
+              <tbody>
                 {admins.map(admin => {
                   const isRoot = admin.is_super_admin || admin.email.toLowerCase() === 'ashukataria2005@gmail.com';
                   const isCurrent = currentAdminUser?.id === admin.id;
 
                   return (
-                    <tr key={admin.id} className="hover:bg-white/[0.02] transition-colors">
+                    <tr
+                      key={admin.id}
+                      style={{
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                        transition: 'background-color 0.15s ease'
+                      }}
+                    >
                       {/* Name & Email */}
-                      <td className="py-4 pl-2 pr-4">
-                        <div className="flex items-center gap-3">
+                      <td style={{ padding: '16px 16px 16px 8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 border ${
-                              isRoot
-                                ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                                : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                            }`}
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '14px',
+                              flexShrink: 0,
+                              backgroundColor: isRoot ? 'rgba(245, 166, 35, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                              border: isRoot ? '1px solid rgba(245, 166, 35, 0.35)' : '1px solid rgba(59, 130, 246, 0.25)',
+                              color: isRoot ? '#F5A623' : '#3B82F6'
+                            }}
                           >
                             {isRoot ? <Crown size={18} /> : <User size={18} />}
                           </div>
-                          <div className="min-w-0">
-                            <div className="font-bold text-white flex items-center gap-2 truncate">
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: '#FFFFFF', fontSize: '14px' }}>
                               <span>{admin.name || 'Admin'}</span>
                               {isCurrent && (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-neutral-300 border border-white/10">
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    padding: '1px 6px',
+                                    borderRadius: '9999px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: '#D1D5DB',
+                                    border: '1px solid rgba(255, 255, 255, 0.15)'
+                                  }}
+                                >
                                   You
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-neutral-400 truncate">{admin.email}</div>
+                            <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>{admin.email}</div>
                           </div>
                         </div>
                       </td>
 
                       {/* Authority */}
-                      <td className="py-4 px-3 whitespace-nowrap">
+                      <td style={{ padding: '16px', whiteSpace: 'nowrap' }}>
                         {isRoot ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/40 text-amber-300 shadow-sm">
-                            <Crown size={13} /> Root Super Admin
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 12px',
+                              borderRadius: '9999px',
+                              fontSize: '11px',
+                              fontWeight: 800,
+                              backgroundColor: 'rgba(245, 166, 35, 0.15)',
+                              border: '1px solid rgba(245, 166, 35, 0.35)',
+                              color: '#F5A623'
+                            }}
+                          >
+                            <Crown size={12} /> Root Super Admin
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-300">
-                            <ShieldCheck size={13} /> Sub-Admin
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 12px',
+                              borderRadius: '9999px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                              border: '1px solid rgba(59, 130, 246, 0.25)',
+                              color: '#93C5FD'
+                            }}
+                          >
+                            <ShieldCheck size={12} /> Sub-Admin
                           </span>
                         )}
                       </td>
 
                       {/* Permissions */}
-                      <td className="py-4 px-3">
+                      <td style={{ padding: '16px' }}>
                         {isRoot ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 10px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                              border: '1px solid rgba(16, 185, 129, 0.25)',
+                              color: '#10B981'
+                            }}
+                          >
                             Full Unrestricted Access [*]
                           </span>
                         ) : (
-                          <div className="flex flex-wrap gap-1 max-w-xs">
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '320px' }}>
                             {admin.permissions && admin.permissions.length > 0 ? (
                               admin.permissions.map(p => (
                                 <span
                                   key={p}
-                                  className="text-[10px] font-semibold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-neutral-300"
+                                  style={{
+                                    fontSize: '10px',
+                                    fontWeight: 600,
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    color: '#D1D5DB'
+                                  }}
                                 >
                                   {p}
                                 </span>
                               ))
                             ) : (
-                              <span className="text-xs text-neutral-500 italic">No modules granted</span>
+                              <span style={{ fontSize: '12px', color: '#6B7280', fontStyle: 'italic' }}>No modules granted</span>
                             )}
                           </div>
                         )}
                       </td>
 
                       {/* Status */}
-                      <td className="py-4 px-3 whitespace-nowrap">
+                      <td style={{ padding: '16px', whiteSpace: 'nowrap' }}>
                         {isRoot ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '3px 10px',
+                              borderRadius: '9999px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              color: '#10B981'
+                            }}
+                          >
                             <CheckCircle2 size={12} /> Permanent Active
                           </span>
                         ) : admin.status === 'ACTIVE' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '3px 10px',
+                              borderRadius: '9999px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                              border: '1px solid rgba(16, 185, 129, 0.25)',
+                              color: '#10B981'
+                            }}
+                          >
                             Active
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-400">
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '3px 10px',
+                              borderRadius: '9999px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              color: '#F87171'
+                            }}
+                          >
                             Suspended
                           </span>
                         )}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-4 pr-2 text-right whitespace-nowrap">
+                      <td style={{ padding: '16px 8px 16px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                         {isRoot ? (
-                          <span className="text-xs font-semibold text-neutral-500 px-3 py-1 bg-white/[0.03] border border-white/5 rounded-lg">
+                          <span
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: '#6B7280',
+                              padding: '4px 10px',
+                              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                              border: '1px solid rgba(255, 255, 255, 0.06)',
+                              borderRadius: '8px'
+                            }}
+                          >
                             Protected Owner
                           </span>
                         ) : (
-                          <div className="inline-flex items-center gap-2">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                             {/* Suspend / Activate Toggle */}
                             <button
                               onClick={() => handleToggleStatus(admin)}
                               disabled={actionLoadingId === admin.id}
                               title={admin.status === 'ACTIVE' ? 'Suspend Account' : 'Activate Account'}
-                              className={`p-2 rounded-lg border transition-all text-xs font-semibold inline-flex items-center gap-1.5 ${
-                                admin.status === 'ACTIVE'
-                                  ? 'bg-neutral-800/80 hover:bg-neutral-800 text-neutral-300 border-white/10 hover:text-white'
-                                  : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                              }`}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                backgroundColor: admin.status === 'ACTIVE' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(16, 185, 129, 0.15)',
+                                border: admin.status === 'ACTIVE' ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(16, 185, 129, 0.3)',
+                                color: admin.status === 'ACTIVE' ? '#D1D5DB' : '#10B981'
+                              }}
                             >
-                              <Power size={14} />
-                              <span className="hidden sm:inline">
-                                {admin.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
-                              </span>
+                              <Power size={13} />
+                              <span>{admin.status === 'ACTIVE' ? 'Suspend' : 'Activate'}</span>
                             </button>
 
                             {/* 1-Click Delete Account */}
                             <button
                               onClick={() => setAdminToDelete(admin)}
                               title="Permanently Delete Account"
-                              className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-400 hover:text-red-300 transition-all text-xs font-semibold inline-flex items-center gap-1.5"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                                border: '1px solid rgba(239, 68, 68, 0.25)',
+                                color: '#F87171',
+                                transition: 'all 0.15s ease'
+                              }}
                             >
-                              <Trash2 size={14} />
-                              <span className="hidden sm:inline">Delete</span>
+                              <Trash2 size={13} />
+                              <span>Delete</span>
                             </button>
                           </div>
                         )}
@@ -569,30 +1001,79 @@ export const AdminSecurityPage: React.FC<AdminSecurityPageProps> = () => {
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* 5. Delete Confirmation Modal */}
       {adminToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-neutral-900 border border-red-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-left">
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 mb-4">
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(6px)'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#161622',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: '20px',
+              maxWidth: '440px',
+              width: '100%',
+              padding: '24px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              textAlign: 'left'
+            }}
+          >
+            <div
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '14px',
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#EF4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
               <AlertTriangle size={24} />
             </div>
 
-            <h3 className="text-lg font-bold text-white">Delete Administrator Account?</h3>
-            <p className="text-sm text-neutral-300 mt-2">
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+              Delete Administrator Account?
+            </h3>
+            <p style={{ fontSize: '14px', color: '#D1D5DB', margin: 0, lineHeight: 1.5 }}>
               Are you sure you want to permanently delete administrator{' '}
-              <strong className="text-white font-semibold">{adminToDelete.name}</strong> (
-              <span className="text-neutral-400">{adminToDelete.email}</span>)?
+              <strong style={{ color: '#FFFFFF' }}>{adminToDelete.name}</strong> (
+              <span style={{ color: '#9CA3AF' }}>{adminToDelete.email}</span>)?
             </p>
-            <p className="text-xs text-red-400 mt-2 font-medium">
+            <p style={{ fontSize: '12px', color: '#F87171', margin: 0, fontWeight: 600 }}>
               This action is immediate and irrevocable. Their administrative access token will be instantly revoked.
             </p>
 
-            <div className="mt-6 flex items-center justify-end gap-3">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
               <button
                 type="button"
                 onClick={() => setAdminToDelete(null)}
                 disabled={isDeleting}
-                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-300 text-sm font-semibold transition-all"
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#D1D5DB',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
               >
                 Cancel
               </button>
@@ -600,16 +1081,30 @@ export const AdminSecurityPage: React.FC<AdminSecurityPageProps> = () => {
                 type="button"
                 onClick={confirmDeleteAdmin}
                 disabled={isDeleting}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-all shadow-lg shadow-red-500/20 disabled:opacity-50"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  backgroundColor: '#EF4444',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isDeleting ? 0.6 : 1,
+                  boxShadow: '0 4px 16px rgba(239, 68, 68, 0.3)'
+                }}
               >
                 {isDeleting ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={15} className="animate-spin" />
                     <span>Deleting...</span>
                   </>
                 ) : (
                   <>
-                    <Trash2 size={16} />
+                    <Trash2 size={15} />
                     <span>Confirm Delete</span>
                   </>
                 )}

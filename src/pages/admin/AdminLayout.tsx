@@ -71,7 +71,17 @@ const navGroups: NavGroup[] = [
       { id: 'admin-dashboard', label: 'Dashboard', icon: LayoutDashboard }
     ]
   },
-  // 2. Content Catalog
+  // 2. Payments
+  {
+    id: 'group-payments',
+    title: 'PAYMENTS',
+    icon: QrCode,
+    items: [
+      { id: 'admin-upi-settings', label: 'UPI Settings', icon: QrCode },
+      { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck }
+    ]
+  },
+  // 3. Content Catalog
   {
     id: 'group-content',
     title: 'CONTENT / CATALOG',
@@ -83,7 +93,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-genres', label: 'Genres & Categories', icon: Tag }
     ]
   },
-  // 3. Home Page
+  // 4. Home Page
   {
     id: 'group-homepage',
     title: 'HOME PAGE',
@@ -94,16 +104,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-spotlight', label: 'Cinematic Spotlight', icon: Sparkles }
     ]
   },
-  // 4. Payments
-  {
-    id: 'group-payments',
-    title: 'PAYMENTS',
-    icon: QrCode,
-    items: [
-      { id: 'admin-upi-settings', label: 'UPI Settings', icon: QrCode },
-      { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck }
-    ]
-  },
+
   // 5. Plans & Pricing
   {
     id: 'group-pricing',
@@ -794,8 +795,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const currentSectionLabel = activeNavItem
     ? activeNavItem.label
     : currentTab === 'admin-editor'
-    ? 'Content Editor'
-    : 'Admin Dashboard';
+      ? 'Content Editor'
+      : 'Admin Dashboard';
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-primary, #07070A)', color: '#FFFFFF' }}>

@@ -2,9 +2,9 @@
 -- and Removal of Permanent Entitlements from Purchases
 
 -- 1. Add product_type, plan_id, and plan_name to upi_payment_requests
-ALTER TABLE upi_payment_requests ADD COLUMN IF NOT EXISTS product_type VARCHAR(32) NOT NULL DEFAULT 'MOVIE';
-ALTER TABLE upi_payment_requests ADD COLUMN IF NOT EXISTS plan_id TEXT DEFAULT NULL;
-ALTER TABLE upi_payment_requests ADD COLUMN IF NOT EXISTS plan_name TEXT DEFAULT NULL;
+ALTER TABLE upi_payment_requests ADD COLUMN product_type TEXT NOT NULL DEFAULT 'MOVIE';
+ALTER TABLE upi_payment_requests ADD COLUMN plan_id TEXT DEFAULT NULL;
+ALTER TABLE upi_payment_requests ADD COLUMN plan_name TEXT DEFAULT NULL;
 
 -- 2. Indexes for fast filtering and metrics
 CREATE INDEX IF NOT EXISTS idx_upi_payment_product_type ON upi_payment_requests(product_type);
@@ -21,5 +21,5 @@ WHERE product_type = 'MOVIE' AND content_id IS NOT NULL;
 -- 4. Bound any legacy purchases where expires_at IS NULL to 30 days from purchased_at
 -- This ensures no permanent entitlements exist in the database.
 UPDATE purchases
-SET expires_at = (purchased_at::TIMESTAMPTZ + INTERVAL '30 days')::TEXT
+SET expires_at = datetime(purchased_at, '+30 days')
 WHERE expires_at IS NULL AND purchased_at IS NOT NULL;

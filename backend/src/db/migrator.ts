@@ -18,6 +18,115 @@ interface MigrationResult {
 // ─────────────────────────────────────────────────────────────────────────────
 // SQLite migrator — uses node:sqlite DatabaseSync directly
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Safely split a SQL script into individual executable statements,
+ * ignoring semicolons inside string literals.
+ */
+function splitSqlStatements(sql: string): string[] {
+  // Remove block comments /* ... */
+  const cleanSql = sql.replace(/\/\*[\s\S]*?\*\//g, '');
+  
+  const statements: string[] = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  for (let i = 0; i < cleanSql.length; i++) {
+    const char = cleanSql[i];
+    const prevChar = i > 0 ? cleanSql[i - 1] : '';
+
+    if (char === "'" && prevChar !== '\\') {
+      if (!inDoubleQuote) inSingleQuote = !inSingleQuote;
+    } else if (char === '"' && prevChar !== '\\') {
+      if (!inSingleQuote) inDoubleQuote = !inDoubleQuote;
+    }
+
+    if (char === ';' && !inSingleQuote && !inDoubleQuote) {
+      const stmt = current.trim();
+      if (stmt) {
+        statements.push(stmt);
+      }
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  const remainder = current.trim();
+  if (remainder) {
+    statements.push(remainder);
+  }
+
+  return statements;
+}
+
+/**
+ * Execute a single SQLite statement safely.
+ * Specifically prevents crashes when:
+ * 1. "ALTER TABLE ... ADD COLUMN IF NOT EXISTS" is executed (SQLite does not support IF NOT EXISTS for ADD COLUMN).
+ * 2. "ALTER TABLE ... ADD COLUMN" attempts to add a column that already exists (duplicate column name).
+ * 3. Postgres timestamp syntax (NOW()::TEXT, ::TIMESTAMPTZ) leaks into SQLite.
+ */
+function executeSqliteStatementSafely(db: DatabaseSync, rawStmt: string): void {
+  // Remove line comments and normalize whitespace
+  const lines = rawStmt
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => !line.startsWith('--'));
+  const stmt = lines.join(' ').trim();
+  if (!stmt) return;
+
+  // 1. Detect and safely handle ALTER TABLE ... ADD COLUMN (with or without IF NOT EXISTS)
+  const addColMatch = stmt.match(
+    /^ALTER\s+TABLE\s+([`"'\w]+)\s+ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?([`"'\w]+)\s+(.+)$/i
+  );
+
+  if (addColMatch) {
+    const rawTable = addColMatch[1].replace(/[`"']/g, '');
+    const rawCol = addColMatch[2].replace(/[`"']/g, '');
+    const colDef = addColMatch[3].trim().replace(/;$/, '');
+
+    // Check if column already exists in the table using PRAGMA table_info
+    try {
+      const cols = db.prepare(`PRAGMA table_info("${rawTable}")`).all() as { name: string }[];
+      const alreadyExists = cols.some(c => c.name.toLowerCase() === rawCol.toLowerCase());
+      if (alreadyExists) {
+        return; // Column already exists, safely skip without error
+      }
+    } catch {
+      // Table might not exist or pragma failed, fallback to direct alter
+    }
+
+    // Execute standard SQLite ALTER TABLE without "IF NOT EXISTS"
+    try {
+      db.exec(`ALTER TABLE "${rawTable}" ADD COLUMN "${rawCol}" ${colDef};`);
+      return;
+    } catch (err: any) {
+      if (err?.message?.includes('duplicate column name')) {
+        return; // Already added, ignore gracefully
+      }
+      throw err;
+    }
+  }
+
+  // 2. Preprocess Postgres-specific syntax to SQLite equivalents if present
+  const sanitized = stmt
+    .replace(/NOW\(\)::TEXT/gi, "datetime('now')")
+    .replace(/CURRENT_TIMESTAMP::TEXT/gi, "CURRENT_TIMESTAMP")
+    .replace(/\(purchased_at::TIMESTAMPTZ\s*\+\s*INTERVAL\s*'30 days'\)::TEXT/gi, "datetime(purchased_at, '+30 days')");
+
+  try {
+    db.exec(sanitized);
+  } catch (err: any) {
+    // If it was another form of ADD COLUMN that threw duplicate column name, ignore it
+    if (err?.message?.includes('duplicate column name')) {
+      return;
+    }
+    throw err;
+  }
+}
+
 function runSqliteMigrations(): MigrationResult {
   const db: DatabaseSync = getDatabase();
 
@@ -57,7 +166,10 @@ function runSqliteMigrations(): MigrationResult {
       const sql = fs.readFileSync(filePath, 'utf-8');
 
       runTransaction(txDb => {
-        txDb.exec(sql);
+        const statements = splitSqlStatements(sql);
+        for (const statement of statements) {
+          executeSqliteStatementSafely(txDb, statement);
+        }
         txDb.prepare(
           'INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?);'
         ).run(version, file, new Date().toISOString());

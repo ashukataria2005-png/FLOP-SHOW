@@ -14,7 +14,7 @@ import { contentRepository } from '../repositories/contentRepository.js';
 import { mediaRepository } from '../repositories/mediaRepository.js';
 import { userRepository } from '../repositories/userRepository.js';
 import { promoService } from '../services/promoService.js';
-import { ALL_ADMIN_PERMISSIONS } from '../services/authService.js';
+import { ALL_ADMIN_PERMISSIONS, isSuperAdminUser } from '../services/authService.js';
 import { getAdapter } from '../db/adapter.js';
 
 export const adminRouter = Router();
@@ -679,7 +679,7 @@ adminRouter.delete('/episodes/:id', requirePermission('catalog'), async (req, re
 // ----------------------------------------------------------------------------
 // 6. APPLICATION SETTINGS
 // ----------------------------------------------------------------------------
-adminRouter.get('/settings', requirePermission('settings'), async (_req, res, next) => {
+adminRouter.get('/settings', requireAnyPermission(['settings', 'payments', 'monetization']), async (_req, res, next) => {
   try {
     const settings = await adminService.getSettings();
     res.json({ success: true, settings });
@@ -688,7 +688,7 @@ adminRouter.get('/settings', requirePermission('settings'), async (_req, res, ne
   }
 });
 
-adminRouter.put('/settings', requirePermission('settings'), async (req, res, next) => {
+adminRouter.put('/settings', requireAnyPermission(['settings', 'payments', 'monetization']), async (req, res, next) => {
   try {
     const { settings } = req.body;
     if (!settings || typeof settings !== 'object') {
@@ -1238,6 +1238,43 @@ adminRouter.patch('/sub-admins/:id/status', requireSuperAdmin, async (req: Authe
   }
 });
 
+adminRouter.delete(['/sub-admins/bulk', '/sub-admins'], requireSuperAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        error: { code: 'BAD_REQUEST', message: 'Array of administrator IDs is required.' }
+      });
+    }
+
+    const currentUserId = req.user?.id;
+    let deletedCount = 0;
+
+    for (const id of ids) {
+      if (!id || typeof id !== 'string') continue;
+      const targetUser = await userRepository.findById(id);
+      if (!targetUser || targetUser.role !== 'ADMIN') continue;
+
+      if (isSuperAdminUser(targetUser) || targetUser.id === currentUserId) {
+        return res.status(400).json({
+          error: { code: 'FORBIDDEN', message: 'Cannot delete the Super Admin account or your active session account.' }
+        });
+      }
+
+      await userRepository.deleteAdmin(id);
+      deletedCount++;
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${deletedCount} administrator${deletedCount === 1 ? '' : 's'}.`,
+      deletedCount,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 adminRouter.delete('/sub-admins/:id', requireSuperAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const id = param(req.params.id);
@@ -1253,13 +1290,7 @@ adminRouter.delete('/sub-admins/:id', requireSuperAdmin, async (req: Authenticat
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Administrator not found.' } });
     }
 
-    const isSuper = Boolean(
-      existing.is_super_admin === 1 ||
-      existing.is_super_admin === true ||
-      (existing.email && existing.email.toLowerCase() === 'ashukataria2005@gmail.com')
-    );
-
-    if (isSuper) {
+    if (isSuperAdminUser(existing)) {
       return res.status(400).json({
         error: { code: 'FORBIDDEN', message: 'Super Administrator accounts cannot be deleted.' }
       });

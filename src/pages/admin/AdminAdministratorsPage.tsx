@@ -104,6 +104,10 @@ export const AdminAdministratorsPage: React.FC<AdminAdministratorsPageProps> = (
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Bulk Selection States
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -306,6 +310,44 @@ export const AdminAdministratorsPage: React.FC<AdminAdministratorsPageProps> = (
       (admin.is_super_admin ? 'super admin' : 'sub-admin').includes(q)
     );
   });
+
+  // Only non-super-admin sub-admins can be selected for deletion (exclude super admin & active self)
+  const selectableSubAdmins = filteredAdmins.filter(
+    a => !a.is_super_admin && a.id !== currentUser?.id
+  );
+  const isAllSelected =
+    selectableSubAdmins.length > 0 &&
+    selectableSubAdmins.every(a => selectedIds.includes(a.id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(selectableSubAdmins.map(a => a.id));
+    }
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDeleteConfirm = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      setSubmitting(true);
+      const res = await api.admin.subAdmins.bulkDelete(selectedIds);
+      showToast(res.message || `Deleted ${selectedIds.length} sub-administrators.`, 'success');
+      setShowBulkDeleteModal(false);
+      setSelectedIds([]);
+      await fetchAdmins();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete selected administrators.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const totalAdmins = admins.length;
   const totalSuperAdmins = admins.filter(a => a.is_super_admin).length;
@@ -610,38 +652,69 @@ export const AdminAdministratorsPage: React.FC<AdminAdministratorsPageProps> = (
             backgroundColor: 'rgba(255, 255, 255, 0.02)'
           }}
         >
-          <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
-            <Search
-              size={15}
-              style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#9CA3AF'
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Search admin name or email..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '9px 14px 9px 36px',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: '10px',
-                fontSize: '13px',
-                color: '#FFFFFF',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
+              <Search
+                size={15}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#9CA3AF'
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search admin name or email..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '9px 14px 9px 36px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  color: '#FFFFFF',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {selectedIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteModal(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  backgroundColor: '#EF4444',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Trash2 size={15} />
+                <span>Delete Selected ({selectedIds.length} Admins)</span>
+              </button>
+            )}
           </div>
 
           <div style={{ fontSize: '12px', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>Showing <strong style={{ color: '#FFFFFF' }}>{filteredAdmins.length}</strong> of {totalAdmins} administrators</span>
+            {selectedIds.length > 0 ? (
+              <span style={{ color: '#F87171', fontWeight: 600 }}>{selectedIds.length} sub-admin{selectedIds.length === 1 ? '' : 's'} selected</span>
+            ) : (
+              <span>Showing <strong style={{ color: '#FFFFFF' }}>{filteredAdmins.length}</strong> of {totalAdmins} administrators</span>
+            )}
           </div>
         </div>
 
@@ -661,9 +734,24 @@ export const AdminAdministratorsPage: React.FC<AdminAdministratorsPageProps> = (
           </div>
         ) : (
           <div className="admin-rbac-table-scroll" style={{ width: '100%', overflowX: 'auto' }}>
-            <table className="admin-rbac-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
+            <table className="admin-rbac-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.03)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <th style={{ padding: '16px 12px 16px 20px', width: '38px', verticalAlign: 'middle' }}>
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={handleToggleSelectAll}
+                      disabled={selectableSubAdmins.length === 0}
+                      title="Select All Sub-Admins"
+                      style={{
+                        cursor: selectableSubAdmins.length === 0 ? 'not-allowed' : 'pointer',
+                        width: '16px',
+                        height: '16px',
+                        accentColor: '#EF4444'
+                      }}
+                    />
+                  </th>
                   <th style={{ padding: '16px 20px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF' }}>Administrator</th>
                   <th style={{ padding: '16px 20px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF' }}>Role</th>
                   <th style={{ padding: '16px 20px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#9CA3AF' }}>Assigned Permissions</th>
@@ -680,9 +768,35 @@ export const AdminAdministratorsPage: React.FC<AdminAdministratorsPageProps> = (
                       key={admin.id}
                       style={{
                         borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                        transition: 'background-color 0.15s ease'
+                        transition: 'background-color 0.15s ease',
+                        backgroundColor: selectedIds.includes(admin.id) ? 'rgba(239, 68, 68, 0.06)' : undefined
                       }}
                     >
+                      {/* Selection Checkbox */}
+                      <td style={{ padding: '16px 12px 16px 20px', width: '38px', verticalAlign: 'middle' }}>
+                        {admin.is_super_admin ? (
+                          <span title="Protected Root Account: Cannot be selected or deleted">
+                            <Lock size={15} color="#F5A623" style={{ opacity: 0.8 }} />
+                          </span>
+                        ) : admin.id === currentUser?.id ? (
+                          <span title="Active Account: Cannot delete own logged-in account">
+                            <Lock size={15} color="#6B7280" style={{ opacity: 0.6 }} />
+                          </span>
+                        ) : (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(admin.id)}
+                            onChange={() => handleToggleSelect(admin.id)}
+                            style={{
+                              cursor: 'pointer',
+                              width: '16px',
+                              height: '16px',
+                              accentColor: '#EF4444'
+                            }}
+                          />
+                        )}
+                      </td>
+
                       {/* Name & Email */}
                       <td style={{ padding: '16px 20px', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -903,7 +1017,26 @@ export const AdminAdministratorsPage: React.FC<AdminAdministratorsPageProps> = (
                             <Edit2 size={14} />
                           </button>
 
-                          {!admin.is_super_admin && (
+                          {admin.is_super_admin ? (
+                            <span
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: '8px',
+                                backgroundColor: 'rgba(245, 166, 35, 0.1)',
+                                border: '1px solid rgba(245, 166, 35, 0.25)',
+                                color: '#F5A623',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                              }}
+                              title="Protected Root Account: Super Administrator accounts cannot be deleted."
+                            >
+                              <Lock size={12} />
+                              Protected Root Account
+                            </span>
+                          ) : (
                             <button
                               onClick={() => handleOpenDeleteModal(admin)}
                               title="Delete Sub-Admin"
@@ -1649,6 +1782,109 @@ export const AdminAdministratorsPage: React.FC<AdminAdministratorsPageProps> = (
                   <>
                     <Trash2 size={14} />
                     <span>Delete Admin</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Bulk Delete Confirmation Modal */}
+      {showBulkDeleteModal && selectedIds.length > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#12121A',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: '20px',
+              maxWidth: '460px',
+              width: '100%',
+              padding: '24px',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.9)'
+            }}
+          >
+            <div
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#F87171',
+                marginBottom: '16px'
+              }}
+            >
+              <AlertCircle size={24} />
+            </div>
+
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+              Delete Selected Administrators?
+            </h3>
+            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '8px 0 20px', lineHeight: 1.5 }}>
+              Are you sure you want to permanently delete <strong style={{ color: '#F87171' }}>{selectedIds.length}</strong> selected administrator account{selectedIds.length === 1 ? '' : 's'}? Their access to the FLOPSHOW Admin Panel will be immediately revoked. This action cannot be undone.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteModal(false)}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#D1D5DB',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleBulkDeleteConfirm}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  backgroundColor: '#EF4444',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  opacity: submitting ? 0.6 : 1
+                }}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    <span>Delete {selectedIds.length} Admins</span>
                   </>
                 )}
               </button>

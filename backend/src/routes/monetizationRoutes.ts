@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { monetizationService } from '../services/monetizationService.js';
 import { requireAuth, AuthenticatedRequest } from '../middlewares/authMiddleware.js';
-import { requireAdmin, requirePermission } from '../middlewares/adminMiddleware.js';
+import { requireAdmin, requirePermission, requireAnyPermission } from '../middlewares/adminMiddleware.js';
 
 export const monetizationRouter = Router();
 
@@ -20,7 +20,7 @@ monetizationRouter.get('/config', async (_req, res, next) => {
 // ============================================================================
 // 2. ADMIN MONETIZATION CONTROLS & METRICS
 // ============================================================================
-monetizationRouter.get('/admin', requireAuth, requirePermission('monetization'), async (_req: AuthenticatedRequest, res: Response, next) => {
+monetizationRouter.get('/admin', requireAuth, requireAnyPermission(['monetization', 'payments', 'settings']), async (_req: AuthenticatedRequest, res: Response, next) => {
   try {
     const config = await monetizationService.getAdminConfig();
     res.json({ success: true, config });
@@ -29,7 +29,7 @@ monetizationRouter.get('/admin', requireAuth, requirePermission('monetization'),
   }
 });
 
-monetizationRouter.put('/admin', requireAuth, requirePermission('monetization'), async (req: AuthenticatedRequest, res: Response, next) => {
+monetizationRouter.put('/admin', requireAuth, requireAnyPermission(['monetization', 'payments', 'settings']), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { mode, weeklyPrice, monthlyPrice, threeMonthsPrice, yearlyPrice, prices, defaultMoviePrice, defaultSeriesPrice } = req.body;
     const finalWeekly = weeklyPrice !== undefined ? Number(weeklyPrice) : (prices?.weekly !== undefined ? Number(prices.weekly) : undefined);

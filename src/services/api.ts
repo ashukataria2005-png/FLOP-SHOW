@@ -108,7 +108,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const url = `${API_BASE_URL}${endpoint}`;
   const isAdminEndpoint =
     endpoint.startsWith('/admin') ||
-    endpoint.startsWith('/payments/admin') ||
+    endpoint.includes('/admin') ||
     endpoint.includes('admin-quick-login');
 
   const token = isAdminEndpoint
@@ -282,6 +282,19 @@ export const api = {
     },
 
     async adminLogin(adminId: string, adminPassword: string) {
+      // Strictly purge all previous tokens, cached user objects, and permission states before saving new session
+      adminTokenStorage.clear();
+      tokenStorage.clear();
+      try {
+        localStorage.removeItem('flopshow_auth_token');
+        localStorage.removeItem('flopshow_admin_token');
+        localStorage.removeItem('flopshow_admin_permissions');
+        localStorage.removeItem('flopshow_admin_quick_login');
+        localStorage.removeItem('user');
+      } catch {
+        // Ignore
+      }
+
       const data = await request<{ user: any; token: string }>('/auth/admin-login', {
         method: 'POST',
         body: JSON.stringify({ adminId, adminPassword })
@@ -1465,6 +1478,17 @@ export const api = {
           message: string;
         }>(`/admin/sub-admins/${id}`, {
           method: 'DELETE'
+        });
+      },
+
+      async bulkDelete(ids: string[]) {
+        return request<{
+          success: boolean;
+          message: string;
+          deletedCount: number;
+        }>('/admin/sub-admins/bulk', {
+          method: 'DELETE',
+          body: JSON.stringify({ ids })
         });
       }
     }

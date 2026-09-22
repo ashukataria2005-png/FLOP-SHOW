@@ -3,7 +3,7 @@ import { watchPassService } from '../services/watchPassService.js';
 import { paymentRequestService } from '../services/paymentRequestService.js';
 import { paymentRequestRepository } from '../repositories/paymentRequestRepository.js';
 import { requireAuth, AuthenticatedRequest } from '../middlewares/authMiddleware.js';
-import { requireAdmin, requirePermission } from '../middlewares/adminMiddleware.js';
+import { requireAdmin, requirePermission, requireAnyPermission } from '../middlewares/adminMiddleware.js';
 import { adminService } from '../services/adminService.js';
 
 export const watchPassRouter = Router();
@@ -162,7 +162,7 @@ watchPassRouter.post('/admin/reject', requireAuth, requirePermission('payments')
 });
 
 // Admin: update plan prices
-watchPassRouter.post('/admin/plans', requireAuth, requirePermission('monetization'), async (req: AuthenticatedRequest, res: Response, next) => {
+watchPassRouter.post('/admin/plans', requireAuth, requireAnyPermission(['monetization', 'settings', 'payments']), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { price24h, price3d, price7d, price30d } = req.body;
 

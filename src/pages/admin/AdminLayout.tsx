@@ -322,6 +322,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     setLoginError(null);
 
     try {
+      // Purge previous session and tokens to prevent session contamination
+      adminTokenStorage.clear();
+      try {
+        localStorage.removeItem('flopshow_auth_token');
+        localStorage.removeItem('flopshow_admin_token');
+        localStorage.removeItem('flopshow_admin_permissions');
+        localStorage.removeItem('user');
+      } catch {}
+
       const data = await api.auth.adminLogin(adminId.trim(), adminPassword);
       if (data.user.role !== 'ADMIN') {
         setLoginError('Authentication failed: Administrator privileges required.');
@@ -414,9 +423,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   };
 
   const handleAdminLogout = (forgetDevice: boolean = false) => {
+    try {
+      localStorage.removeItem('flopshow_admin_token');
+      localStorage.removeItem('flopshow_auth_token');
+      localStorage.removeItem('flopshow_admin_permissions');
+      localStorage.removeItem('user');
+    } catch {}
+    adminTokenStorage.clear();
+
     if (forgetDevice) {
       localStorage.removeItem(ADMIN_QUICK_LOGIN_KEY);
-      adminTokenStorage.clear();
       setQuickLoginData(null);
       showToast('Signed out and device forgotten.', 'info');
     } else {

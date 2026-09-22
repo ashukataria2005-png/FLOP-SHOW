@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { paymentRequestService } from '../services/paymentRequestService.js';
 import { requireAuth, AuthenticatedRequest } from '../middlewares/authMiddleware.js';
-import { requireAdmin, requirePermission } from '../middlewares/adminMiddleware.js';
+import { requireAdmin, requirePermission, requireAnyPermission } from '../middlewares/adminMiddleware.js';
 
 export const paymentRouter = Router();
 
@@ -89,7 +89,7 @@ paymentRouter.get('/admin/requests', requireAuth, requirePermission('payments'),
 });
 
 // Admin get payment configuration
-paymentRouter.get('/admin/settings', requireAuth, requirePermission('payments'), async (_req, res, next) => {
+paymentRouter.get('/admin/settings', requireAuth, requireAnyPermission(['settings', 'payments', 'monetization']), async (_req, res, next) => {
   try {
     const config = await paymentRequestService.getPublicPaymentConfig();
     res.json(config);
@@ -99,7 +99,7 @@ paymentRouter.get('/admin/settings', requireAuth, requirePermission('payments'),
 });
 
 // Admin update payment configuration
-paymentRouter.post('/admin/settings', requireAuth, requirePermission('payments'), async (req, res, next) => {
+paymentRouter.post('/admin/settings', requireAuth, requireAnyPermission(['settings', 'payments', 'monetization']), async (req, res, next) => {
   try {
     const { upiId, merchantName, approvalMode } = req.body;
     // Only pass 'enabled' when it is explicitly provided; otherwise undefined preserves existing value.

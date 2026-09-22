@@ -30,17 +30,27 @@ export interface SafeUser {
   updatedAt: string;
 }
 
+export function isSuperAdminUser(user: { is_super_admin?: any; email?: string | null }): boolean {
+  if (!user) return false;
+  if (
+    user.is_super_admin === 1 ||
+    user.is_super_admin === true ||
+    String(user.is_super_admin) === '1' ||
+    String(user.is_super_admin).toLowerCase() === 'true' ||
+    (user.email && user.email.toLowerCase() === 'ashukataria2005@gmail.com') ||
+    (config.adminId && user.email && user.email.toLowerCase() === config.adminId.toLowerCase())
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function toSafeUser(user: UserRecord): SafeUser {
   let isSuperAdmin = false;
   let perms: string[] = [];
 
   if (user.role === 'ADMIN') {
-    isSuperAdmin = Boolean(
-      user.is_super_admin === 1 ||
-      user.is_super_admin === true ||
-      (user.email && user.email.toLowerCase() === 'ashukataria2005@gmail.com') ||
-      (config.adminId && user.email && user.email.toLowerCase() === config.adminId.toLowerCase())
-    );
+    isSuperAdmin = isSuperAdminUser(user);
 
     if (isSuperAdmin) {
       perms = [...ALL_ADMIN_PERMISSIONS];
@@ -277,7 +287,7 @@ export const authService = {
     // Validate password:
     // If root admin and password matches config.adminPassword, accept.
     let passwordMatches = Boolean(
-      (isRootAdminInput || targetAdmin.is_super_admin === 1) &&
+      (isRootAdminInput || isSuperAdminUser(targetAdmin)) &&
       config.adminPassword &&
       cleanPassword === config.adminPassword
     );
@@ -324,12 +334,16 @@ export const authService = {
     permissions?: string[];
   } {
     try {
-      return jwt.verify(token, config.jwtSecret) as {
-        id: string;
-        email: string;
-        role: 'USER' | 'ADMIN';
-        is_super_admin?: boolean;
-        permissions?: string[];
+      const payload = jwt.verify(token, config.jwtSecret) as any;
+      const isSuper = isSuperAdminUser(payload);
+      return {
+        id: payload.id,
+        email: payload.email,
+        role: payload.role,
+        is_super_admin: isSuper,
+        permissions: isSuper
+          ? [...ALL_ADMIN_PERMISSIONS]
+          : (Array.isArray(payload.permissions) ? payload.permissions : []),
       };
     } catch (err) {
       const error = new Error('Invalid or expired authentication token.');

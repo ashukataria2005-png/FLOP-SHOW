@@ -783,11 +783,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const initials = name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
     const isSuper = Boolean(
       extraFields?.is_super_admin === true ||
+      (extraFields as any)?.is_super_admin === 1 ||
+      String(extraFields?.is_super_admin) === '1' ||
+      String(extraFields?.is_super_admin).toLowerCase() === 'true' ||
       (email && email.toLowerCase() === 'ashukataria2005@gmail.com')
     );
     const perms = Array.isArray(extraFields?.permissions)
       ? extraFields!.permissions
       : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : (role === 'ADMIN' ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []));
+
+    if (role === 'ADMIN') {
+      try {
+        localStorage.removeItem('user');
+        localStorage.removeItem('flopshow_auth_token');
+      } catch {}
+    }
 
     const newUser: User = {
       id: userId,   // Real backend UUID — never a client-generated timestamp ID

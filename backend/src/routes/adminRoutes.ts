@@ -26,6 +26,29 @@ adminRouter.use(requireAuth);
 adminRouter.use(requireAdmin);
 
 // ----------------------------------------------------------------------------
+// 0. ADMIN SESSION VERIFICATION
+// ----------------------------------------------------------------------------
+adminRouter.get('/session', async (req: AuthenticatedRequest, res: Response) => {
+  const admin = req.user;
+  if (!admin) {
+    res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } });
+    return;
+  }
+  res.json({
+    success: true,
+    admin: {
+      id: admin.id,
+      email: admin.email,
+      name: admin.name || 'Admin',
+      role: admin.role,
+      is_super_admin: isSuperAdminUser(admin) ? 1 : (Number(admin.is_super_admin) === 1 ? 1 : 0),
+      permissions: admin.permissions || [],
+      status: admin.status || 'ACTIVE'
+    }
+  });
+});
+
+// ----------------------------------------------------------------------------
 // 1. DASHBOARD & STATS
 // ----------------------------------------------------------------------------
 adminRouter.get('/dashboard', requirePermission('analytics'), async (req, res, next) => {

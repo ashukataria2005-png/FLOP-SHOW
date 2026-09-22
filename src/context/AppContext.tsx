@@ -11,7 +11,7 @@ import {
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { formatCurrentDate } from '../utils/formatters';
 import { MediaPlayerSource } from '../components/player/MediaPlayer';
-import { api, tokenStorage, adminTokenStorage, API_BASE_URL } from '../services/api';
+import { api, tokenStorage, API_BASE_URL } from '../services/api';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 
 function isDemoStreamUrl(url?: string | null): boolean {
@@ -507,7 +507,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Keep local default
     });
 
-    const token = tokenStorage.get() || adminTokenStorage.get();
+    const token = tokenStorage.get();
     if (token) {
       // Validate token with backend and restore user session
       api.auth.me().then(({ user: serverUser, wallet: serverWallet }) => {
@@ -589,46 +589,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             // Standard refresh failed
           }
 
-          // Check if admin quick login is present before giving up
-          const hasAdminQuick = Boolean(localStorage.getItem('flopshow_admin_quick_login'));
-          if (hasAdminQuick) {
-            try {
-              const res = await api.auth.adminQuickLogin();
-              if (res?.user && res.user.role === 'ADMIN') {
-                const isSuper = Boolean(
-                  res.user.is_super_admin === 1 ||
-                  res.user.is_super_admin === true ||
-                  (res.user.email && res.user.email.toLowerCase() === 'ashukataria2005@gmail.com')
-                );
-                const perms = Array.isArray(res.user.permissions)
-                  ? res.user.permissions
-                  : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
-
-                const restoredAdmin: User = {
-                  id: res.user.id,
-                  name: res.user.name,
-                  email: res.user.email,
-                  avatarInitials: (res.user.name || '').trim().split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'AK',
-                  joinedDate: formatCurrentDate(),
-                  role: 'ADMIN',
-                  is_super_admin: isSuper,
-                  permissions: perms,
-                  status: res.user.status || 'ACTIVE',
-                  last_login_at: res.user.last_login_at || null,
-                };
-                setUser(restoredAdmin);
-                saveToStorage('user', restoredAdmin);
-                setIsAuthenticated(true);
-                return;
-              }
-            } catch {
-              // Admin quick login also failed
-            }
-          }
-
-          console.warn('[Auth] Session token invalid or expired, signing out.');
+          console.warn('[Auth] Consumer session token invalid or expired, signing out.');
           tokenStorage.clear();
-          adminTokenStorage.clear();
           setIsAuthenticated(false);
           setUser(GUEST_USER);
           setWalletBalance(0);
@@ -645,47 +607,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSessionLoading(false);
       });
     } else {
-      // Check if admin quick login is saved on this device
-      const hasAdminQuick = Boolean(localStorage.getItem('flopshow_admin_quick_login'));
-      if (hasAdminQuick) {
-        api.auth.adminQuickLogin().then(res => {
-          if (res?.user && res.user.role === 'ADMIN') {
-            const isSuper = Boolean(
-              res.user.is_super_admin === 1 ||
-              res.user.is_super_admin === true ||
-              (res.user.email && res.user.email.toLowerCase() === 'ashukataria2005@gmail.com')
-            );
-            const perms = Array.isArray(res.user.permissions)
-              ? res.user.permissions
-              : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
-
-            const restoredAdmin: User = {
-              id: res.user.id,
-              name: res.user.name,
-              email: res.user.email,
-              avatarInitials: (res.user.name || '').trim().split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'AK',
-              joinedDate: formatCurrentDate(),
-              role: 'ADMIN',
-              is_super_admin: isSuper,
-              permissions: perms,
-              status: res.user.status || 'ACTIVE',
-              last_login_at: res.user.last_login_at || null,
-            };
-            setUser(restoredAdmin);
-            saveToStorage('user', restoredAdmin);
-            setIsAuthenticated(true);
-          } else {
-            setIsAuthenticated(false);
-          }
-        }).catch(() => {
-          setIsAuthenticated(false);
-        }).finally(() => {
-          setSessionLoading(false);
-        });
-      } else {
-        setIsAuthenticated(false);
-        setSessionLoading(false);
-      }
+      setIsAuthenticated(false);
+      setSessionLoading(false);
     }
   }, []);
 
@@ -728,7 +651,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!isAuthenticated) return;
 
     const interval = setInterval(() => {
-      const token = tokenStorage.get() || adminTokenStorage.get();
+      const token = tokenStorage.get();
       if (token) {
         api.auth.refresh().catch(() => {
           // Ignore background refresh errors
@@ -738,7 +661,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        const token = tokenStorage.get() || adminTokenStorage.get();
+        const token = tokenStorage.get();
         if (token) {
           api.auth.refresh().catch(() => {});
         }

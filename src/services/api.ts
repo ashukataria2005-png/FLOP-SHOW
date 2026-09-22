@@ -34,28 +34,32 @@ export const API_BASE_URL = resolveApiBaseUrl();
 /**
  * Helper to get and set auth tokens in localStorage
  */
-const TOKEN_KEY = 'flopshow_auth_token';
-const ADMIN_TOKEN_KEY = 'flopshow_admin_token';
+const USER_TOKEN_KEY = 'flops_user_token';
+const ADMIN_TOKEN_KEY = 'flops_admin_token';
+const LEGACY_USER_TOKEN_KEY = 'flopshow_auth_token';
+const LEGACY_ADMIN_TOKEN_KEY = 'flopshow_admin_token';
 const ADMIN_QUICK_LOGIN_KEY = 'flopshow_admin_quick_login';
 
 export const tokenStorage = {
   get: (): string | null => {
     try {
-      return localStorage.getItem(TOKEN_KEY);
+      return localStorage.getItem(USER_TOKEN_KEY) || localStorage.getItem(LEGACY_USER_TOKEN_KEY);
     } catch {
       return null;
     }
   },
   set: (token: string): void => {
     try {
-      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_TOKEN_KEY, token);
+      localStorage.removeItem(LEGACY_USER_TOKEN_KEY);
     } catch {
       // Ignore in non-browser environments
     }
   },
   clear: (): void => {
     try {
-      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_TOKEN_KEY);
+      localStorage.removeItem(LEGACY_USER_TOKEN_KEY);
     } catch {
       // Ignore
     }
@@ -65,7 +69,7 @@ export const tokenStorage = {
 export const adminTokenStorage = {
   get: (): string | null => {
     try {
-      const direct = localStorage.getItem(ADMIN_TOKEN_KEY);
+      const direct = localStorage.getItem(ADMIN_TOKEN_KEY) || localStorage.getItem(LEGACY_ADMIN_TOKEN_KEY);
       if (direct) return direct;
       const quick = localStorage.getItem(ADMIN_QUICK_LOGIN_KEY);
       if (quick) {
@@ -80,6 +84,7 @@ export const adminTokenStorage = {
   set: (token: string): void => {
     try {
       localStorage.setItem(ADMIN_TOKEN_KEY, token);
+      localStorage.removeItem(LEGACY_ADMIN_TOKEN_KEY);
     } catch {
       // Ignore
     }
@@ -87,6 +92,7 @@ export const adminTokenStorage = {
   clear: (): void => {
     try {
       localStorage.removeItem(ADMIN_TOKEN_KEY);
+      localStorage.removeItem(LEGACY_ADMIN_TOKEN_KEY);
     } catch {
       // Ignore
     }
@@ -101,6 +107,7 @@ interface RequestOptions extends RequestInit {
  * Standard HTTP Request Wrapper for FLOPSHOW API
  * Robust session handling:
  * - Differentiates admin vs user tokens
+ * - Strictly isolates admin and consumer user sessions
  * - Transparently auto-refreshes on 401 before giving up
  * - Never destroys state on transient network/server errors
  */
@@ -108,12 +115,24 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const url = `${API_BASE_URL}${endpoint}`;
   const isAdminEndpoint =
     endpoint.startsWith('/admin') ||
+    endpoint.startsWith('admin') ||
     endpoint.includes('/admin') ||
     endpoint.includes('admin-quick-login');
 
-  const token = isAdminEndpoint
-    ? (adminTokenStorage.get() || tokenStorage.get())
-    : (tokenStorage.get() || adminTokenStorage.get());
+  const isAuthLoginEndpoint =
+    endpoint === '/auth/login' ||
+    endpoint === '/auth/register' ||
+    endpoint === '/admin/login' ||
+    endpoint === '/auth/admin-login' ||
+    endpoint === '/admin-login';
+
+  // Strict Token Separation:
+  // Admin endpoints strictly use flops_admin_token.
+  // Consumer app endpoints strictly use flops_user_token.
+  // Unauthenticated login/register endpoints send no token.
+  const token = isAuthLoginEndpoint
+    ? null
+    : (isAdminEndpoint ? adminTokenStorage.get() : tokenStorage.get());
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -282,34 +301,41 @@ export const api = {
     },
 
     async adminLogin(adminId: string, adminPassword: string) {
-      // Strictly purge all previous tokens, cached user objects, and permission states before saving new session
+      // Purge prior admin token and session from storage
       adminTokenStorage.clear();
-      tokenStorage.clear();
       try {
-        localStorage.removeItem('flopshow_auth_token');
+        localStorage.removeItem('flops_admin_token');
         localStorage.removeItem('flopshow_admin_token');
         localStorage.removeItem('flopshow_admin_permissions');
         localStorage.removeItem('flopshow_admin_quick_login');
-        localStorage.removeItem('user');
+        localStorage.removeItem('flops_admin_user');
       } catch {
         // Ignore
       }
 
-      const data = await request<{ user: any; token: string }>('/auth/admin-login', {
-        method: 'POST',
-        body: JSON.stringify({ adminId, adminPassword })
-      });
+      // Try dedicated /admin/login endpoint first, fallback to /auth/admin-login
+      let data: { user: any; token: string };
+      try {
+        data = await request<{ user: any; token: string }>('/admin/login', {
+          method: 'POST',
+          body: JSON.stringify({ adminId, adminPassword })
+        });
+      } catch (err: any) {
+        data = await request<{ user: any; token: string }>('/auth/admin-login', {
+          method: 'POST',
+          body: JSON.stringify({ adminId, adminPassword })
+        });
+      }
+
+      // Strictly isolated: admin session ONLY gets flops_admin_token
       adminTokenStorage.set(data.token);
-      tokenStorage.set(data.token);
       return data;
     },
 
     async me() {
       const data = await request<{ user: any; wallet: any; token?: string }>('/auth/me');
       if (data && data.token) {
-        if (data.user?.role === 'ADMIN') {
-          adminTokenStorage.set(data.token);
-        }
+        // Consumer app token only
         tokenStorage.set(data.token);
       }
       return data;
@@ -320,9 +346,7 @@ export const api = {
         method: 'POST'
       });
       if (data && data.token) {
-        if (data.user?.role === 'ADMIN') {
-          adminTokenStorage.set(data.token);
-        }
+        // Consumer app token only
         tokenStorage.set(data.token);
       }
       return data;
@@ -334,7 +358,6 @@ export const api = {
       });
       if (data && data.token) {
         adminTokenStorage.set(data.token);
-        tokenStorage.set(data.token);
       }
       return data;
     },
@@ -354,8 +377,25 @@ export const api = {
     },
 
     logout() {
+      // Isolated consumer app logout: clears ONLY user token
       tokenStorage.clear();
+      try {
+        localStorage.removeItem('flops_user_token');
+        localStorage.removeItem('flopshow_auth_token');
+        localStorage.removeItem('user');
+      } catch {}
+    },
+
+    adminLogout() {
+      // Isolated admin panel logout: clears ONLY admin token & session
       adminTokenStorage.clear();
+      try {
+        localStorage.removeItem('flops_admin_token');
+        localStorage.removeItem('flopshow_admin_token');
+        localStorage.removeItem('flopshow_admin_permissions');
+        localStorage.removeItem('flopshow_admin_quick_login');
+        localStorage.removeItem('flops_admin_user');
+      } catch {}
     }
   },
 
@@ -784,6 +824,21 @@ export const api = {
   // ADMIN MANAGEMENT
   // --------------------------------------------------------------------------
   admin: {
+    async verifySession() {
+      return request<{
+        success: boolean;
+        admin: {
+          id: string;
+          email: string;
+          name: string;
+          role: string;
+          is_super_admin: number;
+          permissions: string[];
+          status: string;
+        };
+      }>('/admin/session');
+    },
+
     async getDashboard(tzOffset?: number) {
       const qs = tzOffset !== undefined ? `?tzOffset=${tzOffset}` : '';
       return request<{

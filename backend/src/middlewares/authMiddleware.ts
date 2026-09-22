@@ -1,13 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
-import { authService, toSafeUser } from '../services/authService.js';
+import { authService, toSafeUser, isSuperAdminUser } from '../services/authService.js';
 import { userRepository } from '../repositories/userRepository.js';
 
 export interface AuthenticatedUser {
   id: string;
   email: string;
+  name?: string;
   role: 'USER' | 'ADMIN';
   is_super_admin?: boolean;
   permissions?: string[];
+  status?: string;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -47,7 +49,10 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
         return;
       }
 
-      if (freshUser.status === 'SUSPENDED') {
+      // STRICT IMMUNITY CHECK: If user is verified as Super Admin (via is_super_admin === 1 or email match), NEVER trigger the 'Administrator account is suspended' block.
+      const isSuper = isSuperAdminUser(freshUser);
+
+      if (freshUser.status === 'SUSPENDED' && !isSuper) {
         res.status(403).json({
           error: {
             code: 'FORBIDDEN',
@@ -61,9 +66,11 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       req.user = {
         id: safe.id,
         email: safe.email,
+        name: safe.name,
         role: safe.role,
         is_super_admin: safe.is_super_admin,
         permissions: safe.permissions,
+        status: safe.status,
       };
     } else {
       req.user = payload;
@@ -90,7 +97,7 @@ export async function optionalAuth(req: AuthenticatedRequest, res: Response, nex
       if (payload.role === 'ADMIN') {
         const freshUser = (await userRepository.findById(payload.id)) ||
           (payload.email ? await userRepository.findByEmail(payload.email) : null);
-        if (freshUser && freshUser.status !== 'SUSPENDED') {
+        if (freshUser && (freshUser.status !== 'SUSPENDED' || isSuperAdminUser(freshUser))) {
           const safe = toSafeUser(freshUser);
           req.user = {
             id: safe.id,

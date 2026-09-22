@@ -731,7 +731,53 @@ async function runPostgresMigrations(): Promise<MigrationResult> {
       }
     }
 
-    return { applied: appliedNow, total: 16 };
+    // Apply incremental 021_purge_demo_admins for PostgreSQL if not already applied
+    const purgeDemoMigrationVersion = '021_purge_demo_admins';
+    if (!appliedSet.has(purgeDemoMigrationVersion)) {
+      console.log('[PostgreSQL] Applying migration: 021_purge_demo_admins...');
+      await client.query('BEGIN');
+      try {
+        await client.query(`
+          DELETE FROM wallets 
+          WHERE user_id IN (
+            SELECT id FROM users 
+            WHERE (
+              LOWER(email) IN ('admin', 'test_admin', 'demo_admin', 'admin@flopshow.tv', 'demo@flopshow.tv', 'admin@flopshow.com', 'demo@flopshow.com', 'test_admin@flopshow.com', 'admin@test.com')
+              OR id IN ('admin', 'test_admin', 'demo_admin', 'admin-dev-01', 'user-demo-01')
+              OR (role = 'ADMIN' AND LOWER(name) IN ('admin', 'test admin', 'demo admin', 'test_admin', 'demo_admin'))
+            )
+            AND LOWER(email) != 'ashukataria2005@gmail.com'
+          );
+
+          DELETE FROM users 
+          WHERE (
+            LOWER(email) IN ('admin', 'test_admin', 'demo_admin', 'admin@flopshow.tv', 'demo@flopshow.tv', 'admin@flopshow.com', 'demo@flopshow.com', 'test_admin@flopshow.com', 'admin@test.com')
+            OR id IN ('admin', 'test_admin', 'demo_admin', 'admin-dev-01', 'user-demo-01')
+            OR (role = 'ADMIN' AND LOWER(name) IN ('admin', 'test admin', 'demo admin', 'test_admin', 'demo_admin'))
+          )
+          AND LOWER(email) != 'ashukataria2005@gmail.com';
+
+          UPDATE users 
+          SET status = 'ACTIVE', 
+              is_super_admin = 1, 
+              role = 'ADMIN',
+              permissions = '["analytics","monetization","promos","payments","catalog","users","settings"]'
+          WHERE LOWER(email) = 'ashukataria2005@gmail.com';
+
+          INSERT INTO schema_migrations (version, name, applied_at)
+          VALUES ('${purgeDemoMigrationVersion}', '021_purge_demo_admins.sql', NOW()::TEXT)
+          ON CONFLICT (version) DO NOTHING;
+        `);
+        await client.query('COMMIT');
+        appliedNow.push('021_purge_demo_admins.sql');
+        console.log('✓ [PostgreSQL] Migration 021_purge_demo_admins applied.');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return { applied: appliedNow, total: 17 };
   } finally {
     client.release();
     await pool.end();

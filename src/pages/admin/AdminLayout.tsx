@@ -91,8 +91,9 @@ const navGroups: NavGroup[] = [
     icon: QrCode,
     permission: 'payments',
     items: [
-      { id: 'admin-upi-settings', label: 'UPI Settings', icon: QrCode, permission: 'payments' },
-      { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck, permission: 'payments' }
+      { id: 'admin-payments', label: 'Verify Payments', icon: ShieldCheck, permission: 'payments' },
+
+      { id: 'admin-upi-settings', label: 'UPI Settings', icon: QrCode, permission: 'payments' }
     ]
   },
   // 4. Content Catalog
@@ -206,13 +207,36 @@ const navGroups: NavGroup[] = [
   }
 ];
 
+interface AdminSessionUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  is_super_admin: boolean;
+  permissions: string[];
+  status?: string;
+  last_login_at?: string | null;
+}
+
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   currentTab,
   onNavigateTab,
   onExitAdmin,
   children
 }) => {
-  const { user, login, logout, showToast } = useApp();
+  const { showToast } = useApp();
+  const [adminUser, setAdminUser] = useState<AdminSessionUser | null>(() => {
+    try {
+      const token = adminTokenStorage.get();
+      const cached = localStorage.getItem('flops_admin_user');
+      if (token && cached) {
+        return JSON.parse(cached);
+      }
+    } catch {}
+    return null;
+  });
+  const [isVerifyingSession, setIsVerifyingSession] = useState<boolean>(true);
+
   const [adminId, setAdminId] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -236,16 +260,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Clean accordion state: exactly one group open at a time, or null (all collapsed).
-  // Initialized to null: no group is automatically expanded on open/login.
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
 
   const toggleGroup = (groupId: string) => {
-    // Accordion behavior: opening one automatically closes any other previously opened group.
-    // Clicking the already open group collapses it.
     setExpandedGroupId(prev => (prev === groupId ? null : groupId));
   };
 
-  // Close drawer on Escape key (always registered; no-op when login screen is shown)
+  // Close drawer on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -256,16 +277,89 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const isAdmin = Boolean(user && user.role === 'ADMIN');
+  // Strict Token & Session Verification Gateway:
+  // Admin panel strictly verifies flops_admin_token against GET /api/admin/session.
+  // It NEVER inherits, falls back to, or checks the regular consumer user session.
+  useEffect(() => {
+    let isMounted = true;
+    const verifyAdminSession = async () => {
+      const token = adminTokenStorage.get();
+      if (!token) {
+        if (isMounted) {
+          setAdminUser(null);
+          try {
+            localStorage.removeItem('flops_admin_user');
+          } catch {}
+          setIsVerifyingSession(false);
+        }
+        return;
+      }
+
+      try {
+        const res = await api.admin.verifySession();
+        if (isMounted) {
+          if (res?.success && res.admin && (res.admin.role === 'ADMIN' || res.admin.role === 'admin')) {
+            const isSuper = Boolean(
+              Number(res.admin.is_super_admin) === 1 ||
+              (res.admin.email && res.admin.email.toLowerCase() === 'ashukataria2005@gmail.com')
+            );
+            const perms = Array.isArray(res.admin.permissions)
+              ? res.admin.permissions
+              : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
+
+            const verifiedAdmin: AdminSessionUser = {
+              id: res.admin.id,
+              name: res.admin.name || 'Admin',
+              email: res.admin.email,
+              role: 'ADMIN',
+              is_super_admin: isSuper,
+              permissions: perms,
+              status: res.admin.status || 'ACTIVE'
+            };
+            setAdminUser(verifiedAdmin);
+            try {
+              localStorage.setItem('flops_admin_user', JSON.stringify(verifiedAdmin));
+            } catch {}
+          } else {
+            setAdminUser(null);
+            adminTokenStorage.clear();
+            try {
+              localStorage.removeItem('flops_admin_user');
+            } catch {}
+          }
+        }
+      } catch (err) {
+        console.warn('[AdminLayout] Admin session token invalid or expired:', err);
+        if (isMounted) {
+          setAdminUser(null);
+          adminTokenStorage.clear();
+          try {
+            localStorage.removeItem('flops_admin_user');
+          } catch {}
+        }
+      } finally {
+        if (isMounted) {
+          setIsVerifyingSession(false);
+        }
+      }
+    };
+
+    verifyAdminSession();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const isAdmin = Boolean(adminUser && adminUser.role === 'ADMIN');
 
   // RBAC permissions and dynamic navigation calculation
   const isSuperAdmin = Boolean(
-    user?.is_super_admin === true ||
-    (user as any)?.is_super_admin === 1 ||
-    (user?.email && user?.email.toLowerCase() === 'ashukataria2005@gmail.com')
+    adminUser?.is_super_admin === true ||
+    (adminUser as any)?.is_super_admin === 1 ||
+    (adminUser?.email && adminUser?.email.toLowerCase() === 'ashukataria2005@gmail.com')
   );
 
-  const userPermissions = Array.isArray(user?.permissions) ? user.permissions : [];
+  const userPermissions = Array.isArray(adminUser?.permissions) ? adminUser.permissions : [];
 
   const hasPermission = (perm?: string) => {
     if (isSuperAdmin) return true;
@@ -283,6 +377,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     .filter(group => group.items.length > 0);
 
   const authorizedTabIds = authorizedNavGroups.flatMap(g => g.items.map(i => i.id));
+
+  // Enforce Admin Gateway: if not authenticated as admin, redirect to /admin login gateway
+  useEffect(() => {
+    if (!isVerifyingSession && !isAdmin && currentTab !== 'admin') {
+      onNavigateTab('admin');
+    }
+  }, [isAdmin, isVerifyingSession, currentTab]);
 
   // Enforce frontend permission guard: redirect unauthorized routes to primary authorized tab
   useEffect(() => {
@@ -309,40 +410,58 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     }
   }, [currentTab, isAdmin, isSuperAdmin, authorizedTabIds.join(',')]);
 
-  // Auto-restore admin session silently on mount if device is remembered
-  useEffect(() => {
-    if (!isAdmin && quickLoginData?.token && !useStandardLogin && !isQuickLoggingIn) {
-      handleQuickLogin();
-    }
-  }, [isAdmin, quickLoginData, useStandardLogin]);
-
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
     setLoginError(null);
 
     try {
-      // Purge previous session and tokens to prevent session contamination
+      // Purge previous admin session and tokens
       adminTokenStorage.clear();
       try {
-        localStorage.removeItem('flopshow_auth_token');
+        localStorage.removeItem('flops_admin_token');
         localStorage.removeItem('flopshow_admin_token');
         localStorage.removeItem('flopshow_admin_permissions');
-        localStorage.removeItem('user');
-      } catch {}
+        localStorage.removeItem('flops_admin_user');
+      } catch { }
 
       const data = await api.auth.adminLogin(adminId.trim(), adminPassword);
-      if (data.user.role !== 'ADMIN') {
+      if (data.user?.role !== 'ADMIN' && data.user?.role !== 'admin') {
         setLoginError('Authentication failed: Administrator privileges required.');
         return;
       }
 
       adminTokenStorage.set(data.token);
 
+      const isSuper = Boolean(
+        data.user.is_super_admin === 1 ||
+        data.user.is_super_admin === true ||
+        (data.user.email && data.user.email.toLowerCase() === 'ashukataria2005@gmail.com')
+      );
+      const perms = Array.isArray(data.user.permissions)
+        ? data.user.permissions
+        : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
+
+      const sessionAdmin: AdminSessionUser = {
+        id: data.user.id,
+        name: data.user.name || 'Admin',
+        email: data.user.email,
+        role: 'ADMIN',
+        is_super_admin: isSuper,
+        permissions: perms,
+        status: data.user.status || 'ACTIVE',
+        last_login_at: data.user.last_login_at || null
+      };
+
+      setAdminUser(sessionAdmin);
+      try {
+        localStorage.setItem('flops_admin_user', JSON.stringify(sessionAdmin));
+      } catch {}
+
       if (rememberDevice) {
         const qData: AdminQuickLoginData = {
           token: data.token,
-          adminName: data.user.name || 'Ashu Kataria',
+          adminName: sessionAdmin.name,
           adminId: adminId.trim(),
           savedAt: new Date().toISOString()
         };
@@ -350,19 +469,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         setQuickLoginData(qData);
       }
 
-      login(data.user.id, data.user.name, data.user.email, 'ADMIN', 0, {
-        is_super_admin: data.user.is_super_admin,
-        permissions: data.user.permissions,
-        status: data.user.status,
-        last_login_at: data.user.last_login_at
-      });
-      showToast(`Admin signed in: ${data.user.name}`, 'success');
-      if (currentTab === 'admin') {
-        const dest = data.user.is_super_admin ? 'admin-dashboard' : (authorizedTabIds[0] || 'admin-dashboard');
-        onNavigateTab(dest);
-      }
+      showToast(`Admin signed in: ${sessionAdmin.name}`, 'success');
+      const dest = isSuper ? 'admin-dashboard' : (authorizedTabIds[0] || 'admin-dashboard');
+      onNavigateTab(dest);
     } catch (err: any) {
-      setLoginError(err.message || 'Invalid Admin ID or Admin Password.');
+      setLoginError(err.message || 'Invalid Admin Email or Admin Password.');
     } finally {
       setIsLoggingIn(false);
     }
@@ -374,31 +485,46 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     setLoginError(null);
 
     try {
-      localStorage.setItem('flopshow_auth_token', quickLoginData.token);
       adminTokenStorage.set(quickLoginData.token);
       const res = await api.auth.adminQuickLogin();
-      if (res && res.user && res.user.role === 'ADMIN') {
+      if (res && res.user && (res.user.role === 'ADMIN' || res.user.role === 'admin')) {
+        const isSuper = Boolean(
+          res.user.is_super_admin === 1 ||
+          res.user.is_super_admin === true ||
+          (res.user.email && res.user.email.toLowerCase() === 'ashukataria2005@gmail.com')
+        );
+        const perms = Array.isArray(res.user.permissions)
+          ? res.user.permissions
+          : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
+
+        const sessionAdmin: AdminSessionUser = {
+          id: res.user.id,
+          name: res.user.name || 'Admin',
+          email: res.user.email,
+          role: 'ADMIN',
+          is_super_admin: isSuper,
+          permissions: perms,
+          status: res.user.status || 'ACTIVE',
+          last_login_at: res.user.last_login_at || null
+        };
+
         const updatedQuick: AdminQuickLoginData = {
           ...quickLoginData,
           token: res.token,
-          adminName: res.user.name,
+          adminName: sessionAdmin.name,
           savedAt: new Date().toISOString()
         };
         localStorage.setItem(ADMIN_QUICK_LOGIN_KEY, JSON.stringify(updatedQuick));
         setQuickLoginData(updatedQuick);
         adminTokenStorage.set(res.token);
+        setAdminUser(sessionAdmin);
+        try {
+          localStorage.setItem('flops_admin_user', JSON.stringify(sessionAdmin));
+        } catch {}
 
-        login(res.user.id, res.user.name, res.user.email, 'ADMIN', 0, {
-          is_super_admin: res.user.is_super_admin,
-          permissions: res.user.permissions,
-          status: res.user.status,
-          last_login_at: res.user.last_login_at
-        });
-        showToast(`Welcome back, ${res.user.name}! (One-Click Quick Login)`, 'success');
-        if (currentTab === 'admin') {
-          const dest = res.user.is_super_admin ? 'admin-dashboard' : (authorizedTabIds[0] || 'admin-dashboard');
-          onNavigateTab(dest);
-        }
+        showToast(`Welcome back, ${sessionAdmin.name}!`, 'success');
+        const dest = isSuper ? 'admin-dashboard' : (authorizedTabIds[0] || 'admin-dashboard');
+        onNavigateTab(dest);
       } else {
         throw new Error('Quick login rejected: Administrator privileges required.');
       }
@@ -406,6 +532,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       console.warn('Quick login session expired, prompting password:', err);
       localStorage.removeItem(ADMIN_QUICK_LOGIN_KEY);
       adminTokenStorage.clear();
+      setAdminUser(null);
       setQuickLoginData(null);
       setUseStandardLogin(true);
       setLoginError(err.message || 'Remembered session expired. Please enter your credentials.');
@@ -417,32 +544,57 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const handleForgetDevice = () => {
     localStorage.removeItem(ADMIN_QUICK_LOGIN_KEY);
     adminTokenStorage.clear();
+    setAdminUser(null);
     setQuickLoginData(null);
     setUseStandardLogin(true);
     showToast('Device forgotten. Quick Login removed from this browser.', 'info');
   };
 
+  // Strictly isolated Admin Logout:
+  // Clears ONLY flops_admin_token and adminUser.
+  // Does NOT disrupt the user's movie watching / consumer profile session!
   const handleAdminLogout = (forgetDevice: boolean = false) => {
-    try {
-      localStorage.removeItem('flopshow_admin_token');
-      localStorage.removeItem('flopshow_auth_token');
-      localStorage.removeItem('flopshow_admin_permissions');
-      localStorage.removeItem('user');
-    } catch {}
+    api.auth.adminLogout();
     adminTokenStorage.clear();
+    setAdminUser(null);
+    try {
+      localStorage.removeItem('flops_admin_token');
+      localStorage.removeItem('flops_admin_user');
+      localStorage.removeItem('flopshow_admin_token');
+      localStorage.removeItem('flopshow_admin_permissions');
+    } catch { }
 
     if (forgetDevice) {
       localStorage.removeItem(ADMIN_QUICK_LOGIN_KEY);
       setQuickLoginData(null);
       showToast('Signed out and device forgotten.', 'info');
     } else {
-      showToast('Signed out. Quick Login remains ready on this device.', 'info');
+      showToast('Admin session signed out.', 'info');
     }
-    logout();
     onNavigateTab('admin');
   };
 
-  // Dedicated Admin Login Screen: Displayed whenever the user is not authenticated as an ADMIN
+  // Loading indicator while verifying flops_admin_token with backend
+  if (isVerifyingSession && !adminUser) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          backgroundColor: 'var(--bg-primary, #07070A)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px'
+        }}
+      >
+        <Loader2 size={36} className="animate-spin" style={{ color: 'var(--brand-gold, #F5C518)', marginBottom: '16px' }} />
+        <p style={{ color: '#9CA3AF', fontSize: '14px' }}>Verifying secure administrator session...</p>
+      </div>
+    );
+  }
+
+  // Dedicated Admin Login Screen: Displayed whenever flops_admin_token is not verified
   if (!isAdmin) {
     // 1. One-Click Quick Login UI for remembered devices
     if (quickLoginData && !useStandardLogin) {
@@ -996,7 +1148,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div className="admin-header-user" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#9CA3AF' }}>
             <ShieldCheck size={16} color="var(--brand-gold, #F5C518)" />
-            <span>{user.name || user.email || 'Admin'}</span>
+            <span>{adminUser?.name || adminUser?.email || 'Admin'}</span>
             <span
               style={{
                 fontSize: '10px',
@@ -1344,7 +1496,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <div style={{ fontSize: '13px', fontWeight: 700, color: '#FFFFFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {user.name || 'Admin'}
+                      {adminUser?.name || 'Admin'}
                     </div>
                     <span
                       style={{
@@ -1361,7 +1513,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                     </span>
                   </div>
                   <div style={{ fontSize: '11px', color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {user.email || 'Administrator'}
+                    {adminUser?.email || 'Administrator'}
                   </div>
                 </div>
               </div>

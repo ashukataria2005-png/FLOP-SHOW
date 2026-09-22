@@ -103,7 +103,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
   useEffect(() => {
     fetchStats();
-    api.admin.getDailyAnalytics('ALL', new Date().getTimezoneOffset()).then(d => setDailyStats(d)).catch(() => {});
+    api.admin.getDailyAnalytics('ALL', new Date().getTimezoneOffset()).then(d => setDailyStats(d)).catch(() => { });
   }, []);
 
   // CRITICAL DAILY TIMER / DATA RULE:
@@ -251,6 +251,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       icon: Sparkles,
       color: '#3B82F6'
     },
+
     {
       label: 'UPI Settings',
       desc: 'Configure receiver UPI ID & preview QR',
@@ -258,6 +259,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       icon: Wallet,
       color: '#F5C518'
     },
+
     {
       label: 'Verify Payments',
       desc: 'Inspect pending UTR submissions & approve',
@@ -265,6 +267,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
       icon: ShieldCheck,
       color: '#10B981'
     },
+
+
     {
       label: 'All Transactions',
       desc: 'Complete credit and debit ledger',
@@ -311,7 +315,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
               key={f}
               onClick={() => {
                 setDailyFilter(f);
-                api.admin.getDailyAnalytics(f, new Date().getTimezoneOffset()).then(d => setDailyStats(d)).catch(() => {});
+                api.admin.getDailyAnalytics(f, new Date().getTimezoneOffset()).then(d => setDailyStats(d)).catch(() => { });
               }}
               style={{
                 padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: 'none',
@@ -331,37 +335,37 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
 
       {/* Daily Hybrid Analytics Summary */}
 
-        {/* Daily stats summary */}
-        {dailyStats && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginTop: '16px', marginBottom: '24px' }}>
-            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(245,197,24,0.06)', border: '1px solid rgba(245,197,24,0.2)' }}>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Today's Revenue</div>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)', margin: '4px 0' }}>₹{dailyStats.totalRevenueRupees || 0}</div>
-              <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.totalSales || 0} sales</div>
-            </div>
-            {(dailyFilter === 'ALL' || dailyFilter === 'ONE_TITLE') && dailyStats.oneTitle && (
-              <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Movie/Series</div>
-                <div style={{ fontSize: '22px', fontWeight: 900, color: '#60A5FA', margin: '4px 0' }}>₹{dailyStats.oneTitle.revenueRupees}</div>
-                <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.oneTitle.sales} purchases</div>
-              </div>
-            )}
-            {(dailyFilter === 'ALL' || dailyFilter === 'PASS') && dailyStats.pass && (
-              <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Watch Pass</div>
-                <div style={{ fontSize: '22px', fontWeight: 900, color: '#C084FC', margin: '4px 0' }}>₹{dailyStats.pass.revenueRupees}</div>
-                <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.pass.sales} passes · {dailyStats.pass.pending} pending</div>
-              </div>
-            )}
-            {(dailyFilter === 'ALL' || dailyFilter === 'VIP_PLANS') && dailyStats.vip && (
-              <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>VIP Plans</div>
-                <div style={{ fontSize: '22px', fontWeight: 900, color: '#34D399', margin: '4px 0' }}>₹{dailyStats.vip.revenueRupees}</div>
-                <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.vip.sales} subs · {dailyStats.vip.pending} pending</div>
-              </div>
-            )}
+      {/* Daily stats summary */}
+      {dailyStats && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginTop: '16px', marginBottom: '24px' }}>
+          <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(245,197,24,0.06)', border: '1px solid rgba(245,197,24,0.2)' }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Today's Revenue</div>
+            <div style={{ fontSize: '22px', fontWeight: 900, color: 'var(--brand-gold, #F5C518)', margin: '4px 0' }}>₹{dailyStats.totalRevenueRupees || 0}</div>
+            <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.totalSales || 0} sales</div>
           </div>
-        )}
+          {(dailyFilter === 'ALL' || dailyFilter === 'ONE_TITLE') && dailyStats.oneTitle && (
+            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Movie/Series</div>
+              <div style={{ fontSize: '22px', fontWeight: 900, color: '#60A5FA', margin: '4px 0' }}>₹{dailyStats.oneTitle.revenueRupees}</div>
+              <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.oneTitle.sales} purchases</div>
+            </div>
+          )}
+          {(dailyFilter === 'ALL' || dailyFilter === 'PASS') && dailyStats.pass && (
+            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Watch Pass</div>
+              <div style={{ fontSize: '22px', fontWeight: 900, color: '#C084FC', margin: '4px 0' }}>₹{dailyStats.pass.revenueRupees}</div>
+              <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.pass.sales} passes · {dailyStats.pass.pending} pending</div>
+            </div>
+          )}
+          {(dailyFilter === 'ALL' || dailyFilter === 'VIP_PLANS') && dailyStats.vip && (
+            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '10px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.06em' }}>VIP Plans</div>
+              <div style={{ fontSize: '22px', fontWeight: 900, color: '#34D399', margin: '4px 0' }}>₹{dailyStats.vip.revenueRupees}</div>
+              <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{dailyStats.vip.sales} subs · {dailyStats.vip.pending} pending</div>
+            </div>
+          )}
+        </div>
+      )}
 
 
       {/* ========================================================================= */}
@@ -1434,14 +1438,14 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                                       record.status === 'APPROVED' || record.status === 'ACTIVE'
                                         ? 'rgba(16, 185, 129, 0.15)'
                                         : record.status === 'PENDING'
-                                        ? 'rgba(245, 197, 24, 0.15)'
-                                        : 'rgba(239, 68, 68, 0.15)',
+                                          ? 'rgba(245, 197, 24, 0.15)'
+                                          : 'rgba(239, 68, 68, 0.15)',
                                     color:
                                       record.status === 'APPROVED' || record.status === 'ACTIVE'
                                         ? '#10B981'
                                         : record.status === 'PENDING'
-                                        ? 'var(--brand-gold, #F5C518)'
-                                        : '#EF4444'
+                                          ? 'var(--brand-gold, #F5C518)'
+                                          : '#EF4444'
                                   }}
                                 >
                                   {record.status}

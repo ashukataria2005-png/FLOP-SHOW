@@ -18,7 +18,56 @@ export const adminAccountService = {
     const now = new Date().toISOString();
     const targetAdminEmail = 'ashukataria2005@gmail.com';
 
-    // 1. Check if Ashu Kataria account exists
+    // 1. Permanently remove all dummy, seeded, or test admin records from users/wallets tables
+    const unwantedEmails = [
+      'admin',
+      'test_admin',
+      'demo_admin',
+      'admin@flopshow.tv',
+      'demo@flopshow.tv',
+      'admin@flopshow.com',
+      'demo@flopshow.com',
+      'test_admin@flopshow.com',
+      'admin@test.com'
+    ];
+    const unwantedIds = ['admin', 'test_admin', 'demo_admin', 'admin-dev-01', 'user-demo-01'];
+
+    for (const uId of unwantedIds) {
+      await db.run('DELETE FROM wallets WHERE user_id = ?;', [uId]);
+      await db.run('DELETE FROM users WHERE id = ?;', [uId]);
+    }
+
+    for (const uEmail of unwantedEmails) {
+      if (uEmail.toLowerCase() === targetAdminEmail) continue;
+      await db.run(
+        `DELETE FROM wallets WHERE user_id IN (SELECT id FROM users WHERE LOWER(email) = ?);`,
+        [uEmail]
+      );
+      await db.run('DELETE FROM users WHERE LOWER(email) = ?;', [uEmail]);
+    }
+
+    // Also purge any accounts named 'test admin', 'demo admin', etc.
+    await db.run(
+      `DELETE FROM users 
+       WHERE role = 'ADMIN' 
+       AND LOWER(name) IN ('admin', 'test admin', 'demo admin', 'test_admin', 'demo_admin') 
+       AND LOWER(email) != ?;`,
+      [targetAdminEmail]
+    );
+
+    // 2. Force-update the primary Super Admin record
+    await db.run(
+      `UPDATE users 
+       SET status = 'ACTIVE', 
+           is_super_admin = 1, 
+           role = 'ADMIN',
+           permissions = '["analytics","monetization","promos","payments","catalog","users","settings"]',
+           updated_at = ?
+       WHERE LOWER(email) = ?;`,
+      [now, targetAdminEmail]
+    );
+
+    // Check canonical admin
     const { rows: ashuRows } = await db.query(
       'SELECT id, name, email, role, status FROM users WHERE LOWER(email) = ?;',
       [targetAdminEmail]
@@ -28,35 +77,7 @@ export const adminAccountService = {
     let adminEmail = targetAdminEmail;
 
     if (ashuRows.length > 0) {
-      const ashu = ashuRows[0] as any;
-      canonicalAdminId = ashu.id;
-      adminEmail = ashu.email;
-      // Guarantee role is ADMIN, is_super_admin is 1, and all permissions are granted
-      await db.run(
-        `UPDATE users SET role = 'ADMIN', status = 'ACTIVE', is_super_admin = 1, permissions = '["analytics","monetization","promos","payments","catalog","users","settings"]', updated_at = ? WHERE id = ?;`,
-        [now, canonicalAdminId]
-      );
-    } else {
-      // Find any existing active ADMIN
-      const { rows: currentAdmins } = await db.query(
-        "SELECT id, email FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE' LIMIT 1;"
-      );
-      if (currentAdmins.length > 0) {
-        canonicalAdminId = (currentAdmins[0] as any).id;
-        adminEmail = (currentAdmins[0] as any).email;
-      }
-    }
-
-    // 2. Permanently remove the unwanted "FlopShow TV" / dev admin accounts if present
-    const unwantedEmails = ['admin@flopshow.tv', 'demo@flopshow.tv'];
-    const unwantedIds = ['admin-dev-01', 'user-demo-01'];
-
-    for (const uId of unwantedIds) {
-      await db.run('DELETE FROM wallets WHERE user_id = ?;', [uId]);
-      await db.run('DELETE FROM users WHERE id = ?;', [uId]);
-    }
-    for (const uEmail of unwantedEmails) {
-      await db.run('DELETE FROM users WHERE LOWER(email) = ?;', [uEmail]);
+      canonicalAdminId = (ashuRows[0] as any).id;
     }
 
     // 3. Verify final admin count

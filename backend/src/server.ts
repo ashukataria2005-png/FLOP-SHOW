@@ -218,6 +218,10 @@ export function createServer(): Express {
   app.use('/api/purchases', purchaseRouter);
   app.use('/api/wallet', walletRouter);
   app.use('/api/library', libraryRouter);
+  // Direct endpoints for admin login gateway (placed before adminRouter so auth middleware is not required)
+  app.post('/api/admin/login', handleAdminLogin);
+  app.post('/api/admin-login', handleAdminLogin);
+
   app.use('/api/admin', adminRouter);
   app.use('/api/media', mediaRouter);
   app.use('/api/payments', paymentRouter);
@@ -227,10 +231,6 @@ export function createServer(): Express {
   app.use('/api/watch-passes', watchPassRouter);
   app.use('/api/streaming', streamingRouter);
   app.use('/api/promos', promoRouter);
-
-  // Direct aliases for admin login
-  app.post('/api/admin-login', handleAdminLogin);
-  app.post('/api/admin/login', handleAdminLogin);
 
   // 404 Not Found Handler for unknown API routes
   app.use((req: Request, res: Response) => {

@@ -100,6 +100,14 @@ const MODULE_PERMISSIONS = [
 
 export const AdminAdministratorsPage: React.FC<AdminAdministratorsPageProps> = () => {
   const { user: currentUser, showToast } = useApp();
+  const currentAdminUser = React.useMemo(() => {
+    try {
+      const raw = localStorage.getItem('flops_admin_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
   const [admins, setAdmins] = useState<AdminUserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -260,7 +268,7 @@ export const AdminAdministratorsPage: React.FC<AdminAdministratorsPageProps> = (
       showToast('Super Admin accounts cannot be deleted.', 'error');
       return;
     }
-    if (admin.id === currentUser?.id) {
+    if (admin.id === currentUser?.id || admin.id === currentAdminUser?.id) {
       showToast('You cannot delete your own account.', 'error');
       return;
     }
@@ -313,7 +321,7 @@ export const AdminAdministratorsPage: React.FC<AdminAdministratorsPageProps> = (
 
   // Only non-super-admin sub-admins can be selected for deletion (exclude super admin & active self)
   const selectableSubAdmins = filteredAdmins.filter(
-    a => !a.is_super_admin && a.id !== currentUser?.id
+    a => !a.is_super_admin && a.id !== currentUser?.id && a.id !== currentAdminUser?.id
   );
   const isAllSelected =
     selectableSubAdmins.length > 0 &&

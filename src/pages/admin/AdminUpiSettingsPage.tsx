@@ -308,7 +308,7 @@ export const AdminUpiSettingsPage: React.FC<AdminUpiSettingsPageProps> = ({ onNa
                   <Smartphone size={15} />
                   <span>Dynamic QR Spec Compliance</span>
                 </div>
-                The system automatically builds standard UPI intent URIs (`upi://pay?pa=...&am=...&cu=INR`). 
+                The system automatically builds standard UPI intent URIs (`upi://pay?pa=...&am=...&cu=INR`).
                 Users will get exact-amount QR codes generated dynamically on demand without manual static image uploads.
               </div>
             </div>

@@ -48,7 +48,7 @@ import { CheckCircle2, AlertCircle, Info, Crown } from 'lucide-react';
 function pathToTab(pathname: string): { tab: string; param?: string } {
   const cleanPath = pathname.replace(/\/+$/, '') || '/';
 
-  if (cleanPath === '/admin' || cleanPath === '/admin/') {
+  if (cleanPath === '/admin' || cleanPath === '/admin/' || cleanPath === '/admin/login') {
     return { tab: 'admin' };
   }
   if (cleanPath === '/admin/dashboard') {

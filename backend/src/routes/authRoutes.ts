@@ -42,24 +42,53 @@ authRouter.post('/login', async (req, res, next) => {
 // POST /api/auth/admin-login (and aliases)
 export const handleAdminLogin = async (req: any, res: any, next: any) => {
   try {
-    const { adminId, adminPassword, id, password, email } = req.body;
-    const inputId = adminId || id || email;
-    const inputPassword = adminPassword || password;
+    const body = req.body || {};
+
+    // Normalize all possible field names and sanitize
+    const rawId = (body.adminId || body.id || body.email || '').toString().trim().toLowerCase();
+    const rawPassword = (body.adminPassword || body.password || '').toString();
+
+    if (!rawId || !rawPassword) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_CREDENTIALS',
+          message: 'Admin ID/email and password are required.'
+        }
+      });
+      return;
+    }
+
+    console.log(`[Admin Login] Attempt for: ${rawId}`);
 
     const result = await authService.adminLogin({
-      adminId: inputId,
-      adminPassword: inputPassword,
+      adminId: rawId,
+      adminPassword: rawPassword,
     });
+
+    console.log(`[Admin Login] ✓ Success for: ${rawId} (id=${result.user.id}, is_super_admin=${result.user.is_super_admin})`);
 
     res.json({
       success: true,
       user: result.user,
       token: result.token,
     });
-  } catch (err) {
-    next(err);
+  } catch (err: any) {
+    console.error(`[Admin Login] ✗ Failed:`, err.message);
+    const statusCode = err.statusCode || 500;
+    res.status(statusCode).json({
+      success: false,
+      error: {
+        code: statusCode === 401 ? 'INVALID_CREDENTIALS'
+             : statusCode === 403 ? 'ACCOUNT_SUSPENDED'
+             : statusCode === 400 ? 'MISSING_CREDENTIALS'
+             : 'LOGIN_ERROR',
+        message: err.message || 'An unexpected error occurred during login.'
+      }
+    });
   }
 };
+
 
 authRouter.post('/admin-login', handleAdminLogin);
 authRouter.post('/admin/login', handleAdminLogin);

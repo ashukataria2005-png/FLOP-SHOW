@@ -230,7 +230,7 @@ export const authService = {
     adminId: string;
     adminPassword: string;
   }): Promise<{ user: SafeUser; token: string }> {
-    const cleanId = (params.adminId || '').trim();
+    const cleanId = (params.adminId || '').trim().toLowerCase();
     const cleanPassword = params.adminPassword || '';
 
     if (!cleanId || !cleanPassword) {
@@ -243,39 +243,62 @@ export const authService = {
 
     // Check if logging in as root super admin via config ID/alias
     const isRootAdminInput =
-      cleanId.toLowerCase() === config.adminId.toLowerCase() ||
-      cleanId.toLowerCase() === 'admin' ||
-      cleanId.toLowerCase() === 'ashukataria2005@gmail.com';
+      cleanId === config.adminId.toLowerCase() ||
+      cleanId === 'admin' ||
+      cleanId === 'ashukataria2005@gmail.com';
+
+    console.log(`[authService.adminLogin] id="${cleanId}" isRootAdminInput=${isRootAdminInput}`);
 
     let targetAdmin: any = null;
 
     if (isRootAdminInput) {
-      // Find root admin in database
+      // Find root admin in database by is_super_admin flag OR email
       const { rows } = await db.query(
-        "SELECT * FROM users WHERE role = 'ADMIN' AND (is_super_admin = 1 OR LOWER(email) = 'ashukataria2005@gmail.com') LIMIT 1"
+        "SELECT * FROM users WHERE (is_super_admin = 1 OR LOWER(email) = 'ashukataria2005@gmail.com') AND role = 'ADMIN' LIMIT 1"
       );
       if (rows.length > 0) {
         targetAdmin = rows[0];
+        console.log(`[authService.adminLogin] Found Super Admin in DB: id=${targetAdmin.id}, email=${targetAdmin.email}, status=${targetAdmin.status}`);
       } else {
-        // Fall back to first active admin
+        // Fall back to first admin role account (any status)
         const { rows: firstAdmin } = await db.query(
-          "SELECT * FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE' LIMIT 1"
+          "SELECT * FROM users WHERE role = 'ADMIN' LIMIT 1"
         );
-        if (firstAdmin.length > 0) targetAdmin = firstAdmin[0];
+        if (firstAdmin.length > 0) {
+          targetAdmin = firstAdmin[0];
+          console.log(`[authService.adminLogin] Fallback to first ADMIN: id=${targetAdmin.id}, email=${targetAdmin.email}, status=${targetAdmin.status}`);
+        }
       }
     } else {
       // Find sub-admin by email or ID
       const { rows } = await db.query(
         "SELECT * FROM users WHERE role = 'ADMIN' AND (LOWER(email) = ? OR id = ?) LIMIT 1",
-        [cleanId.toLowerCase(), cleanId]
+        [cleanId, cleanId]
       );
-      if (rows.length > 0) targetAdmin = rows[0];
+      if (rows.length > 0) {
+        targetAdmin = rows[0];
+        console.log(`[authService.adminLogin] Found sub-admin: id=${targetAdmin.id}, email=${targetAdmin.email}, status=${targetAdmin.status}`);
+      }
     }
 
     if (!targetAdmin) {
-      const err = new Error('Invalid Admin ID or Admin Password.');
+      console.warn(`[authService.adminLogin] No admin record found for "${cleanId}"`);
+      const err = new Error('No administrator account found for that email or ID. Please contact support.');
       (err as any).statusCode = 401;
       throw err;
+    }
+
+    // SUPER ADMIN IMMUNITY: If identified as Super Admin, their account is always ACTIVE.
+    // This prevents stale DB status from locking out the primary administrator.
+    const isSuperAdmin = isSuperAdminUser(targetAdmin);
+    if (isSuperAdmin && targetAdmin.status !== 'ACTIVE') {
+      console.warn(`[authService.adminLogin] Super Admin had non-ACTIVE status ("${targetAdmin.status}"). Forcing ACTIVE for login...`);
+      const now = new Date().toISOString();
+      await db.run(
+        `UPDATE users SET status = 'ACTIVE', is_super_admin = 1, updated_at = ? WHERE id = ?;`,
+        [now, targetAdmin.id]
+      );
+      targetAdmin.status = 'ACTIVE';
     }
 
     if (targetAdmin.status !== 'ACTIVE') {
@@ -285,19 +308,24 @@ export const authService = {
     }
 
     // Validate password:
-    // If root admin and password matches config.adminPassword, accept.
+    // Priority 1: Config env password match (for Super Admin or root input)
     let passwordMatches = Boolean(
-      (isRootAdminInput || isSuperAdminUser(targetAdmin)) &&
+      (isRootAdminInput || isSuperAdmin) &&
       config.adminPassword &&
       cleanPassword === config.adminPassword
     );
 
+    console.log(`[authService.adminLogin] Env password match: ${passwordMatches}`);
+
+    // Priority 2: bcrypt hash comparison (works for all admins)
     if (!passwordMatches && targetAdmin.password_hash) {
       passwordMatches = await bcrypt.compare(cleanPassword, targetAdmin.password_hash);
+      console.log(`[authService.adminLogin] bcrypt hash match: ${passwordMatches}`);
     }
 
     if (!passwordMatches) {
-      const err = new Error('Invalid Admin ID or Admin Password.');
+      console.warn(`[authService.adminLogin] Password verification failed for "${cleanId}"`);
+      const err = new Error('Incorrect password. Please check your admin password and try again.');
       (err as any).statusCode = 401;
       throw err;
     }
@@ -309,6 +337,8 @@ export const authService = {
 
     const safeUser = toSafeUser(targetAdmin);
     const token = authService.generateToken(safeUser);
+
+    console.log(`[authService.adminLogin] ✓ Login success for "${cleanId}" (is_super_admin=${safeUser.is_super_admin}, permissions=${JSON.stringify(safeUser.permissions)})`);
     return { user: safeUser, token };
   },
 

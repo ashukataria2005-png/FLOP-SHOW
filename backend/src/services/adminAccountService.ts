@@ -1,4 +1,7 @@
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { getAdapter } from '../db/adapter.js';
+import { config } from '../config/env.js';
 
 export interface AdminCleanupResult {
   canonicalAdminId: string;
@@ -55,35 +58,70 @@ export const adminAccountService = {
       [targetAdminEmail]
     );
 
-    // 2. Force-update the primary Super Admin record
-    await db.run(
-      `UPDATE users 
-       SET status = 'ACTIVE', 
-           is_super_admin = 1, 
-           role = 'ADMIN',
-           permissions = '["analytics","monetization","promos","payments","catalog","users","settings"]',
-           updated_at = ?
-       WHERE LOWER(email) = ?;`,
-      [now, targetAdminEmail]
-    );
-
-    // Check canonical admin
-    const { rows: ashuRows } = await db.query(
-      'SELECT id, name, email, role, status FROM users WHERE LOWER(email) = ?;',
+    // 2. Check if the canonical Super Admin record already exists
+    const { rows: existingRows } = await db.query(
+      'SELECT id, name, email, role, status, is_super_admin, password_hash FROM users WHERE LOWER(email) = ?;',
       [targetAdminEmail]
     );
 
     let canonicalAdminId = '';
-    let adminEmail = targetAdminEmail;
+    const adminEmail = targetAdminEmail;
 
-    if (ashuRows.length > 0) {
-      canonicalAdminId = (ashuRows[0] as any).id;
+    if (existingRows.length > 0) {
+      // Record exists — force-update to correct state
+      const existing = existingRows[0] as any;
+      canonicalAdminId = existing.id;
+
+      console.log(`[AdminAccountService] Super Admin found (id=${canonicalAdminId}). Reinforcing status, role, permissions...`);
+
+      await db.run(
+        `UPDATE users 
+         SET status = 'ACTIVE', 
+             is_super_admin = 1, 
+             role = 'ADMIN',
+             permissions = '["analytics","monetization","promos","payments","catalog","users","settings"]',
+             updated_at = ?
+         WHERE LOWER(email) = ?;`,
+        [now, targetAdminEmail]
+      );
+
+      console.log(`[AdminAccountService] ✓ Super Admin reinforced: status=ACTIVE, is_super_admin=1, full permissions.`);
+    } else {
+      // Record does NOT exist — create it with a bcrypt-hashed password from env config
+      console.log(`[AdminAccountService] Super Admin NOT found in DB. Creating fresh account...`);
+
+      const rawPassword = config.adminPassword || 'Kataria2005#';
+      const salt = await bcrypt.genSalt(12);
+      const passwordHash = await bcrypt.hash(rawPassword, salt);
+      canonicalAdminId = `admin-${crypto.randomUUID()}`;
+
+      await db.run(
+        `INSERT INTO users 
+           (id, name, email, phone, password_hash, role, status, is_super_admin, permissions, created_at, updated_at)
+         VALUES (?, ?, ?, NULL, ?, 'ADMIN', 'ACTIVE', 1, ?, ?, ?);`,
+        [
+          canonicalAdminId,
+          'Ashu Kataria',
+          targetAdminEmail,
+          passwordHash,
+          '["analytics","monetization","promos","payments","catalog","users","settings"]',
+          now,
+          now,
+        ]
+      );
+
+      console.log(`[AdminAccountService] ✓ Super Admin created (id=${canonicalAdminId}) with bcrypt-hashed env password.`);
     }
 
     // 3. Verify final admin count
     const { rows: finalAdmins } = await db.query(
       `SELECT id, email, role, status FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE';`
     );
+
+    console.log(`[AdminAccountService] Final active admin count: ${finalAdmins.length}`);
+    finalAdmins.forEach((a: any) => {
+      console.log(`  - [${a.id}] ${a.email} (${a.role}, ${a.status})`);
+    });
 
     return {
       canonicalAdminId,

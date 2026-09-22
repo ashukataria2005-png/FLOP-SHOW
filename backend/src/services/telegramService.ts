@@ -34,7 +34,7 @@ export const telegramService = {
   /**
    * Send a rich instant payment alert to Telegram Admin with 1-Click Approve / Reject inline buttons.
    */
-  async sendPaymentAlert(details: TelegramPaymentAlertDetails): Promise<{ success: boolean; messageId?: number } | null> {
+  async sendPaymentAlert(details: TelegramPaymentAlertDetails): Promise<{ success: boolean; messageId?: number; response?: any; error?: string } | null> {
     const botToken = this.getBotToken();
     const chatId = this.getAdminChatId();
 
@@ -43,16 +43,26 @@ export const telegramService = {
       return null;
     }
 
+    const escapeHtml = (text: string) =>
+      text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
     const formattedTime = details.submittedAt
       ? new Date(details.submittedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'medium' })
       : new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'medium' });
 
-    const itemLabel = details.planName
-      ? `${details.planName} (${details.productType || 'PLAN'})`
-      : (details.productType || 'Catalog Title / Content');
+    const itemLabel = escapeHtml(
+      details.planName
+        ? `${details.planName} (${details.productType || 'PLAN'})`
+        : (details.productType || 'Catalog Title / Content')
+    );
 
-    const contactInfo = details.userEmail || details.userPhone || 'Not provided';
-    const userName = details.userName || 'Anonymous User';
+    const contactInfo = escapeHtml(details.userEmail || details.userPhone || 'Not provided');
+    const userName = escapeHtml(details.userName || 'Anonymous User');
+    const utr = escapeHtml(details.utr || '');
+    const paymentId = escapeHtml(details.paymentId || '');
 
     const messageHtml = [
       `🔔 <b>NEW UPI PAYMENT SUBMITTED</b>`,
@@ -61,9 +71,9 @@ export const telegramService = {
       `📧 <b>Contact:</b> ${contactInfo}`,
       `💵 <b>Amount:</b> ₹${details.amountRupees}`,
       `💎 <b>Item / Plan:</b> ${itemLabel}`,
-      `🔢 <b>UTR / Ref No:</b> <code>${details.utr}</code>`,
+      `🔢 <b>UTR / Ref No:</b> <code>${utr}</code>`,
       `🕒 <b>Date & Time:</b> ${formattedTime} IST`,
-      `🆔 <b>Payment ID:</b> <code>${details.paymentId}</code>`,
+      `🆔 <b>Payment ID:</b> <code>${paymentId}</code>`,
       ``,
       `<i>Click below to verify and grant immediate access:</i>`
     ].join('\n');
@@ -127,14 +137,14 @@ export const telegramService = {
       const data: any = await res.json().catch(() => ({}));
       if (data.ok) {
         console.log(`[Telegram Bot] ✓ Payment alert sent for payment ${details.paymentId}`);
-        return { success: true, messageId: data.result?.message_id };
+        return { success: true, messageId: data.result?.message_id, response: data };
       } else {
-        console.error('[Telegram Bot] sendMessage error:', data);
-        return { success: false };
+        console.error('[Telegram Bot] sendMessage error:', JSON.stringify(data, null, 2));
+        return { success: false, response: data, error: data.description || 'Telegram rejected message' };
       }
     } catch (err: any) {
       console.error('[Telegram Bot] Network error sending payment alert:', err.message);
-      return { success: false };
+      return { success: false, error: err.message };
     }
   },
 

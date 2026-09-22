@@ -790,3 +790,143 @@ div:has(> table) {
   }
 }
 
+/* ==========================================================================
+   ADMIN RBAC & SUB-ADMIN MANAGEMENT STYLES
+   ========================================================================== */
+.admin-rbac-page {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 640px) {
+  .admin-rbac-page {
+    padding: 32px 24px 80px;
+  }
+}
+
+.admin-rbac-header-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(245, 166, 35, 0.08) 0%, rgba(18, 18, 26, 0.9) 60%, rgba(18, 18, 26, 0.95) 100%);
+  border: 1px solid rgba(245, 166, 35, 0.25);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .admin-rbac-header-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.admin-rbac-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .admin-rbac-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .admin-rbac-stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.admin-rbac-stat-card {
+  background: rgba(18, 18, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.admin-rbac-stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(245, 166, 35, 0.3);
+}
+
+.admin-rbac-table-card {
+  background: rgba(18, 18, 26, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  overflow: hidden;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.admin-rbac-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-rbac-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.admin-rbac-table thead {
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-rbac-table th {
+  padding: 16px 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9CA3AF;
+  white-space: nowrap;
+}
+
+.admin-rbac-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background-color 0.15s ease;
+}
+
+.admin-rbac-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.admin-rbac-table td {
+  padding: 16px 20px;
+  vertical-align: middle;
+  font-size: 13.5px;
+}
+
+.admin-rbac-perm-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 600px) {
+  .admin-rbac-perm-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+

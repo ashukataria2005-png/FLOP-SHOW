@@ -76,18 +76,19 @@ export const EmbedPlayer: React.FC<EmbedPlayerProps> = ({ media, onClose }) => {
           key={media.source_url}
           src={media.source_url}
           title={media.title}
+          className="w-full h-full border-0 rounded-lg"
           onLoad={handleIframeLoad}
           onError={() => setHasIframeError(true)}
-          allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
           allowFullScreen
-          sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
+          sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
           style={{
             position: 'absolute',
             top: 0,
             left: 0,
             width: '100%',
             height: '100%',
-            border: 'none'
+            border: 0
           }}
         />
 

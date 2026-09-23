@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Hls from 'hls.js';
 import { formatSeconds } from '../../utils/formatters';
-import { parseYouTubeUrl } from '../../utils/mediaUrl';
+import { parseYouTubeUrl, parseEmbedUrl } from '../../utils/mediaUrl';
 import { api } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { AdPreroll, AdConfig } from './AdPreroll';
@@ -97,9 +97,11 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     !!(source && source.mediaType === 'MAIN')
   );
 
-  // Determine if source is YouTube
+  // Determine if source is YouTube or External Embed (e.g. Streamtape, Third-Party Iframe)
   const youtubeInfo = parseYouTubeUrl(source?.url || '');
   const isYouTube = youtubeInfo.isYouTube;
+  const embedInfo = parseEmbedUrl(source?.url || '');
+  const isEmbed = embedInfo.isEmbed;
 
   // ─── ALL HOOKS UNCONDITIONAL — Rules of Hooks requires this ─────────────────
 
@@ -144,20 +146,20 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   useEffect(() => {
     if (!source?.url) return;
     setErrorMessage(null);
-    setIsInitialLoading(!isYouTube);
+    setIsInitialLoading(!isYouTube && !isEmbed);
     setIsBuffering(false);
     setCurrentTime(source.initialTimeSeconds || 0);
     setDuration(0);
     setIsPlaying(false);
-  }, [source?.url, isYouTube]);
+  }, [source?.url, isYouTube, isEmbed]);
 
-  // YouTube trailer safety: clear loading state as soon as iframe is mounted
+  // YouTube & External Embed safety: clear loading state as soon as iframe is mounted
   useEffect(() => {
-    if (isYouTube) {
+    if (isYouTube || isEmbed) {
       setIsInitialLoading(false);
       setIsBuffering(false);
     }
-  }, [isYouTube, source?.url]);
+  }, [isYouTube, isEmbed, source?.url]);
 
   const seekToInitialTime = useCallback((vid: HTMLVideoElement) => {
     const target = sourceRef.current?.initialTimeSeconds;
@@ -297,7 +299,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
 
   // Initialize video stream: Adaptive HLS via hls.js or native HTML5 video
   useEffect(() => {
-    if (!source?.url || isYouTube || adChecking || (!adFinished && adConfig?.enabled)) return;
+    if (!source?.url || isYouTube || isEmbed || adChecking || (!adFinished && adConfig?.enabled)) return;
 
     const video = videoRef.current;
     if (!video) return;
@@ -627,9 +629,33 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             allowFullScreen
           />
         </div>
+      ) : isEmbed ? (
+        /* ------------------------------------------------------------------ */
+        /* 2. STREAMTAPE & THIRD-PARTY IFRAME EMBED PLAYER */
+        /* ------------------------------------------------------------------ */
+        <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <iframe
+            src={embedInfo.embedUrl}
+            title={source.title}
+            className="w-full h-full border-0 rounded-lg"
+            allowFullScreen
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 0,
+              borderRadius: '8px'
+            }}
+            onLoad={() => {
+              setIsInitialLoading(false);
+              setIsBuffering(false);
+            }}
+          />
+        </div>
       ) : (
         /* ------------------------------------------------------------------ */
-        /* 2. HTML5 VIDEO (MP4, WebM, Local Uploaded, Direct URL) */
+        /* 3. HTML5 VIDEO (MP4, WebM, Local Uploaded, Direct URL) */
         /* ------------------------------------------------------------------ */
         <>
           {source.vcdnStatus === 'PROCESSING' && (
@@ -840,8 +866,8 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
         </>
       )}
 
-      {/* 1. Initial Cold-Start Loading Spinner & Overlay — only before media is ready and not YouTube */}
-      {isInitialLoading && !isYouTube && !errorMessage && (
+      {/* 1. Initial Cold-Start Loading Spinner & Overlay — only before media is ready and not YouTube or Embed */}
+      {isInitialLoading && !isYouTube && !isEmbed && !errorMessage && (
         <div
           style={{
             position: 'absolute',
@@ -962,9 +988,9 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           zIndex: 30,
-          opacity: showControls ? 1 : 0,
+          opacity: (showControls || isEmbed) ? 1 : 0,
           transition: 'opacity 0.3s ease',
-          pointerEvents: showControls ? 'auto' : 'none'
+          pointerEvents: (showControls || isEmbed) ? 'auto' : 'none'
         }}
       >
         <button
@@ -1076,7 +1102,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       {/* -------------------------------------------------------------------- */}
       {/* BOTTOM CONTROLS BAR (For HTML5 playback) */}
       {/* -------------------------------------------------------------------- */}
-      {!isYouTube && (
+      {!isYouTube && !isEmbed && (
         <div
           style={{
             position: 'absolute',

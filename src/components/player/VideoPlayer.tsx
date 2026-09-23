@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Episode } from '../../types/content';
 import { formatSeconds } from '../../utils/formatters';
+import { parseEmbedUrl } from '../../utils/mediaUrl';
 import {
   Play,
   Pause,
@@ -47,6 +48,9 @@ export const VideoPlayer: React.FC = () => {
   const currentVideoSrc = isSeries
     ? (activeEpisode?.videoUrl || activePlayerContent.seasons?.[0]?.episodes[0]?.videoUrl)
     : activePlayerContent.videoUrl;
+
+  const embedInfo = parseEmbedUrl(currentVideoSrc || '');
+  const isEmbed = embedInfo.isEmbed;
 
   // On mount / item change, check if there was previous progress to resume
   useEffect(() => {
@@ -190,25 +194,38 @@ export const VideoPlayer: React.FC = () => {
         userSelect: 'none'
       }}
     >
-      {/* HTML5 Video Element */}
-      <video
-        ref={videoRef}
-        src={currentVideoSrc}
-        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={() => {
-          if (videoRef.current) {
-            setDuration(videoRef.current.duration);
-            videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-          }
-        }}
-        onClick={togglePlay}
-        onEnded={() => {
-          setIsPlaying(false);
-          if (nextEp) handleSwitchEpisode(nextEp);
-        }}
-        playsInline
-      />
+      {/* Conditional Player: Responsive Iframe for Embeds/Streamtape or HTML5 Video */}
+      {isEmbed ? (
+        <iframe
+          src={embedInfo.embedUrl}
+          title={activePlayerContent.title}
+          className="w-full h-full border-0 rounded-lg"
+          allowFullScreen
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
+          style={{ width: '100%', height: '100%', border: 0, borderRadius: '8px' }}
+        />
+      ) : (
+        /* HTML5 Video Element */
+        <video
+          ref={videoRef}
+          src={currentVideoSrc}
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={() => {
+            if (videoRef.current) {
+              setDuration(videoRef.current.duration);
+              videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+            }
+          }}
+          onClick={togglePlay}
+          onEnded={() => {
+            setIsPlaying(false);
+            if (nextEp) handleSwitchEpisode(nextEp);
+          }}
+          playsInline
+        />
+      )}
 
       {/* Top Header Bar */}
       <div
@@ -222,10 +239,10 @@ export const VideoPlayer: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          zIndex: 10,
-          opacity: showControls ? 1 : 0,
+          zIndex: 20,
+          opacity: (showControls || isEmbed) ? 1 : 0,
           transition: 'opacity 0.3s ease',
-          pointerEvents: showControls ? 'auto' : 'none'
+          pointerEvents: (showControls || isEmbed) ? 'auto' : 'none'
         }}
       >
         <button
@@ -281,8 +298,8 @@ export const VideoPlayer: React.FC = () => {
         )}
       </div>
 
-      {/* Center Play/Pause Large Trigger on Click */}
-      {!isPlaying && (
+      {/* Center Play/Pause Large Trigger on Click (only for HTML5 video) */}
+      {!isEmbed && !isPlaying && (
         <div
           onClick={togglePlay}
           style={{
@@ -305,8 +322,9 @@ export const VideoPlayer: React.FC = () => {
         </div>
       )}
 
-      {/* Bottom Controls Bar */}
-      <div
+      {/* Bottom Controls Bar (only for HTML5 video) */}
+      {!isEmbed && (
+        <div
         style={{
           position: 'absolute',
           bottom: 0,
@@ -404,6 +422,7 @@ export const VideoPlayer: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Series Episode Drawer */}
       {isSeries && showEpisodeDrawer && activePlayerContent.seasons && (

@@ -3,7 +3,6 @@ import bcrypt from 'bcryptjs';
 import { getAdapter } from './adapter.js';
 import { config } from '../config/env.js';
 import { adminAccountService } from '../services/adminAccountService.js';
-import { seedDefaultCatalogIfEmpty } from './defaultCatalog.js';
 
 export interface SeedReport {
   genresCount: number;
@@ -68,13 +67,7 @@ export async function seedDatabase(): Promise<SeedReport> {
     adminEmail = cleanupRes.adminEmail;
   });
 
-  // ------------------------------------------------------------------------
-  // 3. SAFE STARTUP SEED FOR EMPTY CATALOG:
-  // If the content table is empty (e.g. fresh migrations on Render),
-  // populate premier default titles, official artwork, trailers & hero banner
-  // so the app is never a blank screen for visitors.
-  // ------------------------------------------------------------------------
-  await seedDefaultCatalogIfEmpty(db);
+
 
   // Query counts to verify
   const { rows: gcRows } = await db.query('SELECT COUNT(*) as c FROM genres');

@@ -159,23 +159,18 @@ async def run_pyrogram_checks() -> None:
 
     # -- BIN_CHANNEL write/delete probe --------------------------------------
     print(f"\n[CHECK 4] Testing write permission to BIN_CHANNEL ({BIN_CHANNEL}) ...", flush=True)
-    probe_msg = None
     try:
+        chat = await bot.get_chat(BIN_CHANNEL)
+        print(f"   Chat resolved: {chat.title} ({chat.id})", flush=True)
         probe_msg = await bot.send_message(
-            chat_id=BIN_CHANNEL,
-            text="🔧 [Diagnostic probe] This message will be deleted immediately.",
+            chat_id=chat.id,
+            text="🔧 [Diagnostic] Connection probe message. Deleting immediately...",
         )
-        print(f"  ✅ Message sent successfully (message_id={probe_msg.id}).", flush=True)
-    except Exception as exc:
-        print(f"  ❌ send_message to BIN_CHANNEL failed: {exc}", flush=True)
+        await bot.delete_messages(chat_id=chat.id, message_ids=probe_msg.id)
+        print("  ✅ send_message to BIN_CHANNEL succeeded and test message deleted.", flush=True)
+    except Exception as e:
+        print(f"  ❌ send_message to BIN_CHANNEL failed: {e}", flush=True)
         traceback.print_exc()
-
-    if probe_msg:
-        try:
-            await bot.delete_messages(chat_id=BIN_CHANNEL, message_ids=probe_msg.id)
-            print("  ✅ Probe message deleted.", flush=True)
-        except Exception as exc:
-            print(f"  ⚠️  Could not delete probe message: {exc}", flush=True)
 
     # -- Stop client ---------------------------------------------------------
     print("\n[CLEANUP] Stopping Pyrogram client ...", flush=True)

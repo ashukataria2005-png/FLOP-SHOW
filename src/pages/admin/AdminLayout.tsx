@@ -471,8 +471,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       }
 
       showToast(`Admin signed in: ${sessionAdmin.name}`, 'success');
-      // Settle delay so browser credential manager intercepts form submit
-      await new Promise(resolve => setTimeout(resolve, 600));
       const dest = isSuper ? 'admin-dashboard' : (authorizedTabIds[0] || 'admin-dashboard');
       onNavigateTab(dest);
     } catch (err: any) {
@@ -890,11 +888,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
           >
             <div style={{ textAlign: 'left' }}>
-              <label htmlFor="username" style={{ fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
+              <label htmlFor="admin-username" style={{ fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
                 Admin Email / ID
               </label>
               <input
-                id="username"
+                id="admin-username"
                 name="username"
                 type="text"
                 value={adminId}
@@ -918,12 +916,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
             </div>
 
             <div style={{ textAlign: 'left' }}>
-              <label htmlFor="password" style={{ fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
+              <label htmlFor="admin-password" style={{ fontSize: '12px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>
                 Admin Password
               </label>
               <div style={{ position: 'relative', marginTop: '6px' }}>
                 <input
-                  id="password"
+                  id="admin-password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   value={adminPassword}

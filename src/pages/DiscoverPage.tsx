@@ -4,7 +4,6 @@ import { CinematicSpotlight } from '../components/home/CinematicSpotlight';
 import { ContentSection } from '../components/home/ContentSection';
 import { BrandPromoCard } from '../components/home/BrandPromoCard';
 import { ContentItem } from '../types/content';
-import { DEMO_CATALOG } from '../data/catalog';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 
@@ -31,7 +30,7 @@ let cachedSpotlights: ContentItem[] = [];
 
 export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavigate }) => {
   const { watchProgress, catalog } = useApp();
-  const activeCatalog = (catalog && catalog.length > 0) ? catalog : DEMO_CATALOG;
+  const activeCatalog = catalog || [];
   const [dedicatedHero, setDedicatedHero] = useState<ContentItem | null>(() => cachedHero);
   const [spotlights, setSpotlights] = useState<ContentItem[]>(() => cachedSpotlights);
 
@@ -566,10 +565,6 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
   // - Every subsequent spotlight appears with two normal rows between consecutive spotlights
   // (Spotlight #1 -> 2 rows -> Spotlight #2 -> 2 rows -> Spotlight #3 -> ...)
   // - Any remaining spotlights placed naturally after available rows without losing them.
-  const activeSpotlights = (spotlights && spotlights.length > 0)
-    ? spotlights
-    : activeCatalog.filter(c => c.isFeatured && !c.isHero).slice(0, 4);
-
   const interleavedSections: React.ReactNode[] = [];
   let spotlightIndex = 0;
 
@@ -578,10 +573,10 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
 
     // Check if a spotlight should be inserted after this row
     if (
-      spotlightIndex < activeSpotlights.length &&
+      spotlightIndex < spotlights.length &&
       rowIndex === 2 + spotlightIndex * 2
     ) {
-      const spot = activeSpotlights[spotlightIndex];
+      const spot = spotlights[spotlightIndex];
       interleavedSections.push(
         <CinematicSpotlight
           key={`cinematic-spotlight-${spot.id}-${spotlightIndex}`}
@@ -595,8 +590,8 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
 
   // If there are more Spotlights than available row insertion points,
   // place remaining Spotlights naturally after the available rows without losing them.
-  while (spotlightIndex < activeSpotlights.length) {
-    const spot = activeSpotlights[spotlightIndex];
+  while (spotlightIndex < spotlights.length) {
+    const spot = spotlights[spotlightIndex];
     interleavedSections.push(
       <CinematicSpotlight
         key={`cinematic-spotlight-overflow-${spot.id}-${spotlightIndex}`}

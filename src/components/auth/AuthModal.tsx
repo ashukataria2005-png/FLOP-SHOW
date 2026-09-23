@@ -71,8 +71,8 @@ export const AuthModal: React.FC = () => {
         }
       }
 
-      // Allow browser submission lifecycle to settle before modal closes (600ms delay for password manager prompt)
-      await new Promise(resolve => setTimeout(resolve, 600));
+      // Allow browser submission lifecycle to settle before modal closes (standard 300ms delay)
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Pass real backend userId so the frontend never generates a fake timestamp ID
       login(data.user.id, data.user.name, data.user.email, data.user.role, data.wallet?.balanceRupees ?? 0);
@@ -110,6 +110,7 @@ export const AuthModal: React.FC = () => {
         ? await api.auth.register(name.trim(), signupEmail.trim(), signupPassword.trim())
         : await api.auth.register(name.trim(), undefined, signupPassword.trim(), signupMobile.trim().replace(/[^0-9]/g, ''));
 
+      // Store in browser credential manager upon successful account registration
       if (typeof window !== 'undefined' && 'PasswordCredential' in window && (navigator as any).credentials?.store) {
         try {
           const cred = new (window as any).PasswordCredential(form);
@@ -118,9 +119,6 @@ export const AuthModal: React.FC = () => {
           // Gracefully ignore
         }
       }
-
-      // Allow browser submission lifecycle to settle before DOM transition (600ms delay for password manager prompt)
-      await new Promise(resolve => setTimeout(resolve, 600));
 
       setPendingUserId(data.user.id);
       setPendingName(data.user.name);
@@ -210,9 +208,9 @@ export const AuthModal: React.FC = () => {
           >
             {errorBox}
             <div style={fieldStyle}>
-              <label htmlFor="username" style={labelStyle}>Email or Mobile Number</label>
+              <label htmlFor="user-signin-email" style={labelStyle}>Email or Mobile Number</label>
               <input
-                id="username"
+                id="user-signin-email"
                 name="username"
                 type="text"
                 placeholder="e.g. user@example.com or 9876543210"
@@ -225,10 +223,10 @@ export const AuthModal: React.FC = () => {
               />
             </div>
             <div style={{ ...fieldStyle, marginBottom: '22px' }}>
-              <label htmlFor="password" style={labelStyle}>Password</label>
+              <label htmlFor="user-signin-password" style={labelStyle}>Password</label>
               <div style={{ position: 'relative' }}>
                 <input
-                  id="password"
+                  id="user-signin-password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
@@ -342,9 +340,9 @@ export const AuthModal: React.FC = () => {
             {/* OPTION A: Sign up with Email */}
             {signupMethod === 'email' && (
               <div style={fieldStyle}>
-                <label htmlFor="username" style={labelStyle}>Email Address</label>
+                <label htmlFor="signup-email" style={labelStyle}>Email Address</label>
                 <input
-                  id="username"
+                  id="signup-email"
                   name="username"
                   type="email"
                   placeholder="e.g. user@example.com"
@@ -361,7 +359,7 @@ export const AuthModal: React.FC = () => {
             {/* OPTION B: Sign up with Mobile Number */}
             {signupMethod === 'mobile' && (
               <div style={fieldStyle}>
-                <label htmlFor="username" style={labelStyle}>Mobile Number</label>
+                <label htmlFor="signup-mobile" style={labelStyle}>Mobile Number</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <div
                     style={{
@@ -379,8 +377,8 @@ export const AuthModal: React.FC = () => {
                     +91
                   </div>
                   <input
-                    id="username"
-                    name="username"
+                    id="signup-mobile"
+                    name="phone"
                     type="tel"
                     inputMode="numeric"
                     maxLength={10}
@@ -388,7 +386,7 @@ export const AuthModal: React.FC = () => {
                     value={signupMobile}
                     onChange={e => setSignupMobile(e.target.value.replace(/\D/g, ''))}
                     disabled={isSubmitting}
-                    autoComplete="username"
+                    autoComplete="tel"
                     required
                     style={{ ...inputStyle, flex: 1 }}
                   />
@@ -397,9 +395,9 @@ export const AuthModal: React.FC = () => {
             )}
 
             <div style={{ ...fieldStyle, marginBottom: '22px' }}>
-              <label htmlFor="password" style={labelStyle}>Password</label>
+              <label htmlFor="signup-password" style={labelStyle}>Password</label>
               <input
-                id="password"
+                id="signup-password"
                 name="password"
                 type="password"
                 placeholder="At least 6 characters"

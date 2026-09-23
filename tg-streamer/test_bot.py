@@ -57,7 +57,13 @@ def _require(name: str) -> str:
 API_ID     = int(_require("API_ID"))
 API_HASH   = _require("API_HASH")
 BOT_TOKEN  = _require("BOT_TOKEN")
-BIN_CHANNEL = int(_require("BIN_CHANNEL"))
+_raw_bin = os.environ.get("BIN_CHANNEL", "").strip()
+if _raw_bin.startswith("@"):
+    BIN_CHANNEL = _raw_bin          # username string, e.g. "@flopshow_bin_bot"
+elif _raw_bin.lstrip("-").isdigit():
+    BIN_CHANNEL = int(_raw_bin)     # numeric channel ID, e.g. -1001234567890
+else:
+    BIN_CHANNEL = _raw_bin          # fallback: pass through as-is
 
 print(f"\n{'='*60}", flush=True)
 print(f"  Telegram Bot Diagnostic Test", flush=True)

@@ -38,7 +38,13 @@ from pyrogram.types import Message
 API_ID: int = int(os.environ["API_ID"])
 API_HASH: str = os.environ["API_HASH"]
 BOT_TOKEN: str = os.environ["BOT_TOKEN"]
-BIN_CHANNEL: int = int(os.environ["BIN_CHANNEL"])
+_raw_bin = os.environ.get("BIN_CHANNEL", "").strip()
+if _raw_bin.startswith("@"):
+    BIN_CHANNEL = _raw_bin          # username string, e.g. "@flopshow_bin_bot"
+elif _raw_bin.lstrip("-").isdigit():
+    BIN_CHANNEL = int(_raw_bin)     # numeric channel ID, e.g. -1001234567890
+else:
+    BIN_CHANNEL = _raw_bin          # fallback: pass through as-is
 FQDN: str = os.environ["FQDN"].rstrip("/")
 PORT: int = int(os.environ.get("PORT", 8080))
 BIND_ADDRESS: str = os.environ.get("WEB_SERVER_BIND_ADDRESS", "0.0.0.0")

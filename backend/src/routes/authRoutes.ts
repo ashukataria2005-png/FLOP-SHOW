@@ -25,8 +25,9 @@ authRouter.post('/register', async (req, res, next) => {
 // POST /api/auth/login
 authRouter.post('/login', async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    const result = await authService.login({ email, password });
+    const { email, username, identifier, phone, password } = req.body || {};
+    const finalIdentifier = (username || identifier || email || phone || '').toString().trim();
+    const result = await authService.login({ email: finalIdentifier, password });
     const wallet = await walletService.getBalance(result.user.id);
 
     res.json({
@@ -45,7 +46,7 @@ export const handleAdminLogin = async (req: any, res: any, next: any) => {
     const body = req.body || {};
 
     // Normalize all possible field names and sanitize
-    const rawId = (body.adminId || body.id || body.email || '').toString().trim().toLowerCase();
+    const rawId = (body.adminId || body.id || body.username || body.identifier || body.email || '').toString().trim().toLowerCase();
     const rawPassword = (body.adminPassword || body.password || '').toString();
 
     if (!rawId || !rawPassword) {

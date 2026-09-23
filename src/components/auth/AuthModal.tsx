@@ -12,16 +12,15 @@ export const AuthModal: React.FC = () => {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
 
   // Sign-in fields
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   // Signup fields
   const [name, setName] = useState('');
-  const [signupMethod, setSignupMethod] = useState<'email' | 'mobile'>('email');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupMobile, setSignupMobile] = useState('');
+  const [signupIdentifier, setSignupIdentifier] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [signupStep, setSignupStep] = useState<SignupStep>('details');
   const [otpValue, setOtpValue] = useState('');
 
@@ -37,8 +36,8 @@ export const AuthModal: React.FC = () => {
   if (activeModal !== 'auth') return null;
 
   const resetForm = () => {
-    setName(''); setEmail(''); setPassword('');
-    setSignupEmail(''); setSignupMobile(''); setSignupPassword(''); setOtpValue('');
+    setIdentifier(''); setPassword('');
+    setName(''); setSignupIdentifier(''); setSignupPassword(''); setOtpValue('');
     setSignupStep('details');
     setPendingUserId(''); setPendingName(''); setPendingEmail(''); setPendingBalance(0);
     setError(null);
@@ -54,8 +53,8 @@ export const AuthModal: React.FC = () => {
     e.preventDefault();
     const form = e.currentTarget as HTMLFormElement;
     setError(null);
-    const cleanId = email.trim();
-    if (!cleanId) { setError('Please enter your email or mobile number.'); return; }
+    const cleanId = identifier.trim();
+    if (!cleanId) { setError('Please enter your email or 10-digit mobile number.'); return; }
     if (!password.trim() || password.length < 4) { setError('Password must be at least 4 characters.'); return; }
     setIsSubmitting(true);
     try {
@@ -71,8 +70,8 @@ export const AuthModal: React.FC = () => {
         }
       }
 
-      // Allow browser submission lifecycle to settle before modal closes (standard 300ms delay)
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Settle delay before closing modal allowing Chrome / Android to prompt "Save password to Google"
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Pass real backend userId so the frontend never generates a fake timestamp ID
       login(data.user.id, data.user.name, data.user.email, data.user.role, data.wallet?.balanceRupees ?? 0);
@@ -90,25 +89,32 @@ export const AuthModal: React.FC = () => {
     setError(null);
     if (!name.trim()) { setError('Please enter your full name.'); return; }
 
-    if (signupMethod === 'email') {
-      if (!signupEmail.trim() || !signupEmail.includes('@')) {
+    const cleanInput = signupIdentifier.trim();
+    if (!cleanInput) { setError('Please enter your email or 10-digit mobile number.'); return; }
+
+    const isEmail = cleanInput.includes('@');
+    let emailParam: string | undefined = undefined;
+    let phoneParam: string | undefined = undefined;
+
+    if (isEmail) {
+      if (!cleanInput.includes('.') || cleanInput.length < 5) {
         setError('Please enter a valid email address.');
         return;
       }
+      emailParam = cleanInput;
     } else {
-      const cleanMob = signupMobile.trim().replace(/[^0-9]/g, '');
-      if (cleanMob.length < 10) {
-        setError('Please enter a valid 10-digit mobile number.');
+      const cleanPhone = cleanInput.replace(/\D/g, '');
+      if (cleanPhone.length < 10) {
+        setError('Please enter a valid 10-digit mobile number or email address.');
         return;
       }
+      phoneParam = cleanPhone.length > 10 ? cleanPhone.slice(-10) : cleanPhone;
     }
 
     if (!signupPassword.trim() || signupPassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setIsSubmitting(true);
     try {
-      const data = signupMethod === 'email'
-        ? await api.auth.register(name.trim(), signupEmail.trim(), signupPassword.trim())
-        : await api.auth.register(name.trim(), undefined, signupPassword.trim(), signupMobile.trim().replace(/[^0-9]/g, ''));
+      const data = await api.auth.register(name.trim(), emailParam, signupPassword.trim(), phoneParam);
 
       // Store in browser credential manager upon successful account registration
       if (typeof window !== 'undefined' && 'PasswordCredential' in window && (navigator as any).credentials?.store) {
@@ -119,6 +125,9 @@ export const AuthModal: React.FC = () => {
           // Gracefully ignore
         }
       }
+
+      // Settle delay allowing Chrome / Android to prompt "Save password to Google"
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       setPendingUserId(data.user.id);
       setPendingName(data.user.name);
@@ -200,7 +209,7 @@ export const AuthModal: React.FC = () => {
           <form
             id="user-signin-form"
             name="userSigninForm"
-            method="post"
+            method="POST"
             action="/api/auth/login"
             autoComplete="on"
             onSubmit={handleSignIn}
@@ -208,14 +217,14 @@ export const AuthModal: React.FC = () => {
           >
             {errorBox}
             <div style={fieldStyle}>
-              <label htmlFor="user-signin-email" style={labelStyle}>Email or Mobile Number</label>
+              <label htmlFor="username" style={labelStyle}>Email or 10-digit mobile number</label>
               <input
-                id="user-signin-email"
+                id="username"
                 name="username"
                 type="text"
-                placeholder="e.g. user@example.com or 9876543210"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
+                placeholder="Email or 10-digit mobile number"
+                value={identifier}
+                onChange={e => setIdentifier(e.target.value)}
                 disabled={isSubmitting}
                 autoComplete="username"
                 required
@@ -223,10 +232,10 @@ export const AuthModal: React.FC = () => {
               />
             </div>
             <div style={{ ...fieldStyle, marginBottom: '22px' }}>
-              <label htmlFor="user-signin-password" style={labelStyle}>Password</label>
+              <label htmlFor="password" style={labelStyle}>Password</label>
               <div style={{ position: 'relative' }}>
                 <input
-                  id="user-signin-password"
+                  id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
@@ -273,52 +282,12 @@ export const AuthModal: React.FC = () => {
           <form
             id="user-signup-form"
             name="userSignupForm"
-            method="post"
+            method="POST"
             action="/api/auth/register"
             autoComplete="on"
             onSubmit={handleSignupDetails}
             className="modal-body"
           >
-            {/* Signup Method Switcher (Email vs Mobile) */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', backgroundColor: 'rgba(255, 255, 255, 0.04)', padding: '4px', borderRadius: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setSignupMethod('email')}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: signupMethod === 'email' ? 700 : 500,
-                  backgroundColor: signupMethod === 'email' ? 'var(--brand-gold, #F5C518)' : 'transparent',
-                  color: signupMethod === 'email' ? '#000000' : '#9CA3AF',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                Sign up with Email
-              </button>
-              <button
-                type="button"
-                onClick={() => setSignupMethod('mobile')}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  fontSize: '13px',
-                  fontWeight: signupMethod === 'mobile' ? 700 : 500,
-                  backgroundColor: signupMethod === 'mobile' ? 'var(--brand-gold, #F5C518)' : 'transparent',
-                  color: signupMethod === 'mobile' ? '#000000' : '#9CA3AF',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                Sign up with Mobile Number
-              </button>
-            </div>
-
             {errorBox}
 
             <div style={fieldStyle}>
@@ -337,77 +306,60 @@ export const AuthModal: React.FC = () => {
               />
             </div>
 
-            {/* OPTION A: Sign up with Email */}
-            {signupMethod === 'email' && (
-              <div style={fieldStyle}>
-                <label htmlFor="signup-email" style={labelStyle}>Email Address</label>
-                <input
-                  id="signup-email"
-                  name="username"
-                  type="email"
-                  placeholder="e.g. user@example.com"
-                  value={signupEmail}
-                  onChange={e => setSignupEmail(e.target.value)}
-                  disabled={isSubmitting}
-                  autoComplete="username"
-                  required
-                  style={inputStyle}
-                />
-              </div>
-            )}
-
-            {/* OPTION B: Sign up with Mobile Number */}
-            {signupMethod === 'mobile' && (
-              <div style={fieldStyle}>
-                <label htmlFor="signup-mobile" style={labelStyle}>Mobile Number</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <div
-                    style={{
-                      padding: '12px 14px',
-                      borderRadius: '10px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      color: '#FFFFFF',
-                      fontSize: '14px',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    +91
-                  </div>
-                  <input
-                    id="signup-mobile"
-                    name="phone"
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={10}
-                    placeholder="9876543210"
-                    value={signupMobile}
-                    onChange={e => setSignupMobile(e.target.value.replace(/\D/g, ''))}
-                    disabled={isSubmitting}
-                    autoComplete="tel"
-                    required
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div style={{ ...fieldStyle, marginBottom: '22px' }}>
-              <label htmlFor="signup-password" style={labelStyle}>Password</label>
+            <div style={fieldStyle}>
+              <label htmlFor="signup-username" style={labelStyle}>Email or 10-digit mobile number</label>
               <input
-                id="signup-password"
-                name="password"
-                type="password"
-                placeholder="At least 6 characters"
-                value={signupPassword}
-                onChange={e => setSignupPassword(e.target.value)}
+                id="signup-username"
+                name="username"
+                type="text"
+                placeholder="Email or 10-digit mobile number"
+                value={signupIdentifier}
+                onChange={e => setSignupIdentifier(e.target.value)}
                 disabled={isSubmitting}
-                autoComplete="new-password"
+                autoComplete="username"
                 required
                 style={inputStyle}
               />
+            </div>
+
+            <div style={{ ...fieldStyle, marginBottom: '22px' }}>
+              <label htmlFor="signup-password" style={labelStyle}>Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="signup-password"
+                  name="password"
+                  type={showSignupPassword ? 'text' : 'password'}
+                  placeholder="At least 6 characters"
+                  value={signupPassword}
+                  onChange={e => setSignupPassword(e.target.value)}
+                  disabled={isSubmitting}
+                  autoComplete="new-password"
+                  required
+                  style={{ ...inputStyle, paddingRight: '42px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSignupPassword(prev => !prev)}
+                  title={showSignupPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showSignupPassword ? 'Hide password' : 'Show password'}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#9CA3AF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '4px'
+                  }}
+                >
+                  {showSignupPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             <button type="submit" name="register" disabled={isSubmitting} className="btn btn-primary btn-block btn-lg">

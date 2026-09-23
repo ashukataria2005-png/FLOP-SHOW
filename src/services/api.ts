@@ -34,16 +34,20 @@ export const API_BASE_URL = resolveApiBaseUrl();
 /**
  * Helper to get and set auth tokens in localStorage
  */
-const USER_TOKEN_KEY = 'flops_user_token';
-const ADMIN_TOKEN_KEY = 'flops_admin_token';
+const USER_TOKEN_KEY = 'flops_token';
+const USER_TOKEN_ALT_KEY = 'flops_user_token';
 const LEGACY_USER_TOKEN_KEY = 'flopshow_auth_token';
+const ADMIN_TOKEN_KEY = 'flops_admin_token';
 const LEGACY_ADMIN_TOKEN_KEY = 'flopshow_admin_token';
-const ADMIN_QUICK_LOGIN_KEY = 'flopshow_admin_quick_login';
 
 export const tokenStorage = {
   get: (): string | null => {
     try {
-      return localStorage.getItem(USER_TOKEN_KEY) || localStorage.getItem(LEGACY_USER_TOKEN_KEY);
+      return (
+        localStorage.getItem(USER_TOKEN_KEY) ||
+        localStorage.getItem(USER_TOKEN_ALT_KEY) ||
+        localStorage.getItem(LEGACY_USER_TOKEN_KEY)
+      );
     } catch {
       return null;
     }
@@ -51,6 +55,7 @@ export const tokenStorage = {
   set: (token: string): void => {
     try {
       localStorage.setItem(USER_TOKEN_KEY, token);
+      localStorage.setItem(USER_TOKEN_ALT_KEY, token);
       localStorage.removeItem(LEGACY_USER_TOKEN_KEY);
     } catch {
       // Ignore in non-browser environments
@@ -59,7 +64,10 @@ export const tokenStorage = {
   clear: (): void => {
     try {
       localStorage.removeItem(USER_TOKEN_KEY);
+      localStorage.removeItem(USER_TOKEN_ALT_KEY);
       localStorage.removeItem(LEGACY_USER_TOKEN_KEY);
+      localStorage.removeItem('flops_user');
+      localStorage.removeItem('user');
     } catch {
       // Ignore
     }
@@ -69,14 +77,7 @@ export const tokenStorage = {
 export const adminTokenStorage = {
   get: (): string | null => {
     try {
-      const direct = localStorage.getItem(ADMIN_TOKEN_KEY) || localStorage.getItem(LEGACY_ADMIN_TOKEN_KEY);
-      if (direct) return direct;
-      const quick = localStorage.getItem(ADMIN_QUICK_LOGIN_KEY);
-      if (quick) {
-        const parsed = JSON.parse(quick);
-        if (parsed?.token) return parsed.token;
-      }
-      return null;
+      return localStorage.getItem(ADMIN_TOKEN_KEY) || localStorage.getItem(LEGACY_ADMIN_TOKEN_KEY);
     } catch {
       return null;
     }
@@ -93,6 +94,12 @@ export const adminTokenStorage = {
     try {
       localStorage.removeItem(ADMIN_TOKEN_KEY);
       localStorage.removeItem(LEGACY_ADMIN_TOKEN_KEY);
+      localStorage.removeItem('flops_admin_user');
+      localStorage.removeItem('flopshow_admin_permissions');
+      localStorage.removeItem('flopshow_admin_quick_login');
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.clear();
+      }
     } catch {
       // Ignore
     }
@@ -168,16 +175,6 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
             const freshToken = refreshData.token;
             if (isAdminEndpoint) {
               adminTokenStorage.set(freshToken);
-              try {
-                const quick = localStorage.getItem(ADMIN_QUICK_LOGIN_KEY);
-                if (quick) {
-                  const parsed = JSON.parse(quick);
-                  parsed.token = freshToken;
-                  localStorage.setItem(ADMIN_QUICK_LOGIN_KEY, JSON.stringify(parsed));
-                }
-              } catch {
-                // Ignore storage parsing error
-              }
             } else {
               tokenStorage.set(freshToken);
             }
@@ -377,11 +374,13 @@ export const api = {
     },
 
     logout() {
-      // Isolated consumer app logout: clears ONLY user token
+      // Isolated consumer app logout: clears ONLY user token and profile
       tokenStorage.clear();
       try {
+        localStorage.removeItem('flops_token');
         localStorage.removeItem('flops_user_token');
         localStorage.removeItem('flopshow_auth_token');
+        localStorage.removeItem('flops_user');
         localStorage.removeItem('user');
       } catch {}
     },
@@ -395,6 +394,9 @@ export const api = {
         localStorage.removeItem('flopshow_admin_permissions');
         localStorage.removeItem('flopshow_admin_quick_login');
         localStorage.removeItem('flops_admin_user');
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.clear();
+        }
       } catch {}
     }
   },

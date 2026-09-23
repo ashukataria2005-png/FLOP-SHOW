@@ -162,47 +162,62 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // State initialization with localStorage persistence
   // NOTE: isAuthenticated defaults to FALSE — the startup useEffect will restore
   // the session from the stored JWT if one exists and is still valid.
-  // Helper to determine if any credentials or device session exist
-  const hasAnyStoredAuth = (): boolean => {
+  // Helper to determine if a stored user token exists
+  const getStoredUserToken = (): string | null => {
     try {
-      return Boolean(
-        localStorage.getItem('flopshow_auth_token') ||
-        localStorage.getItem('flopshow_admin_token') ||
-        localStorage.getItem('flopshow_admin_quick_login')
+      return (
+        localStorage.getItem('flops_token') ||
+        localStorage.getItem('flops_user_token') ||
+        localStorage.getItem('flopshow_auth_token')
       );
     } catch {
-      return false;
+      return null;
     }
+  };
+
+  const getStoredUserProfile = (): User | null => {
+    try {
+      const u = loadFromStorage<User | null>('flops_user', null) || loadFromStorage<User | null>('user', null);
+      if (u && u.id && u.id !== 'guest-user') {
+        return u;
+      }
+    } catch {
+      // Ignore
+    }
+    return null;
   };
 
   const [theme, setThemeState] = useState<AppTheme>(() => loadFromStorage('app_theme', 'flopshow-gold'));
   const [user, setUser] = useState<User>(() => {
-    // Only restore a saved user if there is an auth token or remembered device
-    const hasToken = hasAnyStoredAuth();
-    return hasToken ? loadFromStorage('user', GUEST_USER) : GUEST_USER;
+    const token = getStoredUserToken();
+    const stored = getStoredUserProfile();
+    if (token && stored) {
+      return stored;
+    }
+    return GUEST_USER;
   });
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const hasToken = hasAnyStoredAuth();
-    const savedUser = loadFromStorage('user', GUEST_USER);
-    return Boolean(hasToken && savedUser && savedUser.id && savedUser.id !== 'guest-user');
+    const token = getStoredUserToken();
+    const stored = getStoredUserProfile();
+    return Boolean(token && stored);
   });
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => {
-    const hasToken = hasAnyStoredAuth();
-    return hasToken ? loadFromStorage('purchases', INITIAL_PURCHASES) : [];
+    const token = getStoredUserToken();
+    return token ? loadFromStorage('purchases', INITIAL_PURCHASES) : [];
   });
   const [myList, setMyList] = useState<string[]>(() => {
-    const hasToken = hasAnyStoredAuth();
-    return hasToken ? loadFromStorage('my_list', INITIAL_MY_LIST) : [];
+    const token = getStoredUserToken();
+    return token ? loadFromStorage('my_list', INITIAL_MY_LIST) : [];
   });
   const [watchProgress, setWatchProgress] = useState<WatchProgress[]>(() => {
-    const hasToken = hasAnyStoredAuth();
-    return hasToken ? loadFromStorage('watch_progress', INITIAL_WATCH_PROGRESS) : [];
+    const token = getStoredUserToken();
+    return token ? loadFromStorage('watch_progress', INITIAL_WATCH_PROGRESS) : [];
   });
-  // sessionLoading: true while we're verifying stored token on startup
+  // sessionLoading: only true if token exists but cached user profile is missing and needs fetching
   const [sessionLoading, setSessionLoading] = useState<boolean>(() => {
-    return hasAnyStoredAuth();
+    return Boolean(getStoredUserToken() && !getStoredUserProfile());
   });
 
   const setTheme = (newTheme: AppTheme) => {
@@ -534,6 +549,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             last_login_at: serverUser.last_login_at || null,
           };
           setUser(restoredUser);
+          saveToStorage('flops_user', restoredUser);
           saveToStorage('user', restoredUser);
           if (serverWallet?.balanceRupees !== undefined) {
             setWalletBalance(serverWallet.balanceRupees);
@@ -550,64 +566,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           syncProgressFromBackend();
         }
       }).catch(async (err: any) => {
-        const isAuthRejection = err?.status === 401 || err?.code === 'INVALID_TOKEN' || err?.code === 'UNAUTHORIZED';
-        if (isAuthRejection) {
-          // Attempt automatic session refresh before destroying state
-          try {
-            const refreshed = await api.auth.refresh();
-            if (refreshed?.user) {
-              const isSuper = Boolean(
-                refreshed.user.is_super_admin === 1 ||
-                refreshed.user.is_super_admin === true ||
-                (refreshed.user.email && refreshed.user.email.toLowerCase() === 'ashukataria2005@gmail.com')
-              );
-              const perms = Array.isArray(refreshed.user.permissions)
-                ? refreshed.user.permissions
-                : (isSuper ? ['analytics', 'monetization', 'promos', 'payments', 'catalog', 'users', 'settings'] : []);
-
-              const restoredUser: User = {
-                id: refreshed.user.id,
-                name: refreshed.user.name,
-                email: refreshed.user.email,
-                avatarInitials: (refreshed.user.name || '').trim().split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U',
-                joinedDate: refreshed.user.createdAt ? new Date(refreshed.user.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : formatCurrentDate(),
-                role: refreshed.user.role,
-                is_super_admin: isSuper,
-                permissions: perms,
-                status: refreshed.user.status || 'ACTIVE',
-                last_login_at: refreshed.user.last_login_at || null,
-              };
-              setUser(restoredUser);
-              saveToStorage('user', restoredUser);
-              if (refreshed.wallet?.balanceRupees !== undefined) {
-                setWalletBalance(refreshed.wallet.balanceRupees);
-              }
-              setIsAuthenticated(true);
-              return;
-            }
-          } catch {
-            // Standard refresh failed
-          }
-
-          console.warn('[Auth] Consumer session token invalid or expired, signing out.');
-          tokenStorage.clear();
-          setIsAuthenticated(false);
-          setUser(GUEST_USER);
-          setWalletBalance(0);
-          setTransactions([]);
-          setPurchases([]);
-          setMyList([]);
-          setWatchProgress([]);
-          saveToStorage('user', GUEST_USER);
-        } else {
-          console.warn('[Auth] Transient network or server error while validating session; keeping cached session.', err);
-          // Keep the restored session active!
-        }
+        // Persistent User Session:
+        // User MUST stay logged in indefinitely until they explicitly click "Log Out".
+        // Do NOT invalidate user session on window reload, cold start, or network hiccups!
+        console.warn('[Auth] Session validation offline or delayed; retaining cached user session.', err);
       }).finally(() => {
         setSessionLoading(false);
       });
     } else {
-      setIsAuthenticated(false);
       setSessionLoading(false);
     }
   }, []);
@@ -770,6 +736,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
     setUser(newUser);
     // Persist the real user so a browser refresh restores it correctly
+    saveToStorage('flops_user', newUser);
     saveToStorage('user', newUser);
     setIsAuthenticated(true);
     // Use the authoritative server wallet balance; reset purchases so we re-sync from backend.
@@ -792,6 +759,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const logout = () => {
     api.auth.logout();
+    tokenStorage.clear();
     setIsAuthenticated(false);
     // Reset user to a clean guest state so the old user's name/email
     // is never visible to the next visitor or after a reload.
@@ -806,6 +774,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setActiveWatchPass(null);
     setHasActiveWatchPass(false);
     // Clear persisted per-user keys from localStorage
+    saveToStorage('flops_user', GUEST_USER);
     saveToStorage('user', GUEST_USER);
     saveToStorage('wallet_balance', 0);
     saveToStorage('purchases', []);
@@ -816,7 +785,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateProfile = (name: string, email: string) => {
     const initials = name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || user.avatarInitials;
-    setUser(prev => ({ ...prev, name, email, avatarInitials: initials }));
+    const updated = { ...user, name, email, avatarInitials: initials };
+    setUser(updated);
+    saveToStorage('flops_user', updated);
+    saveToStorage('user', updated);
     showToast('Profile updated successfully', 'success');
   };
 

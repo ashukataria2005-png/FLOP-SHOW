@@ -22,6 +22,7 @@ except RuntimeError:
 
 import os
 import traceback
+from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 import uvicorn
@@ -54,10 +55,31 @@ bot = Client(
 )
 
 # ---------------------------------------------------------------------------
+# FastAPI lifespan — manages Pyrogram startup/shutdown tied to Uvicorn's loop
+# ---------------------------------------------------------------------------
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start the Pyrogram client when Uvicorn starts; stop it on shutdown."""
+    print("[STARTUP] Starting Telegram Pyrogram client...", flush=True)
+    try:
+        await bot.start()
+        print("[STARTUP] Telegram bot started and listening for updates.", flush=True)
+    except Exception as e:
+        print(f"[FATAL] Failed to start Pyrogram client: {type(e).__name__}: {e}", flush=True)
+        traceback.print_exc()
+        raise
+    yield
+    print("[SHUTDOWN] Stopping Telegram Pyrogram client...", flush=True)
+    await bot.stop()
+    print("[SHUTDOWN] Pyrogram client stopped.", flush=True)
+
+
+# ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="TG File Streamer", version="1.0.0")
+app = FastAPI(title="TG File Streamer", version="1.0.0", lifespan=lifespan)
 
 # Default chunk size for streaming (512 KiB)
 CHUNK_SIZE = 512 * 1024
@@ -134,78 +156,56 @@ async def health_check() -> dict:
 # Telegram bot handlers
 # ---------------------------------------------------------------------------
 
-@bot.on_message(filters.private & (filters.video | filters.document))
+@bot.on_message(filters.command("start") & filters.private)
+async def start_cmd(client: Client, message: Message) -> None:
+    """Greet the user and confirm the bot is alive."""
+    await message.reply_text(
+        "👋 Hello! Bot is alive. Send me any video or document to get a stream link."
+    )
+
+
+@bot.on_message(filters.private & (filters.document | filters.video))
 async def handle_media(client: Client, message: Message) -> None:
     """
     Receives a video or document in private chat, copies it to BIN_CHANNEL,
-    then replies with a streaming URL and file metadata.
+    then replies with a direct streaming URL.
     """
-    # Forward/copy to the bin channel
-    copied: Message = await message.copy(chat_id=BIN_CHANNEL)
-
-    stream_url = f"{FQDN}/stream/{copied.id}"
-
-    # Gather metadata for the reply
-    media = message.video or message.document
-    file_name: str = getattr(media, "file_name", "Unknown") or "Unknown"
-    file_size: int = getattr(media, "file_size", 0)
-    mime_type: str = getattr(media, "mime_type", "Unknown")
-    size_mb: str = f"{file_size / (1024 * 1024):.2f} MB" if file_size else "Unknown"
-
-    reply_text = (
-        f"✅ **File Stored & Ready to Stream**\n\n"
-        f"📄 **Name:** `{file_name}`\n"
-        f"📦 **Size:** `{size_mb}`\n"
-        f"🎞 **Type:** `{mime_type}`\n\n"
-        f"🔗 **Streaming URL:**\n{stream_url}"
-    )
-
-    await message.reply_text(reply_text, quote=True)
-
-
-# ---------------------------------------------------------------------------
-# Entrypoint — run bot + web server concurrently in one event loop
-# ---------------------------------------------------------------------------
-
-async def main() -> None:
-    """Start Pyrogram client and Uvicorn server in the same event loop."""
     try:
-        # ── Step 1: Configure Uvicorn ────────────────────────────────────────
-        print("[STARTUP] Configuring Uvicorn server...", flush=True)
-        config = uvicorn.Config(
-            app=app,
-            host=BIND_ADDRESS,
-            port=PORT,
-            loop="none",           # we supply the loop ourselves
-            log_level="info",
-        )
-        server = uvicorn.Server(config)
-        print(
-            f"[STARTUP] Uvicorn configured → binding on {BIND_ADDRESS}:{PORT}",
-            flush=True,
-        )
+        print(f"[BOT] Received media from user {message.from_user.id}", flush=True)
+        forwarded_msg: Message = await message.copy(chat_id=BIN_CHANNEL)
+        stream_url = f"{FQDN}/stream/{forwarded_msg.id}"
+        print(f"[BOT] Stored as message {forwarded_msg.id} → {stream_url}", flush=True)
 
-        # ── Step 2: Start the Telegram bot ───────────────────────────────────
-        print("[STARTUP] Starting Telegram Bot...", flush=True)
-        await bot.start()
-        print("[STARTUP] Telegram Bot started successfully ✓", flush=True)
+        # Gather metadata for the reply
+        media = message.video or message.document
+        file_name: str = getattr(media, "file_name", "Unknown") or "Unknown"
+        file_size: int = getattr(media, "file_size", 0)
+        mime_type: str = getattr(media, "mime_type", "Unknown")
+        size_mb: str = f"{file_size / (1024 * 1024):.2f} MB" if file_size else "Unknown"
 
-        # ── Step 3: Launch both concurrently ─────────────────────────────────
-        print("[STARTUP] Launching Uvicorn web server...", flush=True)
-        await server.serve()
+        reply_text = (
+            f"✅ **File Stored & Ready to Stream**\n\n"
+            f"📄 **Name:** `{file_name}`\n"
+            f"📦 **Size:** `{size_mb}`\n"
+            f"🎞 **Type:** `{mime_type}`\n\n"
+            f"🔗 **Streaming URL:**\n{stream_url}"
+        )
+        await message.reply_text(reply_text, quote=True)
 
     except Exception as e:  # noqa: BLE001
-        print(
-            f"[FATAL] Startup failed with exception: {type(e).__name__}: {e}",
-            flush=True,
-        )
+        print(f"[BOT ERROR] handle_media failed: {type(e).__name__}: {e}", flush=True)
         traceback.print_exc()
-        raise
+        await message.reply_text(f"❌ Error processing your file: {e}")
 
+
+# ---------------------------------------------------------------------------
+# Entrypoint
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    print(f"[STARTUP] Launching Uvicorn on {BIND_ADDRESS}:{PORT} ...", flush=True)
     try:
-        asyncio.run(main())
+        uvicorn.run(app, host=BIND_ADDRESS, port=PORT, log_level="info")
     except KeyboardInterrupt:
         print("[SHUTDOWN] Interrupted by user.", flush=True)
     except Exception as e:  # noqa: BLE001

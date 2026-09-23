@@ -13,6 +13,7 @@ import { formatCurrentDate } from '../utils/formatters';
 import { MediaPlayerSource } from '../components/player/MediaPlayer';
 import { api, tokenStorage, API_BASE_URL } from '../services/api';
 import { resolveMediaUrl } from '../utils/mediaUrl';
+import { DEMO_CATALOG } from '../data/catalog';
 
 function isDemoStreamUrl(url?: string | null): boolean {
   if (!url || typeof url !== 'string') return false;
@@ -222,8 +223,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [theme]);
 
-  // Catalog state from central database (strictly dynamic, no hardcoded fallbacks)
-  const [catalog, setCatalog] = useState<ContentItem[]>([]);
+  // Catalog state with instant zero-friction guest fallback
+  const [catalog, setCatalog] = useState<ContentItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('flops_cached_catalog');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {
+      // Ignore parse/storage errors
+    }
+    return DEMO_CATALOG;
+  });
 
   // Modal states
   const [activeModal, setActiveModal] = useState<'purchase' | 'recharge' | 'auth' | 'subscription' | 'watchpass' | 'plan_selector' | null>(null);
@@ -488,9 +502,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshCatalog = async () => {
     try {
       const items = await api.content.list({ limit: 1000 });
-      setCatalog(items || []);
+      if (Array.isArray(items) && items.length > 0) {
+        setCatalog(items);
+        try {
+          localStorage.setItem('flops_cached_catalog', JSON.stringify(items));
+        } catch {
+          // Ignore quota errors
+        }
+      } else {
+        // If server returns empty catalog, preserve current or fall back to DEMO_CATALOG
+        setCatalog(prev => (prev && prev.length > 0 ? prev : DEMO_CATALOG));
+      }
     } catch {
-      // Offline: keep current state
+      // Offline fallback: keep current catalog or fallback to DEMO_CATALOG
+      setCatalog(prev => (prev && prev.length > 0 ? prev : DEMO_CATALOG));
     }
   };
 

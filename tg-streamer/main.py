@@ -9,6 +9,7 @@ Environment variables (see .env.example):
 
 import asyncio
 import os
+import traceback
 from typing import AsyncGenerator
 
 import uvicorn
@@ -156,21 +157,48 @@ async def handle_media(client: Client, message: Message) -> None:
 
 async def main() -> None:
     """Start Pyrogram client and Uvicorn server in the same event loop."""
-    # Configure Uvicorn without its own event-loop management
-    config = uvicorn.Config(
-        app=app,
-        host=BIND_ADDRESS,
-        port=PORT,
-        loop="none",           # we supply the loop ourselves
-        log_level="info",
-    )
-    server = uvicorn.Server(config)
+    try:
+        # ── Step 1: Configure Uvicorn ────────────────────────────────────────
+        print("[STARTUP] Configuring Uvicorn server...", flush=True)
+        config = uvicorn.Config(
+            app=app,
+            host=BIND_ADDRESS,
+            port=PORT,
+            loop="none",           # we supply the loop ourselves
+            log_level="info",
+        )
+        server = uvicorn.Server(config)
+        print(
+            f"[STARTUP] Uvicorn configured → binding on {BIND_ADDRESS}:{PORT}",
+            flush=True,
+        )
 
-    await asyncio.gather(
-        bot.start(),
-        server.serve(),
-    )
+        # ── Step 2: Start the Telegram bot ───────────────────────────────────
+        print("[STARTUP] Starting Telegram Bot...", flush=True)
+        await bot.start()
+        print("[STARTUP] Telegram Bot started successfully ✓", flush=True)
+
+        # ── Step 3: Launch both concurrently ─────────────────────────────────
+        print("[STARTUP] Launching Uvicorn web server...", flush=True)
+        await server.serve()
+
+    except Exception as e:  # noqa: BLE001
+        print(
+            f"[FATAL] Startup failed with exception: {type(e).__name__}: {e}",
+            flush=True,
+        )
+        traceback.print_exc()
+        raise
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("[SHUTDOWN] Interrupted by user.", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(
+            f"[FATAL] Unhandled exception at top level: {type(e).__name__}: {e}",
+            flush=True,
+        )
+        traceback.print_exc()

@@ -66,19 +66,21 @@ bot = Client(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start the Pyrogram client when Uvicorn starts; stop it on shutdown."""
+    # Startup: Start Pyrogram inside the active Uvicorn event loop
     print("[STARTUP] Starting Telegram Pyrogram client...", flush=True)
-    try:
-        await bot.start()
-        print("[STARTUP] Telegram bot started and listening for updates.", flush=True)
-    except Exception as e:
-        print(f"[FATAL] Failed to start Pyrogram client: {type(e).__name__}: {e}", flush=True)
-        traceback.print_exc()
-        raise
+    await bot.start()
+    print("[STARTUP] Telegram bot started and listening for updates.", flush=True)
+
     yield
+
+    # Shutdown: Safely stop only if still connected
     print("[SHUTDOWN] Stopping Telegram Pyrogram client...", flush=True)
-    await bot.stop()
-    print("[SHUTDOWN] Pyrogram client stopped.", flush=True)
+    try:
+        if getattr(bot, "is_connected", False):
+            await bot.stop()
+            print("[SHUTDOWN] Pyrogram client stopped cleanly.", flush=True)
+    except Exception as e:
+        print(f"[SHUTDOWN WARNING] Clean stop bypassed: {e}", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +88,9 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 
 app = FastAPI(title="TG File Streamer", version="1.0.0", lifespan=lifespan)
+
+# Ensure the lifespan is bound on the router level as well (belt-and-suspenders)
+app.router.lifespan_context = lifespan
 
 # Default chunk size for streaming (512 KiB)
 CHUNK_SIZE = 512 * 1024
@@ -209,14 +214,9 @@ async def handle_media(client: Client, message: Message) -> None:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print(f"[STARTUP] Launching Uvicorn on {BIND_ADDRESS}:{PORT} ...", flush=True)
-    try:
-        uvicorn.run(app, host=BIND_ADDRESS, port=PORT, log_level="info")
-    except KeyboardInterrupt:
-        print("[SHUTDOWN] Interrupted by user.", flush=True)
-    except Exception as e:  # noqa: BLE001
-        print(
-            f"[FATAL] Unhandled exception at top level: {type(e).__name__}: {e}",
-            flush=True,
-        )
-        traceback.print_exc()
+    port = int(os.environ.get("PORT", 8080))
+    print(f"[STARTUP] Launching Uvicorn on 0.0.0.0:{port} ...", flush=True)
+    # CRITICAL: Pass import string "main:app" + loop="asyncio" so Uvicorn
+    # does NOT create a disconnected worker event loop — fixes the
+    # RuntimeError: attached to a different loop on Python 3.14.
+    uvicorn.run("main:app", host="0.0.0.0", port=port, loop="asyncio")

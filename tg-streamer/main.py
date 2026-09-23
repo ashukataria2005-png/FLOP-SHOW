@@ -153,9 +153,9 @@ async def stream_media(message_id: int, request: Request) -> StreamingResponse:
     )
 
 
-@app.get("/", summary="Health check")
-async def health_check() -> dict:
-    return {"status": "ok", "service": "TG File Streamer"}
+@app.api_route("/", methods=["GET", "HEAD"], summary="Health check")
+async def root() -> dict:
+    return {"status": "ok", "service": "Flopshow Streamer"}
 
 
 # ---------------------------------------------------------------------------

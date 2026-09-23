@@ -640,7 +640,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             className="w-full h-full border-0 rounded-lg"
             allowFullScreen
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
+            referrerPolicy="no-referrer-when-downgrade"
             style={{
               width: '100%',
               height: '100%',

@@ -202,7 +202,7 @@ export const VideoPlayer: React.FC = () => {
           className="w-full h-full border-0 rounded-lg"
           allowFullScreen
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
+          referrerPolicy="no-referrer-when-downgrade"
           style={{ width: '100%', height: '100%', border: 0, borderRadius: '8px' }}
         />
       ) : (

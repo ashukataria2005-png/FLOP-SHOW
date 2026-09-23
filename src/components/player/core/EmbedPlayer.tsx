@@ -81,7 +81,7 @@ export const EmbedPlayer: React.FC<EmbedPlayerProps> = ({ media, onClose }) => {
           onError={() => setHasIframeError(true)}
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
           allowFullScreen
-          sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
+          referrerPolicy="no-referrer-when-downgrade"
           style={{
             position: 'absolute',
             top: 0,

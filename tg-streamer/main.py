@@ -29,6 +29,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pyrogram import Client, filters
+from pyrogram.errors import FloodWait
 from pyrogram.types import Message
 
 # ---------------------------------------------------------------------------
@@ -66,10 +67,19 @@ bot = Client(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Start Pyrogram inside the active Uvicorn event loop
     print("[STARTUP] Starting Telegram Pyrogram client...", flush=True)
-    await bot.start()
-    print("[STARTUP] Telegram bot started and listening for updates.", flush=True)
+    while True:
+        try:
+            await bot.start()
+            print("[STARTUP] Telegram bot started and listening for updates.", flush=True)
+            break
+        except FloodWait as e:
+            wait = e.value + 2
+            print(f"[STARTUP] Telegram FloodWait encountered. Sleeping for {wait} seconds...", flush=True)
+            await asyncio.sleep(wait)
+        except Exception as e:
+            print(f"[STARTUP ERROR] Failed to start bot: {type(e).__name__}: {e}", flush=True)
+            raise e
 
     yield
 
@@ -80,7 +90,7 @@ async def lifespan(app: FastAPI):
             await bot.stop()
             print("[SHUTDOWN] Pyrogram client stopped cleanly.", flush=True)
     except Exception as e:
-        print(f"[SHUTDOWN WARNING] Clean stop bypassed: {e}", flush=True)
+        print(f"[SHUTDOWN WARNING] {e}", flush=True)
 
 
 # ---------------------------------------------------------------------------

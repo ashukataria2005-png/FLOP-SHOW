@@ -7,7 +7,19 @@ Environment variables (see .env.example):
   API_ID, API_HASH, BOT_TOKEN, BIN_CHANNEL, FQDN, PORT, WEB_SERVER_BIND_ADDRESS
 """
 
-import asyncio
+# ---------------------------------------------------------------------------
+# EVENT LOOP BOOTSTRAP — must run before importing pyrogram or any async lib.
+# Python 3.14 raises RuntimeError("There is no current event loop in thread
+# 'MainThread'") if asyncio.get_event_loop() is called with no loop set.
+# ---------------------------------------------------------------------------
+import asyncio  # noqa: E402 (first stdlib import must stay here)
+
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    _loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(_loop)
+
 import os
 import traceback
 from typing import AsyncGenerator

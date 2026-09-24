@@ -124,7 +124,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   }, []);
 
   // Open Today Detail Modal & Fetch authoritatively
-  const openMetricModal = async (metricType: 'revenue' | 'members' | 'purchases' | 'upi' | 'profit') => {
+  const openMetricModal = async (metricType: 'revenue' | 'members' | 'purchases' | 'upi') => {
     setActiveModal(metricType);
     setModalSearch('');
     setModalLoading(true);
@@ -1131,7 +1131,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                     {activeModal === 'members' && "Today's New Members"}
                     {activeModal === 'purchases' && "Today's Content Purchases"}
                     {activeModal === 'upi' && "Today's UPI Payment Requests"}
-                    {activeModal === 'profit' && "Today's Profit & Margin Analysis"}
                   </h3>
                   <span
                     style={{
@@ -1175,66 +1174,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0', gap: '10px', color: '#9CA3AF' }}>
                   <Loader2 size={20} className="animate-spin" color="var(--brand-gold, #F5C518)" />
                   <span>Loading today's itemized records...</span>
-                </div>
-              ) : activeModal === 'profit' ? (
-                /* Profit Breakdown Content */
-                <div>
-                  <div
-                    style={{
-                      padding: '20px',
-                      borderRadius: '14px',
-                      backgroundColor: 'rgba(245, 197, 24, 0.06)',
-                      border: '1px solid rgba(245, 197, 24, 0.25)',
-                      marginBottom: '20px'
-                    }}
-                  >
-                    <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--brand-gold, #F5C518)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                      Operating Profit Mathematical Derivation
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
-                        <span>Content Purchases Revenue (Paise to INR):</span>
-                        <strong style={{ color: '#10B981' }}>+₹{today.todayPurchasesRevenueRupees}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
-                        <span>Approved UPI Wallet Recharge Deposits:</span>
-                        <strong style={{ color: '#10B981' }}>+₹{today.todayUpiRevenueRupees}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#D1D5DB' }}>
-                        <span>External Bandwidth / Hosting / CDN Expenses:</span>
-                        <strong style={{ color: '#9CA3AF' }}>₹0.00 (Unconfigured in platform)</strong>
-                      </div>
-                      <div
-                        style={{
-                          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                          paddingTop: '10px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: '18px',
-                          fontWeight: 900,
-                          color: '#FFFFFF'
-                        }}
-                      >
-                        <span>Net Calculated Operating Profit:</span>
-                        <span style={{ color: 'var(--brand-gold, #F5C518)' }}>₹{today.todayProfitRupees}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      padding: '14px 18px',
-                      borderRadius: '10px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      fontSize: '13px',
-                      color: '#9CA3AF',
-                      lineHeight: 1.5
-                    }}
-                  >
-                    <strong style={{ color: '#FFFFFF' }}>Transparency Notice: </strong>
-                    {today.profitNote}
-                  </div>
                 </div>
               ) : (
                 /* Itemized Lists for Members, Revenue, Purchases, UPI */

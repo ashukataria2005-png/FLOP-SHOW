@@ -221,18 +221,27 @@ export function adaptDbContentToFrontend(item: any): ContentItem {
   const seasons: Season[] = (item.seasons || []).map((s: any) => ({
     seasonNumber: s.season_number ?? s.seasonNumber,
     title: s.title,
-    episodes: (s.episodes || []).map((e: any): Episode => ({
-      id: e.id,
-      seriesId: item.id,
-      seasonNumber: s.season_number ?? s.seasonNumber,
-      episodeNumber: e.episode_number ?? e.episodeNumber,
-      title: e.title,
-      duration: e.duration || '45m',
-      durationSeconds: e.duration_seconds ?? e.durationSeconds ?? 0,
-      thumbnailUrl: resolveMediaUrl(e.thumbnail || e.thumbnail_url || e.thumbnailUrl || item.poster || item.posterUrl, API_BASE_URL),
-      videoUrl: e.video_url || e.videoUrl ? resolveMediaUrl(e.video_url || e.videoUrl, API_BASE_URL) : '',
-      synopsis: e.description || e.synopsis || ''
-    }))
+    episodes: (s.episodes || []).map((e: any): Episode => {
+      const still = resolveMediaUrl(e.thumbnail || e.thumbnail_url || e.thumbnailUrl || e.stillUrl || item.poster || item.posterUrl, API_BASE_URL);
+      const stream = e.video_url || e.videoUrl || e.streamUrl ? resolveMediaUrl(e.video_url || e.videoUrl || e.streamUrl, API_BASE_URL) : '';
+      const plot = e.description || e.overview || e.synopsis || '';
+      return {
+        id: e.id,
+        seriesId: item.id,
+        seasonNumber: s.season_number ?? s.seasonNumber,
+        episodeNumber: e.episode_number ?? e.episodeNumber,
+        title: e.title,
+        duration: e.duration || '45m',
+        durationSeconds: e.duration_seconds ?? e.durationSeconds ?? 0,
+        thumbnailUrl: still,
+        stillUrl: still,
+        videoUrl: stream,
+        streamUrl: stream,
+        synopsis: plot,
+        description: plot,
+        overview: plot
+      };
+    })
   }));
 
   const priceRupees = item.price ? Math.round(item.price / 100) : (item.priceRupees ?? 0);

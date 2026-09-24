@@ -102,18 +102,8 @@ app = FastAPI(title="TG File Streamer", version="1.0.0", lifespan=lifespan)
 # Ensure the lifespan is bound on the router level as well (belt-and-suspenders)
 app.router.lifespan_context = lifespan
 
-# Default chunk size for streaming (512 KiB)
-CHUNK_SIZE = 512 * 1024
-
-
-async def _media_stream(message_id: int) -> AsyncGenerator[bytes, None]:
-    """Async generator that yields raw media bytes from a Telegram message."""
-    msg = await bot.get_messages(BIN_CHANNEL, message_id)
-    if not msg or not msg.media:
-        raise HTTPException(status_code=404, detail="Media not found")
-
-    async for chunk in bot.stream_media(msg, limit=CHUNK_SIZE):
-        yield chunk
+# Chunk size for range-based streaming: 1 MiB aligned to Pyrogram's chunk grid
+CHUNK_SIZE = 1024 * 1024
 
 
 def _get_media_info(msg: Message) -> dict:
@@ -122,7 +112,7 @@ def _get_media_info(msg: Message) -> dict:
     if not media:
         return {}
 
-    mime_type: str = getattr(media, "mime_type", "application/octet-stream")
+    mime_type: str = getattr(media, "mime_type", "video/mp4")
     file_name: str = getattr(media, "file_name", None) or f"file_{msg.id}"
     file_size: int = getattr(media, "file_size", 0)
 
@@ -133,11 +123,52 @@ def _get_media_info(msg: Message) -> dict:
     }
 
 
+async def _ranged_stream(
+    msg: Message,
+    start: int,
+    end: int,
+) -> AsyncGenerator[bytes, None]:
+    """
+    Yield bytes in the range [start, end] inclusive.
+
+    Pyrogram's stream_media() works in fixed 1 MiB chunks internally.
+    We align `offset` to the 1 MiB chunk that contains `start`, then
+    trim leading bytes so the client receives exactly the requested range.
+    """
+    chunk_size = 1024 * 1024                      # 1 MiB — matches Pyrogram's grid
+    offset     = start // chunk_size              # first chunk index to request
+    first_chunk_cut = start % chunk_size          # bytes to discard from chunk[0]
+    bytes_remaining = end - start + 1
+
+    try:
+        async for chunk in bot.stream_media(msg, limit=chunk_size, offset=offset):
+            if first_chunk_cut:
+                chunk = chunk[first_chunk_cut:]   # trim leading bytes on first chunk
+                first_chunk_cut = 0
+
+            if len(chunk) > bytes_remaining:
+                yield chunk[:bytes_remaining]
+                break
+
+            yield chunk
+            bytes_remaining -= len(chunk)
+            if bytes_remaining <= 0:
+                break
+
+    except asyncio.CancelledError:
+        # Client disconnected mid-stream — not an error, exit cleanly
+        pass
+    except Exception as exc:
+        # Log but do not re-raise: prevents Starlette TaskGroup crash
+        print(f"[STREAM] Aborted ({type(exc).__name__}): {exc}", flush=True)
+
+
 @app.get("/stream/{message_id}", summary="Stream a Telegram media file")
 async def stream_media(message_id: int, request: Request) -> StreamingResponse:
     """
-    Streams the media associated with `message_id` from the BIN_CHANNEL.
-    Supports inline playback via proper Content-Disposition header.
+    Streams the media for `message_id` from BIN_CHANNEL.
+    Supports HTTP Range requests (206 Partial Content) for seekable playback
+    in browsers, VLC, and other media players.
     """
     try:
         msg = await bot.get_messages(BIN_CHANNEL, message_id)
@@ -147,22 +178,45 @@ async def stream_media(message_id: int, request: Request) -> StreamingResponse:
     if not msg or not msg.media:
         raise HTTPException(status_code=404, detail="No media found for this ID")
 
-    info = _get_media_info(msg)
-    mime_type = info.get("mime_type", "application/octet-stream")
+    info      = _get_media_info(msg)
+    mime_type = info.get("mime_type", "video/mp4")
     file_name = info.get("file_name", f"file_{message_id}")
     file_size = info.get("file_size", 0)
 
+    # ── Parse Range header ───────────────────────────────────────────────────
+    range_header: str | None = request.headers.get("range")
+    start = 0
+    end   = max(file_size - 1, 0)
+
+    if range_header:
+        try:
+            # Format: "bytes=<start>-<end>"  (end is optional)
+            range_val = range_header.strip().replace("bytes=", "")
+            raw_start, _, raw_end = range_val.partition("-")
+            start = int(raw_start) if raw_start else 0
+            end   = int(raw_end)   if raw_end   else max(file_size - 1, 0)
+            # Clamp to valid bounds
+            start = max(0, min(start, file_size - 1))
+            end   = max(start, min(end, file_size - 1))
+        except ValueError:
+            pass  # Malformed header — fall back to full-file response
+
+    content_length = end - start + 1
+    status_code    = 206 if range_header else 200
+
     headers = {
-        "Content-Type": mime_type,
+        "Content-Type":        mime_type,
         "Content-Disposition": f'inline; filename="{file_name}"',
-        "Content-Length": str(file_size),
-        "Accept-Ranges": "bytes",
-        "Cache-Control": "no-cache",
+        "Content-Length":      str(content_length),
+        "Accept-Ranges":       "bytes",
+        "Cache-Control":       "no-cache",
     }
+    if range_header:
+        headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
 
     return StreamingResponse(
-        _media_stream(message_id),
-        status_code=200,
+        _ranged_stream(msg, start, end),
+        status_code=status_code,
         headers=headers,
         media_type=mime_type,
     )

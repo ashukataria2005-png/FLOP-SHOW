@@ -11,9 +11,25 @@ export const CinematicSpotlight: React.FC<CinematicSpotlightProps> = ({ item, on
 
   const backdropSrc = item.backdropUrl || item.posterUrl;
 
+  // Retrieve admin configured overlay darkness opacity (0-100%, default 45%) and brightness (50-150%, default 100%)
+  let overlayDarkness = 45;
+  let artworkBrightness = 100;
+  try {
+    const savedOpacity = localStorage.getItem('flopshow_spotlight_overlay_opacity');
+    if (savedOpacity !== null) {
+      const parsed = parseFloat(savedOpacity);
+      if (!isNaN(parsed)) overlayDarkness = Math.max(0, Math.min(100, parsed));
+    }
+    const savedBrightness = localStorage.getItem('flopshow_spotlight_brightness');
+    if (savedBrightness !== null) {
+      const parsedB = parseFloat(savedBrightness);
+      if (!isNaN(parsedB)) artworkBrightness = Math.max(50, Math.min(150, parsedB));
+    }
+  } catch (_) {}
+
+  const overlayMultiplier = overlayDarkness / 100;
+
   // Determine ONE short slogan/tagline line:
-  // 1. Stored tagline if present
-  // 2. Clean fallback derived from existing content metadata (first clean sentence or genre summary)
   let slogan = (item.tagline || '').trim();
   if (!slogan && item.description) {
     const firstSentence = item.description.split(/[.!?]/)[0]?.trim();
@@ -63,7 +79,7 @@ export const CinematicSpotlight: React.FC<CinematicSpotlightProps> = ({ item, on
         e.currentTarget.style.boxShadow = '0 20px 60px rgba(0, 0, 0, 0.8), inset 0 0 100px rgba(0, 0, 0, 0.4)';
       }}
     >
-      {/* Title-specific Artwork Backdrop */}
+      {/* Title-specific Artwork Backdrop with dynamic brightness */}
       <img
         src={backdropSrc}
         alt={item.title}
@@ -74,7 +90,9 @@ export const CinematicSpotlight: React.FC<CinematicSpotlightProps> = ({ item, on
           height: '100%',
           objectFit: 'cover',
           objectPosition: 'center 30%',
-          zIndex: 0
+          zIndex: 0,
+          filter: `brightness(${artworkBrightness}%)`,
+          transition: 'filter 0.3s ease'
         }}
         onError={(e) => {
           (e.currentTarget as HTMLImageElement).src =
@@ -82,23 +100,23 @@ export const CinematicSpotlight: React.FC<CinematicSpotlightProps> = ({ item, on
         }}
       />
 
-      {/* Cinematic Vignette & Gradient Overlays */}
+      {/* Cinematic Vignette & Dynamic Gradient Overlays bound to admin opacity slider */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          background:
-            'linear-gradient(90deg, rgba(7, 7, 10, 0.92) 0%, rgba(7, 7, 10, 0.72) 45%, rgba(7, 7, 10, 0.2) 80%, rgba(7, 7, 10, 0.1) 100%)',
-          zIndex: 1
+          background: `linear-gradient(90deg, rgba(7, 7, 10, ${0.9 * overlayMultiplier}) 0%, rgba(7, 7, 10, ${0.7 * overlayMultiplier}) 45%, rgba(7, 7, 10, ${0.2 * overlayMultiplier}) 80%, rgba(7, 7, 10, ${0.05 * overlayMultiplier}) 100%)`,
+          zIndex: 1,
+          transition: 'background 0.3s ease'
         }}
       />
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          background:
-            'linear-gradient(180deg, rgba(7, 7, 10, 0.1) 0%, rgba(7, 7, 10, 0.4) 50%, rgba(7, 7, 10, 0.95) 100%)',
-          zIndex: 1
+          background: `linear-gradient(180deg, rgba(7, 7, 10, ${0.05 * overlayMultiplier}) 0%, rgba(7, 7, 10, ${0.35 * overlayMultiplier}) 50%, rgba(7, 7, 10, ${0.92 * overlayMultiplier}) 100%)`,
+          zIndex: 1,
+          transition: 'background 0.3s ease'
         }}
       />
 

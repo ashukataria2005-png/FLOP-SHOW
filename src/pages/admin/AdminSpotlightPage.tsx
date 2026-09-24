@@ -14,7 +14,10 @@ import {
   Edit3,
   Plus,
   X,
-  AlertCircle
+  AlertCircle,
+  Sliders,
+  Sun,
+  Eye
 } from 'lucide-react';
 
 interface AdminSpotlightPageProps {
@@ -28,6 +31,39 @@ export const AdminSpotlightPage: React.FC<AdminSpotlightPageProps> = ({ onNaviga
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+
+  // Spotlight Artwork Visibility & Overlay Slider Settings
+  const [overlayOpacity, setOverlayOpacity] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('flopshow_spotlight_overlay_opacity');
+      return saved !== null ? Number(saved) : 45;
+    } catch {
+      return 45;
+    }
+  });
+
+  const [brightness, setBrightness] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('flopshow_spotlight_brightness');
+      return saved !== null ? Number(saved) : 100;
+    } catch {
+      return 100;
+    }
+  });
+
+  const handleOverlayChange = (val: number) => {
+    setOverlayOpacity(val);
+    try {
+      localStorage.setItem('flopshow_spotlight_overlay_opacity', val.toString());
+    } catch (_) {}
+  };
+
+  const handleBrightnessChange = (val: number) => {
+    setBrightness(val);
+    try {
+      localStorage.setItem('flopshow_spotlight_brightness', val.toString());
+    } catch (_) {}
+  };
 
   // Editor modal state
   // editingIndex: number (0..N-1 for changing existing, or spotlights.length for new)
@@ -321,6 +357,223 @@ export const AdminSpotlightPage: React.FC<AdminSpotlightPageProps> = ({ onNaviga
             <Plus size={16} />
             <span>+ Add More Spotlight</span>
           </button>
+        </div>
+      </div>
+
+      {/* Cinematic Spotlight Brightness & Overlay Darkness Slider Section */}
+      <div
+        style={{
+          marginBottom: '32px',
+          padding: '24px',
+          borderRadius: '16px',
+          backgroundColor: 'var(--bg-surface, #12121A)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <Sliders size={20} color="var(--brand-gold, #F5C518)" />
+          <h2 style={{ fontSize: '17px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+            Cinematic Spotlight Brightness & Overlay Darkness Control
+          </h2>
+        </div>
+        <p style={{ fontSize: '13.5px', color: '#9CA3AF', margin: '0 0 20px', maxWidth: '780px' }}>
+          Control how dark or bright the spotlight backdrop artwork appears on the homepage. Dial down the heavy blackness to make the artwork clearly visible to your viewers.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', alignItems: 'center' }}>
+          {/* Sliders Box */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Slider 1: Overlay Darkness (0% to 100%) */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>Overlay Darkness (Black Gradient Veil)</span>
+                </label>
+                <span
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 800,
+                    padding: '2px 10px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                    color: 'var(--brand-gold, #F5C518)'
+                  }}
+                >
+                  {overlayOpacity}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={overlayOpacity}
+                onChange={e => handleOverlayChange(Number(e.target.value))}
+                style={{
+                  width: '100%',
+                  height: '6px',
+                  borderRadius: '3px',
+                  accentColor: 'var(--brand-gold, #F5C518)',
+                  cursor: 'pointer'
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+                <span>0% (Crystal Clear Artwork)</span>
+                <span>45% (Balanced)</span>
+                <span>100% (Maximum Dark)</span>
+              </div>
+            </div>
+
+            {/* Slider 2: Artwork Brightness (50% to 150%) */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Sun size={15} color="var(--brand-gold, #F5C518)" />
+                  <span>Artwork Filter Brightness</span>
+                </label>
+                <span
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 800,
+                    padding: '2px 10px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                    color: '#38BDF8'
+                  }}
+                >
+                  {brightness}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="50"
+                max="150"
+                value={brightness}
+                onChange={e => handleBrightnessChange(Number(e.target.value))}
+                style={{
+                  width: '100%',
+                  height: '6px',
+                  borderRadius: '3px',
+                  accentColor: '#38BDF8',
+                  cursor: 'pointer'
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+                <span>50% (Subdued)</span>
+                <span>100% (Natural)</span>
+                <span>150% (Vibrant Pop)</span>
+              </div>
+            </div>
+
+            {/* Quick Presets */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => { handleOverlayChange(20); handleBrightnessChange(110); }}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Ultra Vivid (Low Darkness)
+              </button>
+              <button
+                type="button"
+                onClick={() => { handleOverlayChange(45); handleBrightnessChange(100); }}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Recommended Default (45%)
+              </button>
+              <button
+                type="button"
+                onClick={() => { handleOverlayChange(75); handleBrightnessChange(90); }}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cinematic Dark (High Contrast)
+              </button>
+            </div>
+          </div>
+
+          {/* Live Preview Card */}
+          <div
+            style={{
+              position: 'relative',
+              height: '180px',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-end',
+              padding: '16px'
+            }}
+          >
+            <img
+              src={spotlights[0]?.backdropUrl || spotlights[0]?.posterUrl || 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80'}
+              alt="Live Preview"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                filter: `brightness(${brightness}%)`,
+                transition: 'filter 0.2s ease',
+                zIndex: 0
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: `linear-gradient(90deg, rgba(7, 7, 10, ${0.9 * (overlayOpacity / 100)}) 0%, rgba(7, 7, 10, ${0.7 * (overlayOpacity / 100)}) 45%, rgba(7, 7, 10, ${0.1 * (overlayOpacity / 100)}) 100%)`,
+                zIndex: 1,
+                transition: 'background 0.2s ease'
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: `linear-gradient(180deg, transparent 0%, rgba(7, 7, 10, ${0.92 * (overlayOpacity / 100)}) 100%)`,
+                zIndex: 1,
+                transition: 'background 0.2s ease'
+              }}
+            />
+            <div style={{ position: 'relative', zIndex: 2 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--brand-gold, #F5C518)', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>
+                <Eye size={12} />
+                <span>Live Homepage Preview</span>
+              </div>
+              <h4 style={{ fontSize: '18px', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+                {spotlights[0]?.title || 'Preview Spotlight Title'}
+              </h4>
+            </div>
+          </div>
         </div>
       </div>
 

@@ -27,7 +27,8 @@ import {
   EyeOff,
   Gift,
   RotateCcw,
-  TrendingUp
+  TrendingUp,
+  Flame
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -107,6 +108,7 @@ const navGroups: NavGroup[] = [
     permission: 'catalog',
     items: [
       { id: 'admin-hero', label: 'Hero Banner', icon: Crown, permission: 'catalog' },
+      { id: 'admin-top10', label: 'Top 10 Rankings', icon: Flame, permission: 'catalog' },
       { id: 'admin-trending', label: 'Trending #1', icon: TrendingUp, permission: 'catalog' },
       { id: 'admin-spotlight', label: 'Cinematic Spotlight', icon: Sparkles, permission: 'catalog' }
     ]

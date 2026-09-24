@@ -15,8 +15,10 @@ import {
   Tv,
   Star,
   ArrowUpRight,
-  Check
+  Check,
+  Flame
 } from 'lucide-react';
+import { AdminTop10Page } from './AdminTop10Page';
 
 interface GenreWithCount {
   id: string;
@@ -34,6 +36,7 @@ export const AdminGenresPage: React.FC<AdminGenresPageProps> = ({ onNavigateTab 
   const [genres, setGenres] = useState<GenreWithCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeSection, setActiveSection] = useState<'taxonomy' | 'top10'>('taxonomy');
 
   // Genre Explorer state
   const [selectedGenre, setSelectedGenre] = useState<GenreWithCount | null>(null);
@@ -646,16 +649,65 @@ export const AdminGenresPage: React.FC<AdminGenresPageProps> = ({ onNavigateTab 
         /* TAXONOMY LIST VIEW                                                       */
         /* ========================================================================= */
         <div>
-          {/* Page Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
+          {/* Sub-navigation tabs: Taxonomy vs Top 10 Curation */}
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '14px' }}>
+            <button
+              type="button"
+              onClick={() => setActiveSection('taxonomy')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 18px',
+                borderRadius: '8px',
+                backgroundColor: activeSection === 'taxonomy' ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.06)',
+                color: activeSection === 'taxonomy' ? '#0E0E12' : '#FFFFFF',
+                fontWeight: 800,
+                fontSize: '13px',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <Tag size={16} />
+              <span>Genres & Categories</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveSection('top10')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '9px 18px',
+                borderRadius: '8px',
+                backgroundColor: activeSection === 'top10' ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.06)',
+                color: activeSection === 'top10' ? '#0E0E12' : '#FFFFFF',
+                fontWeight: 800,
+                fontSize: '13px',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <Flame size={16} />
+              <span>Top 10 Row Curation</span>
+            </button>
+          </div>
+
+          {activeSection === 'top10' ? (
+            <AdminTop10Page onNavigateTab={onNavigateTab} />
+          ) : (
             <div>
-              <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em', marginBottom: '6px' }}>
-                Genre & Category Taxonomy
-              </h1>
-              <p style={{ fontSize: '14px', color: '#9CA3AF' }}>
-                Manage genres, studio categories, and explore titles grouped by genre dynamically from the database.
-              </p>
-            </div>
+              {/* Page Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#FFFFFF', letterSpacing: '-0.02em', marginBottom: '6px' }}>
+                    Genre & Category Taxonomy
+                  </h1>
+                  <p style={{ fontSize: '14px', color: '#9CA3AF' }}>
+                    Manage genres, studio categories, and explore titles grouped by genre dynamically from the database.
+                  </p>
+                </div>
 
             <button
               onClick={() => setShowAddModal(true)}
@@ -873,6 +925,8 @@ export const AdminGenresPage: React.FC<AdminGenresPageProps> = ({ onNavigateTab 
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
             </div>
           )}
         </div>

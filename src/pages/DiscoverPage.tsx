@@ -3,6 +3,9 @@ import { HeroBanner } from '../components/home/HeroBanner';
 import { CinematicSpotlight } from '../components/home/CinematicSpotlight';
 import { ContentSection } from '../components/home/ContentSection';
 import { BrandPromoCard } from '../components/home/BrandPromoCard';
+import { TelegramPromoCard } from '../components/home/TelegramPromoCard';
+import { Top10Row } from '../components/home/Top10Row';
+import { OnlyOnFlopshowRow } from '../components/home/OnlyOnFlopshowRow';
 import { ContentItem } from '../types/content';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
@@ -270,6 +273,15 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     );
   }
 
+  // ── Top 10 in FlopShow Today Row with Giant Outlined Numbers ────────────────
+  contentRows.push(
+    <Top10Row
+      key="top10-daily-row"
+      catalog={activeCatalog}
+      onSelect={onSelectItem}
+    />
+  );
+
   if (topRated.length > 0) {
     contentRows.push(
       <ContentSection
@@ -406,6 +418,9 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     );
   }
 
+  // ── Telegram Promo Card after first 2-3 genre rows ──────────────────────────
+  contentRows.push(<TelegramPromoCard key="telegram-channel-promo-card" />);
+
   // ── Genre 4: Crime ──────────────────────────────────────────────────────────
   if (crimeItems.length > 0) {
     contentRows.push(
@@ -461,6 +476,15 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
       />
     );
   }
+
+  // ── "Only on FlopShow" Tall Poster Row (5-7 genre sections down) ────────────
+  contentRows.push(
+    <OnlyOnFlopshowRow
+      key="only-on-flopshow-tall-posters"
+      catalog={activeCatalog}
+      onSelect={onSelectItem}
+    />
+  );
 
   // ── Studio 5: HBO ───────────────────────────────────────────────────────────
   if (hboItems.length > 0) {

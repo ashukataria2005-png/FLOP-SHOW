@@ -206,25 +206,61 @@ export const VideoPlayer: React.FC = () => {
           style={{ width: '100%', height: '100%', border: 0, borderRadius: '8px' }}
         />
       ) : (
-        /* HTML5 Video Element */
-        <video
-          ref={videoRef}
-          src={currentVideoSrc}
-          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={() => {
-            if (videoRef.current) {
-              setDuration(videoRef.current.duration);
-              videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-            }
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: '100%',
+            aspectRatio: '16 / 9',
+            backgroundColor: '#000',
+            overflow: 'hidden',
           }}
-          onClick={togglePlay}
-          onEnded={() => {
-            setIsPlaying(false);
-            if (nextEp) handleSwitchEpisode(nextEp);
-          }}
-          playsInline
-        />
+        >
+          {/* Poster overlay — hidden once video starts playing */}
+          {activePlayerContent.posterUrl && !isPlaying && (
+            <img
+              src={activePlayerContent.posterUrl}
+              alt="poster"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                zIndex: 1,
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+          <video
+            ref={videoRef}
+            src={currentVideoSrc}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              display: 'block',
+              position: 'relative',
+              zIndex: 2,
+            }}
+            preload="metadata"
+            playsInline
+            // @ts-ignore — webkit non-standard attr for iOS Safari
+            webkit-playsinline="true"
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={() => {
+              if (videoRef.current) {
+                setDuration(videoRef.current.duration);
+                videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+              }
+            }}
+            onClick={togglePlay}
+            onEnded={() => {
+              setIsPlaying(false);
+              if (nextEp) handleSwitchEpisode(nextEp);
+            }}
+          />
+        </div>
       )}
 
       {/* Top Header Bar */}

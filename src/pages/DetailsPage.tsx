@@ -138,7 +138,19 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
 
   const handlePrimaryAction = () => {
     if (canWatch) {
-      startPlaying(currentItem);
+      if (currentItem.type === 'series' && currentItem.seasons?.length) {
+        // Resolve Ep 1 sorted ascending — never default to whatever array order arrives
+        const firstEp = currentItem.seasons
+          .flatMap(s => s.episodes ?? [])
+          .sort((a, b) => {
+            if ((a.seasonNumber ?? 0) !== (b.seasonNumber ?? 0))
+              return (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0);
+            return (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0);
+          })[0];
+        startPlaying(currentItem, firstEp);
+      } else {
+        startPlaying(currentItem);
+      }
     } else {
       showToast('Subscribe or get a Watch Pass to watch this title', 'info');
       openPlanSelector(currentItem);

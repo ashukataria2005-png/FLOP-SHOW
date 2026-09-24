@@ -1104,9 +1104,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           ep = content.seasons.flatMap(s => s.episodes).find(e => e.id === activeEpProgress.episodeId);
         }
         if (!ep && content.seasons && content.seasons.length > 0) {
+          // Sort episodes ascending by episodeNumber so Ep 1 is always chosen first
           for (const s of content.seasons) {
             if (s.episodes && s.episodes.length > 0) {
-              ep = s.episodes[0];
+              const sorted = [...s.episodes].sort(
+                (a, b) => (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0)
+              );
+              ep = sorted[0];
               break;
             }
           }

@@ -398,19 +398,14 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem, initialFil
         )}
       </div>
 
-      {/* Results Grid */}
+      {/* Results Grid - Compact 3-4 cards per row on mobile (< 640px) */}
       {filteredItems.length > 0 ? (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-            gap: 'clamp(12px, 2.5vw, 20px)'
-          }}
-        >
+        <div className="search-results-grid">
           {filteredItems.map(item => (
             <ContentCard
               key={item.id}
               item={item}
+              compact
               onSelect={selected => {
                 if (query.trim()) addSearchHistory(query.trim());
                 onSelectItem(selected);
@@ -463,6 +458,32 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSelectItem, initialFil
           </button>
         </div>
       )}
+
+      <style>{`
+        .search-results-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+        }
+        @media (min-width: 480px) {
+          .search-results-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+          }
+        }
+        @media (min-width: 768px) {
+          .search-results-grid {
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 16px;
+          }
+        }
+        @media (min-width: 1024px) {
+          .search-results-grid {
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 20px;
+          }
+        }
+      `}</style>
     </div>
   );
 };

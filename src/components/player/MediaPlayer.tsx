@@ -140,6 +140,15 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     };
   }, []);
 
+  // Lock document body scroll while player is active
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
   // ─── ALL HOOKS UNCONDITIONAL — Rules of Hooks requires this ─────────────────
 
   // Fetch ad config once per content/episode for MAIN type
@@ -688,14 +697,31 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         userSelect: 'none',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        width: '100%',
+        maxWidth: '100vw',
+        height: '100%',
+        maxHeight: '100vh',
       }}
     >
       {/* -------------------------------------------------------------------- */}
       {/* 1. YOUTUBE EMBEDDED PLAYER */}
       {/* -------------------------------------------------------------------- */}
       {isYouTube && youtubeInfo.embedUrl ? (
-        <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div
+          className="aspect-video w-full max-w-full"
+          style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: '100vw',
+            maxHeight: isMobile ? '50vh' : '100vh',
+            aspectRatio: '16 / 9',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden'
+          }}
+        >
           <iframe
             src={youtubeInfo.embedUrl}
             title={source.title}
@@ -719,7 +745,20 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
         /* ------------------------------------------------------------------ */
         /* 2. STREAMTAPE & THIRD-PARTY IFRAME EMBED PLAYER */
         /* ------------------------------------------------------------------ */
-        <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div
+          className="aspect-video w-full max-w-full"
+          style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: '100vw',
+            maxHeight: isMobile ? '50vh' : '100vh',
+            aspectRatio: '16 / 9',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden'
+          }}
+        >
           <iframe
             src={embedInfo.embedUrl}
             title={source.title}

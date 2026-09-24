@@ -140,8 +140,33 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
 
       {/* Right Action Icons: Subscription pill & Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        {/* Dynamic Plan Badge (Replaces duplicate Bonus button) */}
-        {(() => {
+        {/* Mobile Search Icon Button (replaces congested Upgrade Plan button on mobile) */}
+        <button
+          onClick={() => onNavigate('search')}
+          className="header-mobile-search-btn"
+          title="Search FLOPSHOW"
+          aria-label="Search"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '8px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(255, 255, 255, 0.06)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            color: 'var(--brand-gold, #F5C518)',
+            cursor: 'pointer',
+            minWidth: '40px',
+            minHeight: '40px',
+            transition: 'all var(--transition-fast)'
+          }}
+        >
+          <Search size={18} />
+        </button>
+
+        {/* Desktop Plan Badge (hidden on mobile viewports < 768px) */}
+        <div className="header-plan-badge" style={{ display: 'none', alignItems: 'center' }}>
+          {(() => {
           if (hasActiveSubscription && activeSubscription) {
             const planLabel = activeSubscription.plan === 'MONTHLY'
               ? 'MONTHLY VIP'
@@ -286,6 +311,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
             </button>
           );
         })()}
+        </div>
 
         {/* User Avatar Circle */}
         <button
@@ -321,6 +347,20 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
       </div>
 
       <style>{`
+        .header-mobile-search-btn {
+          display: flex !important;
+        }
+        .header-plan-badge {
+          display: none !important;
+        }
+        @media (min-width: 768px) {
+          .header-mobile-search-btn {
+            display: none !important;
+          }
+          .header-plan-badge {
+            display: flex !important;
+          }
+        }
         @media (min-width: 900px) {
           .desktop-nav-links {
             display: flex !important;

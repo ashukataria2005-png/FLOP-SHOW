@@ -69,6 +69,60 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
   // Home Hero: dedicated hero item set by admin, or first featured item, or premier catalog item
   const heroItem = activeCatalog.find(item => item.isHero) || dedicatedHero || activeCatalog.find(item => item.isFeatured) || activeCatalog[0] || undefined;
 
+  // Multi-Banner Hero Carousel items selected by admin or featured
+  const heroCarouselItems = React.useMemo(() => {
+    let savedIds: string[] = [];
+    try {
+      const raw = localStorage.getItem('flopshow_hero_carousel_ids');
+      if (raw) savedIds = JSON.parse(raw);
+    } catch (_) {}
+
+    const selectedList: ContentItem[] = [];
+    const seen = new Set<string>();
+
+    // 1. Prioritize explicit carousel picks from Admin Hero Picker
+    if (Array.isArray(savedIds) && savedIds.length > 0) {
+      for (const id of savedIds) {
+        const found = activeCatalog.find(c => c.id === id);
+        if (found && !seen.has(found.id)) {
+          seen.add(found.id);
+          selectedList.push(found);
+        }
+      }
+    }
+
+    // 2. Add dedicated main hero item if set
+    if (dedicatedHero && !seen.has(dedicatedHero.id)) {
+      seen.add(dedicatedHero.id);
+      selectedList.push(dedicatedHero);
+    }
+
+    // 3. Add any items flagged with isHero
+    for (const item of activeCatalog) {
+      if (item.isHero && !seen.has(item.id)) {
+        seen.add(item.id);
+        selectedList.push(item);
+      }
+    }
+
+    // 4. Add items flagged with isFeatured if list has less than 6 items
+    for (const item of activeCatalog) {
+      if (selectedList.length >= 6) break;
+      if (item.isFeatured && !seen.has(item.id)) {
+        seen.add(item.id);
+        selectedList.push(item);
+      }
+    }
+
+    // 5. Fallback to heroItem or first catalog items if empty
+    if (selectedList.length === 0) {
+      if (heroItem) selectedList.push(heroItem);
+      else if (activeCatalog.length > 0) selectedList.push(...activeCatalog.slice(0, 3));
+    }
+
+    return selectedList;
+  }, [activeCatalog, dedicatedHero, heroItem]);
+
   // ── In-progress: items currently being watched (with completion threshold & deduplication) ───
   const inProgressItems = React.useMemo(() => {
     const activeProgress = watchProgress.filter(wp => {
@@ -604,8 +658,8 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
 
   return (
     <div className="discover-page-container">
-      {/* Featured Hero Banner */}
-      {heroItem && <HeroBanner item={heroItem} onViewDetails={onSelectItem} />}
+      {/* Multi-Banner Hero Carousel */}
+      {heroCarouselItems.length > 0 && <HeroBanner items={heroCarouselItems} onViewDetails={onSelectItem} />}
 
       {/* Dynamic Interleaved Rows and Unlimited Spotlights */}
       {interleavedSections}

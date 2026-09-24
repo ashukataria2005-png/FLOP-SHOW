@@ -55,7 +55,8 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
         cursor: 'pointer',
         transition: 'all var(--transition-fast)',
         alignItems: 'center',
-        position: 'relative'
+        position: 'relative',
+        overflow: 'hidden'
       }}
       className="episode-card-row"
     >
@@ -173,32 +174,6 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
             {episode.duration}
           </span>
         )}
-
-        {/* Hotstar-Style Persistent Watch Progress Bar */}
-        {hasProgress && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: '4px',
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              overflow: 'hidden',
-              zIndex: 10
-            }}
-          >
-            <div
-              style={{
-                width: `${activeProgressFill}%`,
-                height: '100%',
-                backgroundColor: 'var(--brand-gold, #F5C518)',
-                boxShadow: '0 0 4px rgba(245, 197, 24, 0.6)',
-                transition: 'width 0.3s ease'
-              }}
-            />
-          </div>
-        )}
       </div>
 
       {/* Episode Metadata */}
@@ -261,6 +236,24 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
           transform: translateX(3px);
         }
       `}</style>
+
+      {/* Hotstar Card-Base Style Persistent Watch Progress Bar (full width) */}
+      {hasProgress && (
+        <div
+          className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-800/80 overflow-hidden rounded-b"
+          style={{ zIndex: 10 }}
+        >
+          <div
+            style={{
+              width: `${activeProgressFill}%`,
+              height: '100%',
+              backgroundColor: 'var(--brand-gold, #F5C518)',
+              boxShadow: '0 0 6px rgba(245, 197, 24, 0.7)',
+              transition: 'width 0.3s ease'
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };

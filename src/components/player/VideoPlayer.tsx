@@ -18,6 +18,8 @@ import {
   X,
   AlertTriangle,
 } from 'lucide-react';
+import { AdPreroll, AdConfig } from './AdPreroll';
+import { api } from '../../services/api';
 
 export const VideoPlayer: React.FC = () => {
   const {
@@ -42,6 +44,10 @@ export const VideoPlayer: React.FC = () => {
   const [showControls,        setShowControls]        = useState(true);
   const [showEpisodeDrawer,   setShowEpisodeDrawer]   = useState(false);
   const [selectedSeasonIndex, setSelectedSeasonIndex] = useState(0);
+  // Advertisement Pre-roll State
+  const [adConfig,            setAdConfig]            = useState<AdConfig | null>(null);
+  const [adFinished,          setAdFinished]          = useState(false);
+  const [adChecking,          setAdChecking]          = useState(true);
   /** Set when the video element fires an error or produces no decoded frames */
   const [codecError,          setCodecError]          = useState(false);
 
@@ -79,6 +85,39 @@ export const VideoPlayer: React.FC = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Lock document body scroll while player is active
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  // Fetch native advertisement config for active content
+  useEffect(() => {
+    let active = true;
+    setAdChecking(true);
+    api.content.getAdsConfig()
+      .then(cfg => {
+        if (active) {
+          if (cfg && cfg.enabled && cfg.mediaUrl && cfg.mediaUrl.trim() !== '') {
+            setAdConfig(cfg);
+            setAdFinished(false);
+          } else {
+            setAdFinished(true);
+          }
+        }
+      })
+      .catch(() => {
+        if (active) setAdFinished(true);
+      })
+      .finally(() => {
+        if (active) setAdChecking(false);
+      });
+    return () => { active = false; };
+  }, [activePlayerContent?.id, activeEpisode?.id]);
 
   // Sync fullscreen state & orientation unlock on exit
   useEffect(() => {
@@ -285,6 +324,17 @@ export const VideoPlayer: React.FC = () => {
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
+  // Render native advertisement pre-roll before main playback
+  if (!adFinished && adConfig && adConfig.enabled && adConfig.mediaUrl && !adChecking) {
+    return (
+      <AdPreroll
+        adConfig={adConfig}
+        onComplete={() => setAdFinished(true)}
+        onClose={closePlayer}
+      />
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -301,21 +351,26 @@ export const VideoPlayer: React.FC = () => {
         justifyContent:  'center',
         userSelect:      'none',
         overflow:        'hidden',
+        width:           '100%',
+        maxWidth:        '100vw',
+        height:          '100%',
+        maxHeight:       '100vh',
       }}
     >
       {/* ── Iframe for embed / Streamtape sources ─────────────────────── */}
       {isEmbed ? (
         <div
-          className="aspect-video"
+          className="aspect-video w-full max-w-full"
           style={{
             position:       'relative',
             width:          '100%',
-            maxWidth:       '100%',
-            maxHeight:      '100vh',
+            maxWidth:       '100vw',
+            maxHeight:      isMobile ? '50vh' : '100vh',
             aspectRatio:    '16 / 9',
             display:        'flex',
             alignItems:     'center',
             justifyContent: 'center',
+            overflow:       'hidden',
           }}
         >
           <iframe
@@ -330,12 +385,12 @@ export const VideoPlayer: React.FC = () => {
       ) : (
         /* ── 16:9 responsive video wrapper ──────────────────────────── */
         <div
-          className="aspect-video"
+          className="aspect-video w-full max-w-full"
           style={{
             position:        'relative',
             width:           '100%',
-            maxWidth:        '100%',
-            maxHeight:       '100vh',
+            maxWidth:        '100vw',
+            maxHeight:       isMobile ? '50vh' : '100vh',
             aspectRatio:     '16 / 9',
             backgroundColor: '#000',
             overflow:        'hidden',

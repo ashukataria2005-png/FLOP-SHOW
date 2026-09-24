@@ -12,7 +12,9 @@ import {
   Loader2,
   Sparkles,
   ArrowLeft,
-  AlertCircle
+  AlertCircle,
+  Layers,
+  Trash2
 } from 'lucide-react';
 
 interface AdminHeroPageProps {
@@ -26,6 +28,41 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
+
+  // Hero Carousel multi-selection IDs persisted in localStorage
+  const [carouselIds, setCarouselIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('flopshow_hero_carousel_ids');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleToggleCarousel = (item: ContentItem) => {
+    setCarouselIds(prev => {
+      let next: string[];
+      if (prev.includes(item.id)) {
+        next = prev.filter(id => id !== item.id);
+        showToast(`Removed "${item.title}" from Hero Carousel`, 'info');
+      } else {
+        next = [...prev, item.id];
+        showToast(`Added "${item.title}" to Hero Carousel`, 'success');
+      }
+      try {
+        localStorage.setItem('flopshow_hero_carousel_ids', JSON.stringify(next));
+      } catch (_) {}
+      return next;
+    });
+  };
+
+  const handleClearCarousel = () => {
+    setCarouselIds([]);
+    try {
+      localStorage.removeItem('flopshow_hero_carousel_ids');
+    } catch (_) {}
+    showToast('Cleared all titles from Hero Carousel', 'info');
+  };
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -354,6 +391,117 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
         )}
       </div>
 
+      {/* SECTION 1B: Multi-Slide Hero Carousel Configuration */}
+      <div
+        style={{
+          backgroundColor: 'var(--bg-surface, #12121A)',
+          borderRadius: '18px',
+          border: carouselIds.length > 0 ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '24px',
+          marginBottom: '36px',
+          position: 'relative'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Layers size={18} color="#818CF8" />
+            <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', letterSpacing: '0.04em', textTransform: 'uppercase', margin: 0 }}>
+              Hero Carousel Rotation ({carouselIds.length} titles selected)
+            </h2>
+            <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '12px', backgroundColor: 'rgba(99, 102, 241, 0.2)', color: '#A5B4FC', fontWeight: 600 }}>
+              5s Auto-Rotation
+            </span>
+          </div>
+          {carouselIds.length > 0 && (
+            <button
+              onClick={handleClearCarousel}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#F87171',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              <Trash2 size={14} />
+              <span>Clear Carousel</span>
+            </button>
+          )}
+        </div>
+
+        {carouselIds.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px' }}>
+            {carouselIds.map((id, idx) => {
+              const item = catalog.find(c => c.id === id);
+              if (!item) return null;
+              return (
+                <div
+                  key={id}
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                    borderRadius: '10px',
+                    padding: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}
+                >
+                  <div style={{ position: 'relative', width: '100%', height: '110px', borderRadius: '6px', overflow: 'hidden' }}>
+                    <img
+                      src={item.backdropUrl || item.posterUrl}
+                      alt={item.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=300&q=80';
+                      }}
+                    />
+                    <span style={{ position: 'absolute', top: '4px', left: '4px', backgroundColor: 'rgba(0,0,0,0.7)', color: '#FFF', fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
+                      Slide #{idx + 1}
+                    </span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#FFFFFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {item.title}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF' }}>
+                      {item.releaseYear} • {item.type}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleCarousel(item)}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      color: '#F87171',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>
+            No specific titles selected for the carousel yet. Use "+ Carousel" on any title in the catalog table below to add it to the multi-slide Hero banner. Discover page will automatically rotate between them every 5s.
+          </p>
+        )}
+      </div>
+
       {/* SECTION 2: Select Title from Published Catalog */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
@@ -586,66 +734,93 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
 
                       {/* Action */}
                       <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                        {isHeroActive ? (
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '8px 16px',
-                              borderRadius: '8px',
-                              backgroundColor: 'rgba(245, 197, 24, 0.15)',
-                              border: '1px solid var(--brand-gold, #F5C518)',
-                              color: 'var(--brand-gold, #F5C518)',
-                              fontSize: '13px',
-                              fontWeight: 700
-                            }}
-                          >
-                            <Check size={16} />
-                            <span>Current Main Hero</span>
-                          </span>
-                        ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                          {/* Carousel Toggle Button */}
                           <button
                             type="button"
-                            onClick={() => handleSetHero(item)}
-                            disabled={isBeingUpdated}
+                            onClick={() => handleToggleCarousel(item)}
+                            title={carouselIds.includes(item.id) ? "Remove from Hero Carousel" : "Add to Hero Carousel"}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '6px',
-                              padding: '8px 16px',
+                              gap: '5px',
+                              padding: '8px 12px',
                               borderRadius: '8px',
-                              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                              border: '1px solid rgba(255, 255, 255, 0.15)',
-                              color: '#FFFFFF',
-                              fontSize: '13px',
+                              backgroundColor: carouselIds.includes(item.id) ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                              border: carouselIds.includes(item.id) ? '1px solid #818CF8' : '1px solid rgba(255, 255, 255, 0.1)',
+                              color: carouselIds.includes(item.id) ? '#A5B4FC' : '#D1D5DB',
+                              fontSize: '12px',
                               fontWeight: 700,
-                              cursor: isBeingUpdated ? 'not-allowed' : 'pointer',
+                              cursor: 'pointer',
                               transition: 'all 0.15s ease'
                             }}
-                            onMouseEnter={e => {
-                              if (!isBeingUpdated) {
-                                e.currentTarget.style.backgroundColor = 'var(--brand-gold, #F5C518)';
-                                e.currentTarget.style.color = '#000000';
-                                e.currentTarget.style.borderColor = 'var(--brand-gold, #F5C518)';
-                              }
-                            }}
-                            onMouseLeave={e => {
-                              if (!isBeingUpdated) {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
-                                e.currentTarget.style.color = '#FFFFFF';
-                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-                              }
-                            }}
                           >
-                            {isBeingUpdated ? (
-                              <Loader2 size={16} className="animate-spin" />
-                            ) : (
-                              <Crown size={16} />
-                            )}
-                            <span>Set as Main Hero</span>
+                            <Layers size={14} />
+                            <span>{carouselIds.includes(item.id) ? 'In Carousel' : '+ Carousel'}</span>
                           </button>
-                        )}
+
+                          {/* Main Hero Toggle */}
+                          {isHeroActive ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '8px 14px',
+                                borderRadius: '8px',
+                                backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                                border: '1px solid var(--brand-gold, #F5C518)',
+                                color: 'var(--brand-gold, #F5C518)',
+                                fontSize: '13px',
+                                fontWeight: 700
+                              }}
+                            >
+                              <Check size={16} />
+                              <span>Main Hero</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleSetHero(item)}
+                              disabled={isBeingUpdated}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '8px 14px',
+                                borderRadius: '8px',
+                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                color: '#FFFFFF',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                cursor: isBeingUpdated ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                              onMouseEnter={e => {
+                                if (!isBeingUpdated) {
+                                  e.currentTarget.style.backgroundColor = 'var(--brand-gold, #F5C518)';
+                                  e.currentTarget.style.color = '#000000';
+                                  e.currentTarget.style.borderColor = 'var(--brand-gold, #F5C518)';
+                                }
+                              }}
+                              onMouseLeave={e => {
+                                if (!isBeingUpdated) {
+                                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+                                  e.currentTarget.style.color = '#FFFFFF';
+                                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                                }
+                              }}
+                            >
+                              {isBeingUpdated ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Crown size={16} />
+                              )}
+                              <span>Set Main</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

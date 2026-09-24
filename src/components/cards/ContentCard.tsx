@@ -8,9 +8,10 @@ interface ContentCardProps {
   item: ContentItem;
   onSelect: (item: ContentItem) => void;
   width?: string | number;
+  compact?: boolean;
 }
 
-export const ContentCard: React.FC<ContentCardProps> = ({ item, onSelect, width }) => {
+export const ContentCard: React.FC<ContentCardProps> = ({ item, onSelect, width, compact }) => {
   const { isOwned, getProgress, monetizationMode } = useApp();
   const owned = isOwned(item.id);
   const progress = getProgress(item.id);
@@ -34,11 +35,11 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, onSelect, width 
           position: 'relative',
           width: '100%',
           aspectRatio: '2 / 3',
-          borderRadius: '16px',
+          borderRadius: compact ? '10px' : '16px',
           overflow: 'hidden',
           backgroundColor: 'var(--bg-surface)',
           border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
+          boxShadow: compact ? '0 4px 12px rgba(0, 0, 0, 0.35)' : '0 8px 24px rgba(0, 0, 0, 0.45)',
           transition: 'all var(--transition-normal)'
         }}
       >
@@ -144,34 +145,36 @@ export const ContentCard: React.FC<ContentCardProps> = ({ item, onSelect, width 
       </div>
 
       {/* Metadata below poster */}
-      <div style={{ marginTop: '9px', padding: '0 2px' }}>
+      <div style={{ marginTop: compact ? '5px' : '9px', padding: '0 2px' }}>
         <h4
           style={{
-            fontSize: '15px',
+            fontSize: compact ? '12px' : '15px',
             fontWeight: 700,
             color: 'var(--text-primary)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            lineHeight: 1.3
+            lineHeight: 1.25,
+            margin: 0
           }}
+          title={item.title}
         >
           {item.title}
         </h4>
 
         <div
           style={{
-            fontSize: '13px',
+            fontSize: compact ? '11px' : '13px',
             color: 'var(--text-secondary)',
-            marginTop: '3px',
+            marginTop: compact ? '2px' : '3px',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px'
+            gap: compact ? '4px' : '6px'
           }}
         >
           <span>{item.releaseYear}</span>
           <span style={{ opacity: 0.4 }}>•</span>
-          <span>{item.genres[0]}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.genres[0]}</span>
         </div>
       </div>
 

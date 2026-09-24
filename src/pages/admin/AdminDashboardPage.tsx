@@ -81,7 +81,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
   const [dailyFilter, setDailyFilter] = useState<'ALL' | 'ONE_TITLE' | 'PASS' | 'VIP_PLANS'>('ALL');
   const [dailyStats, setDailyStats] = useState<any>(null);
   // Clickable Today Analytics Modal State
-  const [activeModal, setActiveModal] = useState<'revenue' | 'members' | 'purchases' | 'upi' | 'profit' | null>(null);
+  const [activeModal, setActiveModal] = useState<'revenue' | 'members' | 'purchases' | 'upi' | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [modalData, setModalData] = useState<any>(null);
   const [modalSearch, setModalSearch] = useState('');
@@ -477,25 +477,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                       <span>Revenue Details</span>
                       <ChevronRight size={12} />
                     </button>
-                    <button
-                      onClick={() => openMetricModal('profit')}
-                      style={{
-                        padding: '5px 10px',
-                        borderRadius: '6px',
-                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                        border: '1px solid rgba(16, 185, 129, 0.3)',
-                        color: '#34D399',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <span>Profit Audit</span>
-                      <ChevronRight size={12} />
-                    </button>
                   </>
                 ) : (
                   <>
@@ -567,27 +548,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
                     </div>
                   </div>
 
-                  {/* Net Margin / Profit */}
-                  <div
-                    onClick={() => openMetricModal('profit')}
-                    style={{
-                      cursor: 'pointer',
-                      padding: '10px 14px',
-                      borderRadius: '10px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                      transition: 'background 0.2s ease'
-                    }}
-                  >
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '4px' }}>
-                      Today's Profit / Net Margin
-                    </div>
-                    <div style={{ fontSize: '28px', fontWeight: 900, color: '#34D399', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                      ₹{today.todayProfitRupees}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                      Gross 100% margin (Zero server hosting deduction)
-                    </div>
-                  </div>
                 </>
               ) : (
                 <>
@@ -673,39 +633,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ onNaviga
             </div>
           </div>
 
-          {/* Card 1B (MOBILE SPLIT): Profit / Active Subs */}
-          <div
-            onClick={() => (currentMode === 'PER_CONTENT' ? openMetricModal('profit') : onNavigateTab('admin-monetization'))}
-            className="today-card-split admin-stat-card"
-            style={{
-              backgroundColor: 'var(--bg-surface, #12121A)',
-              borderRadius: '16px',
-              border: '1.5px solid rgba(16, 185, 129, 0.35)',
-              padding: '20px',
-              cursor: 'pointer'
-            }}
-          >
-            <div>
-              <div className="stat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span className="stat-title" style={{ fontSize: '11px', fontWeight: 800, color: '#34D399', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  {currentMode === 'PER_CONTENT' ? "Today's Profit" : "Active Subs"}
-                </span>
-                <div className="stat-icon" style={{ width: '30px', height: '30px', borderRadius: '8px', backgroundColor: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34D399' }}>
-                  {currentMode === 'PER_CONTENT' ? <TrendingUp size={16} /> : <ShieldCheck size={16} />}
-                </div>
-              </div>
-              <div className="stat-value" style={{ fontSize: '26px', fontWeight: 900, color: '#34D399', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '4px' }}>
-                {currentMode === 'PER_CONTENT' ? `₹${today.todayProfitRupees}` : (subConfig?.metrics?.activeCount || 0)}
-              </div>
-              <p className="stat-desc" style={{ fontSize: '11px', color: '#9CA3AF', margin: '0 0 8px' }}>
-                {currentMode === 'PER_CONTENT' ? '100% net margin' : 'Active users'}
-              </p>
-            </div>
-            <div className="stat-action" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#34D399' }}>
-              <span>{currentMode === 'PER_CONTENT' ? 'Profit audit' : 'Subscribers'}</span>
-              <ChevronRight size={13} />
-            </div>
-          </div>
 
           {/* Card 2: Today's New Members */}
           <div

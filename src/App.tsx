@@ -244,6 +244,8 @@ export function tabToPath(tab: string, param?: string): string {
 const AppContent: React.FC = () => {
   const {
     user: _user,
+    isAuthenticated,
+    sessionLoading,
     toasts,
     activeMediaSource,
     closePlayer,
@@ -311,6 +313,26 @@ const AppContent: React.FC = () => {
   const handleBackFromDetails = () => {
     setSelectedItem(null);
   };
+
+  // ── Auth gate: show full-page login for unauthenticated visitors ──────────
+  // This runs AFTER the admin branch so the /admin login flow is unaffected.
+  if (sessionLoading) {
+    // Session is still being restored from localStorage — show a minimal splash
+    return (
+      <div style={{
+        minHeight: '100vh', backgroundColor: '#07070A',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div style={{
+          width: '40px', height: '40px', borderRadius: '50%',
+          border: '3px solid rgba(255,255,255,0.1)',
+          borderTopColor: '#F5A623',
+          animation: 'spin 0.9s linear infinite',
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   // If viewing admin route, render Admin Layout and Admin Views
   if (currentTab.startsWith('admin')) {
@@ -425,6 +447,19 @@ const AppContent: React.FC = () => {
   }
 
   // Consumer Customer View
+  // ── Auth gate: unauthenticated visitors see the full-page login ───────────
+  if (!isAuthenticated) {
+    return (
+      <AuthModal
+        isFullPage
+        onSuccess={() => {
+          // After login the context re-renders with isAuthenticated=true;
+          // no extra state needed — the gate just disappears.
+        }}
+      />
+    );
+  }
+
   return (
     <div className="app-container">
       {/* Top Header */}

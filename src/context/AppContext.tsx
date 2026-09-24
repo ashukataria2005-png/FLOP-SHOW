@@ -13,6 +13,7 @@ import { formatCurrentDate } from '../utils/formatters';
 import { MediaPlayerSource } from '../components/player/MediaPlayer';
 import { api, tokenStorage, API_BASE_URL } from '../services/api';
 import { resolveMediaUrl } from '../utils/mediaUrl';
+import { DEMO_CATALOG } from '../data/catalog';
 
 function isDemoStreamUrl(url?: string | null): boolean {
   if (!url || typeof url !== 'string') return false;
@@ -237,8 +238,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [theme]);
 
-  // Catalog state from central database (strictly dynamic, no hardcoded fallbacks)
-  const [catalog, setCatalog] = useState<ContentItem[]>([]);
+  // Catalog state from central database with instant fallback
+  const [catalog, setCatalog] = useState<ContentItem[]>(() => DEMO_CATALOG);
 
   // Modal states
   const [activeModal, setActiveModal] = useState<'purchase' | 'recharge' | 'auth' | 'subscription' | 'watchpass' | 'plan_selector' | null>(null);
@@ -503,9 +504,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshCatalog = async () => {
     try {
       const items = await api.content.list({ limit: 1000 });
-      setCatalog(items || []);
+      setCatalog(items && items.length > 0 ? items : DEMO_CATALOG);
     } catch {
-      // Offline: keep current state
+      // Offline: keep current state or fallback to DEMO_CATALOG
+      setCatalog(prev => prev.length > 0 ? prev : DEMO_CATALOG);
     }
   };
 

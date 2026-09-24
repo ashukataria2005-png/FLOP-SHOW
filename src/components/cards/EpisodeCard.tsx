@@ -21,8 +21,20 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
   const [imgSrc, setImgSrc] = useState<string>(episode.thumbnailUrl || seriesPosterUrl || '');
   const [imgError, setImgError] = useState<boolean>(false);
 
-  const isWatched = Boolean(progress && progress.percent >= 90);
-  const hasProgress = Boolean(progress && progress.percent > 0 && progress.percent < 90);
+  const watchProgressPercent = React.useMemo(() => {
+    if (!progress) return 0;
+    if (typeof progress.percent === 'number' && !isNaN(progress.percent)) {
+      return Math.min(Math.max(progress.percent, 0), 100);
+    }
+    if (typeof progress.currentTime === 'number' && typeof progress.duration === 'number' && progress.duration > 0) {
+      return Math.min(Math.max(Math.round((progress.currentTime / progress.duration) * 100), 0), 100);
+    }
+    return 0;
+  }, [progress]);
+
+  const isWatched = Boolean(progress && (progress.completed || watchProgressPercent >= 90));
+  const hasProgress = watchProgressPercent > 0;
+  const activeProgressFill = isWatched ? 100 : watchProgressPercent;
 
   // Clean title: Strip redundant prefix like "Episode 1: " so UI does not duplicate numbering
   const cleanTitle = episode.title
@@ -154,30 +166,35 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
               backgroundColor: 'rgba(0, 0, 0, 0.75)',
               fontSize: '11px',
               fontWeight: 600,
-              color: '#FFFFFF'
+              color: '#FFFFFF',
+              zIndex: 6
             }}
           >
             {episode.duration}
           </span>
         )}
 
-        {/* Episode Watch Progress Bar */}
-        {hasProgress && progress && (
+        {/* Hotstar-Style Persistent Watch Progress Bar */}
+        {hasProgress && (
           <div
             style={{
               position: 'absolute',
               bottom: 0,
               left: 0,
               right: 0,
-              height: '3px',
-              backgroundColor: 'rgba(255, 255, 255, 0.25)'
+              height: '4px',
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              overflow: 'hidden',
+              zIndex: 10
             }}
           >
             <div
               style={{
-                width: `${progress.percent}%`,
+                width: `${activeProgressFill}%`,
                 height: '100%',
-                backgroundColor: 'var(--brand-gold)'
+                backgroundColor: 'var(--brand-gold, #F5C518)',
+                boxShadow: '0 0 4px rgba(245, 197, 24, 0.6)',
+                transition: 'width 0.3s ease'
               }}
             />
           </div>
@@ -200,11 +217,6 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
               }}
             >
               • NOW PLAYING
-            </span>
-          )}
-          {hasProgress && progress && !isCurrent && (
-            <span style={{ fontSize: '11px', color: 'var(--brand-gold)', fontWeight: 600 }}>
-              • {progress.percent}% watched
             </span>
           )}
         </div>

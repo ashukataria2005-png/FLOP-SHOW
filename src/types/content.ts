@@ -11,6 +11,10 @@ export interface Episode {
   thumbnailUrl: string;
   videoUrl: string;
   synopsis: string;
+  overview?: string;
+  description?: string;
+  stillUrl?: string;
+  streamUrl?: string;
 }
 
 export interface Season {
@@ -24,6 +28,7 @@ export interface ContentItem {
   title: string;
   type: ContentType;
   backdropUrl: string;
+  bannerUrl?: string;
   posterUrl: string;
   tagline?: string;
   description: string;
@@ -34,6 +39,7 @@ export interface ContentItem {
   seasonsCount?: number; // e.g. 2 (series)
   language: string; // e.g. "Hindi"
   genres: string[]; // e.g. ["Drama", "Thriller"]
+  categories?: string[];
   price: number; // in INR e.g. 30 or 35, 0 = free
   customPrice?: number | null; // custom individual price override in INR, null if using default
   isNow?: boolean; // displays "NOW" badge

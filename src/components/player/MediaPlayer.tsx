@@ -103,6 +103,43 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   const embedInfo = parseEmbedUrl(source?.url || '');
   const isEmbed = embedInfo.isEmbed;
 
+  // Track mobile viewport (< 768px)
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Sync fullscreen state & auto-rotation unlock
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFs = Boolean(document.fullscreenElement);
+      setIsFullscreen(isFs);
+      if (!isFs && window.screen?.orientation && 'unlock' in window.screen.orientation) {
+        try {
+          window.screen.orientation.unlock();
+        } catch {
+          // Gracefully ignore
+        }
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
   // ─── ALL HOOKS UNCONDITIONAL — Rules of Hooks requires this ─────────────────
 
   // Fetch ad config once per content/episode for MAIN type
@@ -495,7 +532,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     }
   };
 
-  // Handle controls hide on idle
+  // Handle controls hide on idle (3 seconds inactivity)
   const handleUserActivity = () => {
     setShowControls(true);
     if (controlsTimeoutRef.current) {
@@ -505,7 +542,23 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       if (isPlaying) {
         setShowControls(false);
       }
-    }, 3500);
+    }, 3000);
+  };
+
+  // Re-display or toggle controls on single tap without triggering interactive elements
+  const handleContainerTap = (e: React.MouseEvent | React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('a')) return;
+
+    if (!showControls) {
+      setShowControls(true);
+      if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = window.setTimeout(() => {
+        if (isPlaying) setShowControls(false);
+      }, 3000);
+    } else if (isPlaying) {
+      setShowControls(false);
+    }
   };
 
   const togglePlay = () => {
@@ -515,7 +568,13 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       setIsPlaying(false);
       recordProgress(videoRef.current.currentTime, videoRef.current.duration);
     } else {
-      videoRef.current.play().then(() => setIsPlaying(true)).catch((err) => {
+      videoRef.current.play().then(() => {
+        setIsPlaying(true);
+        if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = window.setTimeout(() => {
+          setShowControls(false);
+        }, 3000);
+      }).catch((err) => {
         if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') {
           setIsPlaying(false);
         } else {
@@ -570,14 +629,40 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     setIsMuted(val === 0);
   };
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = async () => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch(console.error);
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen().catch(console.error);
-      setIsFullscreen(false);
+    try {
+      if (!document.fullscreenElement) {
+        if (containerRef.current.requestFullscreen) {
+          await containerRef.current.requestFullscreen();
+        } else if ((containerRef.current as any).webkitRequestFullscreen) {
+          await (containerRef.current as any).webkitRequestFullscreen();
+        }
+        setIsFullscreen(true);
+        if (window.screen?.orientation && 'lock' in window.screen.orientation) {
+          try {
+            await (window.screen.orientation as any).lock('landscape');
+          } catch {
+            // Gracefully ignore if not supported or permitted
+          }
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        }
+        setIsFullscreen(false);
+        if (window.screen?.orientation && 'unlock' in window.screen.orientation) {
+          try {
+            window.screen.orientation.unlock();
+          } catch {
+            // Gracefully ignore
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Fullscreen toggle error:', err);
     }
   };
 
@@ -593,6 +678,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       ref={containerRef}
       onMouseMove={handleUserActivity}
       onTouchStart={handleUserActivity}
+      onClick={handleContainerTap}
       style={{
         position: 'fixed',
         inset: 0,
@@ -1145,7 +1231,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
 
           {/* Controls Row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '16px' }}>
               {/* Previous Episode button */}
               {source.episodeId && onPrevEpisode && (
                 <button
@@ -1158,6 +1244,9 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
                     cursor: hasPrevEpisode ? 'pointer' : 'not-allowed',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '44px',
+                    minHeight: '44px',
                     padding: '4px'
                   }}
                   title={hasPrevEpisode ? 'Previous Episode' : 'First episode in season'}
@@ -1169,7 +1258,17 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
 
               <button
                 onClick={togglePlay}
-                style={{ background: 'none', border: 'none', color: '#FFFFFF', cursor: 'pointer' }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '44px',
+                  minHeight: '44px'
+                }}
                 aria-label={isPlaying ? 'Pause' : 'Play'}
               >
                 {isPlaying ? <Pause size={24} /> : <Play size={24} fill="#FFFFFF" />}
@@ -1187,6 +1286,9 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
                     cursor: hasNextEpisode ? 'pointer' : 'not-allowed',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '44px',
+                    minHeight: '44px',
                     padding: '4px'
                   }}
                   title={hasNextEpisode ? 'Next Episode' : 'Last episode in season'}
@@ -1198,38 +1300,77 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
 
               <button
                 onClick={() => skipTime(-10)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-secondary, #9CA3AF)', cursor: 'pointer' }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-secondary, #9CA3AF)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '44px',
+                  minHeight: '44px'
+                }}
                 title="Rewind 10s"
+                aria-label="Rewind 10 seconds"
               >
                 <RotateCcw size={20} />
               </button>
 
               <button
                 onClick={() => skipTime(10)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-secondary, #9CA3AF)', cursor: 'pointer' }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-secondary, #9CA3AF)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '44px',
+                  minHeight: '44px'
+                }}
                 title="Forward 10s"
+                aria-label="Forward 10 seconds"
               >
                 <RotateCw size={20} />
               </button>
 
-              {/* Volume */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
-                <button onClick={toggleMute} style={{ background: 'none', border: 'none', color: '#FFFFFF', cursor: 'pointer' }}>
-                  {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={isMuted ? 0 : volume}
-                  onChange={handleVolumeChange}
-                  style={{ width: '70px', height: '4px', accentColor: 'var(--brand-gold, #F5C518)', cursor: 'pointer' }}
-                />
-              </div>
+              {/* Volume: Hidden on mobile (< 768px), handled by physical hardware keys */}
+              {!isMobile && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
+                  <button
+                    onClick={toggleMute}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#FFFFFF',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minWidth: '44px',
+                      minHeight: '44px'
+                    }}
+                    aria-label={isMuted ? 'Unmute' : 'Mute'}
+                  >
+                    {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                  </button>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={isMuted ? 0 : volume}
+                    onChange={handleVolumeChange}
+                    style={{ width: '70px', height: '4px', accentColor: 'var(--brand-gold, #F5C518)', cursor: 'pointer' }}
+                    aria-label="Volume"
+                  />
+                </div>
+              )}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {source.episodeId && hasNextEpisode && onNextEpisode && (
                 <button
                   onClick={onNextEpisode}
@@ -1244,6 +1385,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
                     color: 'var(--brand-gold, #F5C518)',
                     fontSize: '12px',
                     fontWeight: 700,
+                    minHeight: '44px',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease'
                   }}
@@ -1256,7 +1398,17 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
 
               <button
                 onClick={toggleFullscreen}
-                style={{ background: 'none', border: 'none', color: '#FFFFFF', cursor: 'pointer' }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '44px',
+                  minHeight: '44px'
+                }}
                 aria-label="Toggle Fullscreen"
               >
                 {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}

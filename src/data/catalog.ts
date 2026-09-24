@@ -1,11 +1,12 @@
 import { ContentItem } from '../types/content';
+import { POPULAR_SERIES_CATALOG } from './series';
 
 /**
  * FLOPSHOW CATALOG
- * Content is dynamically loaded from the central database.
- * Hardcoded testing/sample catalog has been removed.
+ * Populated with 60 top popular Indian & global series with complete canonical seasons and episodes.
  */
-export const DEMO_CATALOG: ContentItem[] = [];
+export { POPULAR_SERIES_CATALOG };
+export const DEMO_CATALOG: ContentItem[] = POPULAR_SERIES_CATALOG;
 
 export const GENRE_LIST = [
   "All",

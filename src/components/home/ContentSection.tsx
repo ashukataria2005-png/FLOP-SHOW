@@ -103,7 +103,7 @@ export const ContentSection: React.FC<ContentSectionProps> = ({
         {/* Horizontal Card Track */}
         <div
           ref={scrollRef}
-          className="content-row-track"
+          className="content-row-track no-scrollbar scrollbar-none"
           style={{
             display: 'flex',
             gap: '16px',

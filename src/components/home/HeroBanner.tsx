@@ -28,6 +28,13 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onViewDetai
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
+  // Keep index within bounds if slide count changes
+  useEffect(() => {
+    if (currentIndex >= slides.length && slides.length > 0) {
+      setCurrentIndex(0);
+    }
+  }, [slides.length, currentIndex]);
+
   // Swipe handling
   const touchStartXRef = useRef<number | null>(null);
   const touchEndXRef = useRef<number | null>(null);
@@ -84,9 +91,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onViewDetai
 
   if (slides.length === 0) return null;
 
-  const currentItem = slides[currentIndex] || slides[0];
-  const owned = isOwned(currentItem.id);
-
   return (
     <div
       onMouseEnter={() => setIsPaused(true)}
@@ -100,55 +104,223 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onViewDetai
         minHeight: '480px',
         maxHeight: '620px',
         overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'flex-end',
-        padding: '24px 20px 32px',
         boxSizing: 'border-box'
       }}
       className="hero-banner-container"
     >
-      {/* Cinematic Backdrop Image with Smooth Fade Transition */}
-      {slides.map((slide, idx) => (
-        <img
-          key={slide.id}
-          src={slide.backdropUrl || slide.posterUrl}
-          alt={slide.title}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            objectPosition: 'center 25%',
-            zIndex: 0,
-            opacity: idx === currentIndex ? 1 : 0,
-            transition: 'opacity 0.8s ease-in-out',
-            pointerEvents: 'none'
-          }}
-        />
-      ))}
-
-      {/* Cinematic Vignette Gradients */}
+      {/* True Horizontal Carousel Track */}
       <div
+        className="hero-carousel-track"
         style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(180deg, rgba(7, 7, 10, 0.25) 0%, rgba(7, 7, 10, 0.6) 45%, rgba(7, 7, 10, 0.94) 85%, #07070A 100%)',
-          zIndex: 1,
-          pointerEvents: 'none'
+          display: 'flex',
+          width: '100%',
+          height: '100%',
+          minHeight: '480px',
+          maxHeight: '620px',
+          transform: `translateX(-${currentIndex * 100}%)`,
+          transition: 'transform 700ms cubic-bezier(0.25, 1, 0.5, 1)',
+          willChange: 'transform'
         }}
-      />
+      >
+        {slides.map((slide) => {
+          const owned = isOwned(slide.id);
+          return (
+            <div
+              key={slide.id}
+              className="hero-slide-item"
+              style={{
+                flex: '0 0 100%',
+                width: '100%',
+                minWidth: '100%',
+                position: 'relative',
+                minHeight: '480px',
+                maxHeight: '620px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'flex-end',
+                padding: '24px 20px 32px',
+                boxSizing: 'border-box',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Cinematic Backdrop Image */}
+              <img
+                src={slide.backdropUrl || slide.posterUrl}
+                alt={slide.title}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center 25%',
+                  zIndex: 0,
+                  pointerEvents: 'none'
+                }}
+              />
 
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'radial-gradient(circle at 30% 30%, transparent 40%, rgba(7, 7, 10, 0.7) 100%)',
-          zIndex: 1,
-          pointerEvents: 'none'
-        }}
-      />
+              {/* Cinematic Vignette Gradients */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(180deg, rgba(7, 7, 10, 0.25) 0%, rgba(7, 7, 10, 0.6) 45%, rgba(7, 7, 10, 0.94) 85%, #07070A 100%)',
+                  zIndex: 1,
+                  pointerEvents: 'none'
+                }}
+              />
+
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'radial-gradient(circle at 30% 30%, transparent 40%, rgba(7, 7, 10, 0.7) 100%)',
+                  zIndex: 1,
+                  pointerEvents: 'none'
+                }}
+              />
+
+              {/* Slide Hero Content Information */}
+              <div
+                style={{
+                  position: 'relative',
+                  zIndex: 2,
+                  maxWidth: '680px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}
+              >
+                {/* Category Label with Dash */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    letterSpacing: '0.15em',
+                    color: 'var(--brand-gold)',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  <span style={{ width: '24px', height: '2px', backgroundColor: 'var(--brand-gold)', display: 'inline-block' }} />
+                  <span>{slide.trendingPosition === 1 ? 'TRENDING #1 • ' : ''}{slide.categoryLabel || 'FEATURED PREMIERE'}</span>
+                </div>
+
+                {/* Title */}
+                <h1
+                  style={{
+                    fontSize: 'clamp(32px, 5.5vw, 56px)',
+                    fontWeight: 800,
+                    letterSpacing: '-0.02em',
+                    color: '#FFFFFF',
+                    lineHeight: 1.05,
+                    margin: '2px 0 6px'
+                  }}
+                >
+                  {slide.title}
+                </h1>
+
+                {/* Description */}
+                <p
+                  style={{
+                    fontSize: 'clamp(13.5px, 2vw, 16px)',
+                    color: 'rgba(255, 255, 255, 0.85)',
+                    lineHeight: 1.55,
+                    maxWidth: '560px',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {slide.description}
+                </p>
+
+                {/* Metadata Row: Star Rating, Year, Duration, Language */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '14px',
+                    fontSize: '14px',
+                    color: 'var(--text-secondary)',
+                    margin: '4px 0 12px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#FFFFFF', fontWeight: 700 }}>
+                    <Star size={16} fill="var(--brand-gold)" color="var(--brand-gold)" />
+                    <span>{slide.rating.toFixed(1)}</span>
+                  </div>
+
+                  <span>{slide.releaseYear}</span>
+
+                  <span>{slide.runtime || (slide.seasonsCount ? `${slide.seasonsCount} Seasons` : '2h 00m')}</span>
+
+                  <span
+                    style={{
+                      padding: '2px 9px',
+                      borderRadius: '4px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: '#FFFFFF',
+                      fontSize: '12px',
+                      fontWeight: 600
+                    }}
+                  >
+                    {slide.language}
+                  </span>
+                </div>
+
+                {/* Action Buttons: Watch Now / Buy, Watch Trailer, and Details */}
+                <div className="hero-actions-row" style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewDetails(slide);
+                    }}
+                    className="btn btn-primary btn-lg"
+                    style={{ minWidth: '140px' }}
+                  >
+                    <Play size={18} fill="currentColor" />
+                    <span>
+                      {monetizationMode === 'SUBSCRIPTION'
+                        ? (hasActiveSubscription || owned || slide.isFree || slide.price === 0 ? 'Watch now' : 'Subscribe to Watch')
+                        : (owned || slide.isFree || slide.price === 0 ? 'Watch now' : `Buy for ₹${slide.price}`)}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      playTrailer(slide);
+                    }}
+                    className="btn btn-secondary btn-lg"
+                    style={{ minWidth: '120px' }}
+                  >
+                    <Video size={18} color="var(--brand-gold)" />
+                    <span>Trailer</span>
+                  </button>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewDetails(slide);
+                    }}
+                    className="btn btn-secondary btn-lg"
+                    style={{ minWidth: '110px' }}
+                  >
+                    <span>Details</span>
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {/* Left / Right Carousel Navigation Arrows (visible when slides > 1) */}
       {slides.length > 1 && (
@@ -167,8 +339,8 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onViewDetai
               width: '44px',
               height: '44px',
               borderRadius: '50%',
-              backgroundColor: 'rgba(10, 10, 16, 0.65)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              backgroundColor: 'rgba(10, 10, 16, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
               backdropFilter: 'blur(8px)',
               color: '#FFFFFF',
               display: 'flex',
@@ -199,8 +371,8 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onViewDetai
               width: '44px',
               height: '44px',
               borderRadius: '50%',
-              backgroundColor: 'rgba(10, 10, 16, 0.65)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              backgroundColor: 'rgba(10, 10, 16, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
               backdropFilter: 'blur(8px)',
               color: '#FFFFFF',
               display: 'flex',
@@ -218,136 +390,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onViewDetai
           </button>
         </>
       )}
-
-      {/* Hero Content Information */}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 2,
-          maxWidth: '680px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          transition: 'all 0.3s ease'
-        }}
-      >
-        {/* Category Label with Dash */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '12px',
-            fontWeight: 800,
-            letterSpacing: '0.15em',
-            color: 'var(--brand-gold)',
-            textTransform: 'uppercase'
-          }}
-        >
-          <span style={{ width: '24px', height: '2px', backgroundColor: 'var(--brand-gold)', display: 'inline-block' }} />
-          <span>{currentItem.trendingPosition === 1 ? 'TRENDING #1 • ' : ''}{currentItem.categoryLabel || 'FEATURED PREMIERE'}</span>
-        </div>
-
-        {/* Title */}
-        <h1
-          style={{
-            fontSize: 'clamp(32px, 5.5vw, 56px)',
-            fontWeight: 800,
-            letterSpacing: '-0.02em',
-            color: '#FFFFFF',
-            lineHeight: 1.05,
-            margin: '2px 0 6px'
-          }}
-        >
-          {currentItem.title}
-        </h1>
-
-        {/* Description */}
-        <p
-          style={{
-            fontSize: 'clamp(13.5px, 2vw, 16px)',
-            color: 'rgba(255, 255, 255, 0.85)',
-            lineHeight: 1.55,
-            maxWidth: '560px',
-            display: '-webkit-box',
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden'
-          }}
-        >
-          {currentItem.description}
-        </p>
-
-        {/* Metadata Row: Star Rating, Year, Duration, Language */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '14px',
-            fontSize: '14px',
-            color: 'var(--text-secondary)',
-            margin: '4px 0 12px'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#FFFFFF', fontWeight: 700 }}>
-            <Star size={16} fill="var(--brand-gold)" color="var(--brand-gold)" />
-            <span>{currentItem.rating.toFixed(1)}</span>
-          </div>
-
-          <span>{currentItem.releaseYear}</span>
-
-          <span>{currentItem.runtime || (currentItem.seasonsCount ? `${currentItem.seasonsCount} Seasons` : '2h 00m')}</span>
-
-          <span
-            style={{
-              padding: '2px 9px',
-              borderRadius: '4px',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#FFFFFF',
-              fontSize: '12px',
-              fontWeight: 600
-            }}
-          >
-            {currentItem.language}
-          </span>
-        </div>
-
-        {/* Action Buttons: Watch Now / Buy, Watch Trailer, and Details */}
-        <div className="hero-actions-row" style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => onViewDetails(currentItem)}
-            className="btn btn-primary btn-lg"
-            style={{ minWidth: '140px' }}
-          >
-            <Play size={18} fill="currentColor" />
-            <span>
-              {monetizationMode === 'SUBSCRIPTION'
-                ? (hasActiveSubscription || owned || currentItem.isFree || currentItem.price === 0 ? 'Watch now' : 'Subscribe to Watch')
-                : (owned || currentItem.isFree || currentItem.price === 0 ? 'Watch now' : `Buy for ₹${currentItem.price}`)}
-            </span>
-          </button>
-
-          <button
-            onClick={() => playTrailer(currentItem)}
-            className="btn btn-secondary btn-lg"
-            style={{ minWidth: '120px' }}
-          >
-            <Video size={18} color="var(--brand-gold)" />
-            <span>Trailer</span>
-          </button>
-
-          <button
-            onClick={() => onViewDetails(currentItem)}
-            className="btn btn-secondary btn-lg"
-            style={{ minWidth: '110px' }}
-          >
-            <span>Details</span>
-            <ChevronRight size={18} />
-          </button>
-        </div>
-      </div>
 
       {/* Pagination Dots at Bottom */}
       {slides.length > 1 && (
@@ -368,13 +410,13 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onViewDetai
               key={`dot-${slide.id}`}
               onClick={() => goToSlide(idx)}
               style={{
-                width: idx === currentIndex ? '24px' : '8px',
+                width: idx === currentIndex ? '26px' : '8px',
                 height: '8px',
                 borderRadius: '9999px',
-                backgroundColor: idx === currentIndex ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.35)',
+                backgroundColor: idx === currentIndex ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.4)',
                 border: 'none',
                 cursor: 'pointer',
-                transition: 'all 0.3s ease',
+                transition: 'all 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
                 padding: 0
               }}
               title={`Go to slide ${idx + 1}`}
@@ -386,15 +428,23 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onViewDetai
 
       <style>{`
         @media (min-width: 768px) {
-          .hero-banner-container {
-            padding: 40px 48px 52px;
-            min-height: 540px;
+          .hero-banner-container,
+          .hero-carousel-track,
+          .hero-slide-item {
+            min-height: 540px !important;
+          }
+          .hero-slide-item {
+            padding: 40px 48px 52px !important;
           }
         }
         @media (max-width: 640px) {
-          .hero-banner-container {
+          .hero-banner-container,
+          .hero-carousel-track,
+          .hero-slide-item {
+            min-height: 450px !important;
+          }
+          .hero-slide-item {
             padding: 20px 16px 28px !important;
-            min-height: 440px !important;
           }
           .hero-actions-row {
             width: 100% !important;
@@ -417,9 +467,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ item, items, onViewDetai
           }
         }
         .hero-nav-arrow:hover {
-          background-color: rgba(245, 197, 24, 0.25) !important;
+          background-color: rgba(245, 197, 24, 0.3) !important;
           border-color: var(--brand-gold, #F5C518) !important;
           color: var(--brand-gold, #F5C518) !important;
+          transform: translateY(-50%) scale(1.08) !important;
         }
       `}</style>
     </div>

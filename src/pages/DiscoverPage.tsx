@@ -37,6 +37,33 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
   const [dedicatedHero, setDedicatedHero] = useState<ContentItem | null>(() => cachedHero);
   const [spotlights, setSpotlights] = useState<ContentItem[]>(() => cachedSpotlights);
 
+  // Hero Carousel multi-selection IDs persisted in localStorage and synced via events
+  const [carouselIds, setCarouselIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('flopshow_hero_carousel_ids');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        const raw = localStorage.getItem('flopshow_hero_carousel_ids');
+        setCarouselIds(raw ? JSON.parse(raw) : []);
+      } catch {
+        setCarouselIds([]);
+      }
+    };
+    window.addEventListener('flopshow_hero_carousel_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('flopshow_hero_carousel_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     api.content.getHero().then(h => {
@@ -72,59 +99,55 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
   // Home Hero: dedicated hero item set by admin, or first featured item, or premier catalog item
   const heroItem = activeCatalog.find(item => item.isHero) || dedicatedHero || activeCatalog.find(item => item.isFeatured) || activeCatalog[0] || undefined;
 
-  // Multi-Banner Hero Carousel items selected by admin or featured
+  // Multi-Banner Hero Carousel: ONLY explicitly selected items if any; fallback to default featured items ONLY when 0 items selected
   const heroCarouselItems = React.useMemo(() => {
-    let savedIds: string[] = [];
-    try {
-      const raw = localStorage.getItem('flopshow_hero_carousel_ids');
-      if (raw) savedIds = JSON.parse(raw);
-    } catch (_) {}
-
-    const selectedList: ContentItem[] = [];
-    const seen = new Set<string>();
-
-    // 1. Prioritize explicit carousel picks from Admin Hero Picker
-    if (Array.isArray(savedIds) && savedIds.length > 0) {
-      for (const id of savedIds) {
+    // 1. If admin has explicitly selected carousel items, render ONLY those items!
+    if (carouselIds.length > 0) {
+      const selectedList: ContentItem[] = [];
+      const seen = new Set<string>();
+      for (const id of carouselIds) {
         const found = activeCatalog.find(c => c.id === id);
         if (found && !seen.has(found.id)) {
           seen.add(found.id);
           selectedList.push(found);
         }
       }
+      if (selectedList.length > 0) {
+        return selectedList;
+      }
     }
 
-    // 2. Add dedicated main hero item if set
+    // 2. Fallback to default featured items ONLY when admin has selected 0 items
+    const fallbackList: ContentItem[] = [];
+    const seen = new Set<string>();
+
     if (dedicatedHero && !seen.has(dedicatedHero.id)) {
       seen.add(dedicatedHero.id);
-      selectedList.push(dedicatedHero);
+      fallbackList.push(dedicatedHero);
     }
 
-    // 3. Add any items flagged with isHero
     for (const item of activeCatalog) {
       if (item.isHero && !seen.has(item.id)) {
         seen.add(item.id);
-        selectedList.push(item);
+        fallbackList.push(item);
       }
     }
 
-    // 4. Add items flagged with isFeatured if list has less than 6 items
     for (const item of activeCatalog) {
-      if (selectedList.length >= 6) break;
+      if (fallbackList.length >= 6) break;
       if (item.isFeatured && !seen.has(item.id)) {
         seen.add(item.id);
-        selectedList.push(item);
+        fallbackList.push(item);
       }
     }
 
-    // 5. Fallback to heroItem or first catalog items if empty
-    if (selectedList.length === 0) {
-      if (heroItem) selectedList.push(heroItem);
-      else if (activeCatalog.length > 0) selectedList.push(...activeCatalog.slice(0, 3));
+    if (fallbackList.length === 0) {
+      if (heroItem) fallbackList.push(heroItem);
+      else if (activeCatalog.length > 0) fallbackList.push(...activeCatalog.slice(0, 3));
     }
 
-    return selectedList;
-  }, [activeCatalog, dedicatedHero, heroItem]);
+    return fallbackList;
+  }, [activeCatalog, carouselIds, dedicatedHero, heroItem]);
 
   // ── In-progress: items currently being watched (with completion threshold & deduplication) ───
   const inProgressItems = React.useMemo(() => {
@@ -282,6 +305,9 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     />
   );
 
+  // ── Telegram Promo Card elevated directly after immediate Top/Trending rows ──
+  contentRows.push(<TelegramPromoCard key="telegram-channel-promo-card" />);
+
   if (topRated.length > 0) {
     contentRows.push(
       <ContentSection
@@ -417,9 +443,6 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
       />
     );
   }
-
-  // ── Telegram Promo Card after first 2-3 genre rows ──────────────────────────
-  contentRows.push(<TelegramPromoCard key="telegram-channel-promo-card" />);
 
   // ── Genre 4: Crime ──────────────────────────────────────────────────────────
   if (crimeItems.length > 0) {

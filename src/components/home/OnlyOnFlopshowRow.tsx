@@ -177,7 +177,7 @@ export const OnlyOnFlopshowRow: React.FC<OnlyOnFlopshowRowProps> = ({ catalog, o
         {/* Horizontal Track */}
         <div
           ref={scrollRef}
-          className="no-scrollbar"
+          className="no-scrollbar scrollbar-none"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -185,7 +185,9 @@ export const OnlyOnFlopshowRow: React.FC<OnlyOnFlopshowRowProps> = ({ catalog, o
             overflowX: 'auto',
             padding: '12px 20px 24px',
             scrollSnapType: 'x mandatory',
-            WebkitOverflowScrolling: 'touch'
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
           }}
         >
           {exclusiveItems.map(item => (

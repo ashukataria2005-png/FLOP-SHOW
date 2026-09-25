@@ -201,18 +201,20 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
           </button>
         )}
 
-        {/* Horizontal Scroll Track */}
+        {/* Horizontal Scroll Track with Hidden Scrollbar across all browsers */}
         <div
           ref={scrollRef}
-          className="no-scrollbar"
+          className="top10-scroll-track no-scrollbar scrollbar-none"
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
+            gap: '18px',
             overflowX: 'auto',
             padding: '12px 20px 24px',
             scrollSnapType: 'x mandatory',
-            WebkitOverflowScrolling: 'touch'
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
           }}
         >
           {top10Items.map((item, index) => {
@@ -229,7 +231,7 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
                   position: 'relative',
                   scrollSnapAlign: 'start',
                   transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                  paddingRight: '6px'
+                  paddingRight: '8px'
                 }}
                 onMouseEnter={e => {
                   e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
@@ -238,22 +240,11 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
                   e.currentTarget.style.transform = 'translateY(0) scale(1)';
                 }}
               >
-                {/* Massive Outlined / Hollow Rank Number overlapping left edge */}
+                {/* Prominent Scaled Rank Number occupying dedicated left space */}
                 <div
+                  className="top10-rank-number"
                   style={{
-                    fontSize: 'clamp(86px, 11vw, 120px)',
-                    fontWeight: 900,
-                    lineHeight: 0.8,
-                    letterSpacing: '-0.08em',
-                    color: 'transparent',
-                    WebkitTextStroke: '3.5px rgba(255, 255, 255, 0.55)',
-                    textShadow: '0 0 20px rgba(0,0,0,0.8)',
-                    fontFamily: 'Impact, "Arial Black", "Bebas Neue", sans-serif',
-                    userSelect: 'none',
-                    position: 'relative',
-                    zIndex: 1,
-                    marginRight: '-28px',
-                    filter: 'drop-shadow(2px 4px 10px rgba(0,0,0,0.9))'
+                    letterSpacing: rank === 10 ? '-0.09em' : '-0.04em'
                   }}
                 >
                   {rank}
@@ -262,15 +253,16 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
                 {/* Poster Card */}
                 <div
                   style={{
-                    width: 'clamp(130px, 18vw, 175px)',
+                    width: 'clamp(135px, 19vw, 180px)',
                     aspectRatio: '2/3',
                     borderRadius: '12px',
                     overflow: 'hidden',
                     position: 'relative',
                     zIndex: 2,
                     backgroundColor: '#16161F',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    boxShadow: '0 12px 28px rgba(0, 0, 0, 0.75)'
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                    boxShadow: '0 12px 28px rgba(0, 0, 0, 0.75)',
+                    flexShrink: 0
                   }}
                 >
                   <img
@@ -299,7 +291,7 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
                     }}
                   />
 
-                  {/* Card Bottom: "Top 10" or "Recently Added" pill */}
+                  {/* Card Bottom: "Top 3" / "Top 10" badge */}
                   <div
                     style={{
                       position: 'absolute',
@@ -319,7 +311,7 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
                         letterSpacing: '0.04em',
                         padding: '3px 8px',
                         borderRadius: '6px',
-                        backgroundColor: rank <= 3 ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.15)',
+                        backgroundColor: rank <= 3 ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.18)',
                         color: rank <= 3 ? '#0E0E12' : '#FFFFFF',
                         backdropFilter: 'blur(8px)',
                         textTransform: 'uppercase'
@@ -332,7 +324,7 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
                       style={{
                         fontSize: '10px',
                         fontWeight: 700,
-                        color: 'rgba(255, 255, 255, 0.8)'
+                        color: 'rgba(255, 255, 255, 0.85)'
                       }}
                     >
                       {item.type === 'series' ? 'Series' : 'Movie'}
@@ -344,6 +336,45 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
           })}
         </div>
       </div>
+
+      <style>{`
+        /* Completely invisible horizontal scrollbar */
+        .top10-scroll-track::-webkit-scrollbar {
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
+        }
+
+        /* Scaled, prominent rank numbers with high-contrast gradient/stroke */
+        .top10-rank-number {
+          font-size: 100px;
+          line-height: 0.85;
+          font-weight: 900;
+          font-family: 'Impact', 'Bebas Neue', 'Arial Black', sans-serif;
+          user-select: none;
+          position: relative;
+          z-index: 1;
+          margin-right: -12px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: flex-end;
+          justify-content: flex-end;
+          background: linear-gradient(180deg, #FFFFFF 0%, #E2E8F0 50%, #94A3B8 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          -webkit-text-stroke: 2px rgba(255, 255, 255, 0.85);
+          filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 10px rgba(0, 0, 0, 0.85));
+        }
+
+        @media (min-width: 768px) {
+          .top10-rank-number {
+            font-size: 140px;
+            line-height: 0.82;
+            margin-right: -16px;
+            -webkit-text-stroke: 2.5px rgba(255, 255, 255, 0.9);
+          }
+        }
+      `}</style>
     </section>
   );
 };

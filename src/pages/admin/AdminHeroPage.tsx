@@ -14,7 +14,9 @@ import {
   ArrowLeft,
   AlertCircle,
   Layers,
-  Trash2
+  Trash2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface AdminHeroPageProps {
@@ -51,6 +53,8 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
       }
       try {
         localStorage.setItem('flopshow_hero_carousel_ids', JSON.stringify(next));
+        window.dispatchEvent(new CustomEvent('flopshow_hero_carousel_updated', { detail: next }));
+        window.dispatchEvent(new Event('storage'));
       } catch (_) {}
       return next;
     });
@@ -60,8 +64,27 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
     setCarouselIds([]);
     try {
       localStorage.removeItem('flopshow_hero_carousel_ids');
+      window.dispatchEvent(new CustomEvent('flopshow_hero_carousel_updated', { detail: [] }));
+      window.dispatchEvent(new Event('storage'));
     } catch (_) {}
-    showToast('Cleared all titles from Hero Carousel', 'info');
+    showToast('Cleared all titles from Hero Carousel (Discover falls back to default featured items)', 'info');
+  };
+
+  const handleReorderCarousel = (index: number, direction: 'left' | 'right') => {
+    setCarouselIds(prev => {
+      const target = direction === 'left' ? index - 1 : index + 1;
+      if (target < 0 || target >= prev.length) return prev;
+      const copy = [...prev];
+      const tmp = copy[index];
+      copy[index] = copy[target];
+      copy[target] = tmp;
+      try {
+        localStorage.setItem('flopshow_hero_carousel_ids', JSON.stringify(copy));
+        window.dispatchEvent(new CustomEvent('flopshow_hero_carousel_updated', { detail: copy }));
+        window.dispatchEvent(new Event('storage'));
+      } catch (_) {}
+      return copy;
+    });
   };
 
   // Search and filter state
@@ -411,6 +434,9 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
             <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '12px', backgroundColor: 'rgba(99, 102, 241, 0.2)', color: '#A5B4FC', fontWeight: 600 }}>
               5s Auto-Rotation
             </span>
+            <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '12px', backgroundColor: carouselIds.length > 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 197, 24, 0.2)', color: carouselIds.length > 0 ? '#34D399' : 'var(--brand-gold, #F5C518)', fontWeight: 700 }}>
+              {carouselIds.length > 0 ? '★ Live: Exclusive Admin Picks' : '★ Live: Default Featured Fallback'}
+            </span>
           </div>
           {carouselIds.length > 0 && (
             <button
@@ -435,8 +461,14 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
           )}
         </div>
 
+        <p style={{ fontSize: '12.5px', color: '#9CA3AF', margin: '0 0 16px', lineHeight: 1.5 }}>
+          {carouselIds.length > 0
+            ? `Only these ${carouselIds.length} selected titles are rendered in the homepage Hero Banner carousel. Reorder slides using the arrows below or remove titles to update.`
+            : 'No titles explicitly selected. The homepage Hero Banner currently displays default featured catalog items as a fallback. Click "+ Carousel" on any title in the catalog table below to customize the hero rotation.'}
+        </p>
+
         {carouselIds.length > 0 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '14px' }}>
             {carouselIds.map((id, idx) => {
               const item = catalog.find(c => c.id === id);
               if (!item) return null;
@@ -463,7 +495,7 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
                         (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=300&q=80';
                       }}
                     />
-                    <span style={{ position: 'absolute', top: '4px', left: '4px', backgroundColor: 'rgba(0,0,0,0.7)', color: '#FFF', fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
+                    <span style={{ position: 'absolute', top: '4px', left: '4px', backgroundColor: 'rgba(0,0,0,0.75)', color: '#FFF', fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
                       Slide #{idx + 1}
                     </span>
                   </div>
@@ -475,22 +507,61 @@ export const AdminHeroPage: React.FC<AdminHeroPageProps> = ({ onNavigateTab }) =
                       {item.releaseYear} • {item.type}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleCarousel(item)}
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                      border: '1px solid rgba(239, 68, 68, 0.2)',
-                      color: '#F87171',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Remove
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleReorderCarousel(idx, 'left')}
+                        disabled={idx === 0}
+                        style={{
+                          padding: '4px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: idx === 0 ? 'rgba(255, 255, 255, 0.02)' : 'rgba(255, 255, 255, 0.08)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          color: idx === 0 ? '#4B5563' : '#FFFFFF',
+                          fontSize: '11px',
+                          cursor: idx === 0 ? 'not-allowed' : 'pointer'
+                        }}
+                        title="Move slide earlier"
+                      >
+                        <ChevronLeft size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleReorderCarousel(idx, 'right')}
+                        disabled={idx === carouselIds.length - 1}
+                        style={{
+                          padding: '4px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: idx === carouselIds.length - 1 ? 'rgba(255, 255, 255, 0.02)' : 'rgba(255, 255, 255, 0.08)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          color: idx === carouselIds.length - 1 ? '#4B5563' : '#FFFFFF',
+                          fontSize: '11px',
+                          cursor: idx === carouselIds.length - 1 ? 'not-allowed' : 'pointer'
+                        }}
+                        title="Move slide later"
+                      >
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCarousel(item)}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        color: '#F87171',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               );
             })}

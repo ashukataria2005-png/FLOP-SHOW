@@ -425,7 +425,7 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
           </div>
 
           <div
-            className="no-scrollbar"
+            className="no-scrollbar scrollbar-none"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -434,7 +434,9 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
               whiteSpace: 'nowrap',
               flexWrap: 'nowrap',
               padding: '4px 0',
-              WebkitOverflowScrolling: 'touch'
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
             }}
           >
             {availableLanguages.map(lang => {
@@ -632,9 +634,11 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
               gap: '24px',
               borderBottom: '2px solid rgba(255, 255, 255, 0.1)',
               marginBottom: '28px',
-              overflowX: 'auto'
+              overflowX: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
             }}
-            className="no-scrollbar"
+            className="no-scrollbar scrollbar-none"
           >
             {/* Tab 1: Episodes (visible for series) */}
             {isSeries && (

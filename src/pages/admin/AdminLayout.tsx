@@ -28,7 +28,8 @@ import {
   Gift,
   RotateCcw,
   TrendingUp,
-  Flame
+  Flame,
+  Share2
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -97,7 +98,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-content', label: 'Catalog & Media', icon: Film, permission: 'catalog' },
       { id: 'admin-free-content', label: 'Free Content Manager', icon: Gift, permission: 'catalog' },
       { id: 'admin-quick-add', label: 'Quick Add / Auto Import', icon: Sparkles, permission: 'catalog' },
-      { id: 'admin-genres', label: 'Genres & Categories', icon: Tag, permission: 'catalog' }
+      { id: 'admin-genres', label: 'Genres & Categories', icon: Tag, permission: 'genres' }
     ]
   },
   // 5. Home Page
@@ -107,10 +108,10 @@ const navGroups: NavGroup[] = [
     icon: Crown,
     permission: 'catalog',
     items: [
-      { id: 'admin-hero', label: 'Hero Banner', icon: Crown, permission: 'catalog' },
-      { id: 'admin-top10', label: 'Top 10 Rankings', icon: Flame, permission: 'catalog' },
+      { id: 'admin-hero', label: 'Hero Banner', icon: Crown, permission: 'hero' },
+      { id: 'admin-top10', label: 'Top 10 Rankings', icon: Flame, permission: 'top10' },
       { id: 'admin-trending', label: 'Trending #1', icon: TrendingUp, permission: 'catalog' },
-      { id: 'admin-spotlight', label: 'Cinematic Spotlight', icon: Sparkles, permission: 'catalog' }
+      { id: 'admin-spotlight', label: 'Cinematic Spotlight', icon: Sparkles, permission: 'spotlight' }
     ]
   },
   // 6. Plans & Pricing
@@ -184,7 +185,8 @@ const navGroups: NavGroup[] = [
     icon: Sliders,
     permission: 'settings',
     items: [
-      { id: 'admin-settings', label: 'General Settings', icon: Sliders, permission: 'settings' }
+      { id: 'admin-settings', label: 'General Settings', icon: Sliders, permission: 'settings' },
+      { id: 'admin-socials', label: 'Socials & Community', icon: Share2, permission: 'socials' }
     ]
   },
   // 13. Reset
@@ -350,10 +352,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   };
 
   const authorizedNavGroups = navGroups
-    .filter(group => hasPermission(group.permission))
+    .filter(group => (group.permission === 'SUPER_ADMIN' ? isSuperAdmin : true))
     .map(group => ({
       ...group,
-      items: group.items.filter(item => hasPermission(item.permission || group.permission))
+      items: group.items.filter(item => {
+        if (item.permission === 'SUPER_ADMIN') return isSuperAdmin;
+        return hasPermission(item.permission) || (group.permission && hasPermission(group.permission));
+      })
     }))
     .filter(group => group.items.length > 0);
 

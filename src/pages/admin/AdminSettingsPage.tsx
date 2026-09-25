@@ -8,8 +8,16 @@ import {
   Loader2,
   Shield,
   HelpCircle,
-  RotateCcw
+  RotateCcw,
+  Share2,
+  Send,
+  Instagram,
+  Facebook,
+  Youtube,
+  Twitter,
+  Linkedin
 } from 'lucide-react';
+import { getSavedSocials, saveSocials, SocialLinks } from '../../utils/socials';
 
 interface AdminSettingsPageProps {
   onNavigateTab: (tab: string, param?: string) => void;
@@ -28,6 +36,9 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = ({ onNavigate
   const [defaultResolution, setDefaultResolution] = useState('1080p');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [allowGuestBrowsing, setAllowGuestBrowsing] = useState(true);
+
+  // Social Links State
+  const [socials, setSocials] = useState<SocialLinks>(() => getSavedSocials());
 
   const fetchSettings = async () => {
     try {
@@ -60,6 +71,7 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = ({ onNavigate
     e.preventDefault();
     try {
       setSaving(true);
+      saveSocials(socials);
       await api.admin.updateSettings({
         platform_name: platformName.trim(),
         platform_tagline: platformTagline.trim(),
@@ -70,7 +82,7 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = ({ onNavigate
         allow_guest_browsing: String(allowGuestBrowsing),
         app_theme: theme
       });
-      showToast('Application settings saved successfully!', 'success');
+      showToast('Application & Community settings saved successfully!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to save settings.', 'error');
     } finally {
@@ -328,6 +340,206 @@ export const AdminSettingsPage: React.FC<AdminSettingsPageProps> = ({ onNavigate
                 style={{ width: '18px', height: '18px', accentColor: 'var(--brand-gold, #F5C518)', cursor: 'pointer' }}
               />
             </label>
+          </div>
+        </div>
+
+        {/* Section 4: Social Links & Community */}
+        <div
+          id="social-links-section"
+          style={{
+            backgroundColor: 'var(--bg-surface, #12121A)',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '24px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Share2 size={20} style={{ color: 'var(--brand-gold, #F5C518)' }} />
+              <span>Social Links &amp; Community Channels</span>
+            </h2>
+            <button
+              type="button"
+              onClick={() => {
+                saveSocials(socials);
+                showToast('Social links saved and synchronized!', 'success');
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(245, 197, 24, 0.15)',
+                border: '1px solid rgba(245, 197, 24, 0.4)',
+                color: 'var(--brand-gold, #F5C518)',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <Save size={14} />
+              <span>Save Socials Now</span>
+            </button>
+          </div>
+
+          <p style={{ fontSize: '13px', color: '#9CA3AF', marginBottom: '20px' }}>
+            Configure external social networks and the official Telegram broadcast channel. The Telegram link instantly updates the homepage Telegram promo card and community buttons across the mobile menu.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px' }}>
+            {/* Telegram Channel */}
+            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(34, 158, 217, 0.07)', border: '1px solid rgba(34, 158, 217, 0.25)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 800, color: '#38BDF8', textTransform: 'uppercase' }}>
+                <Send size={15} />
+                <span>Telegram Channel URL (Homepage Card)</span>
+              </label>
+              <input
+                type="url"
+                value={socials.telegram}
+                onChange={e => setSocials(prev => ({ ...prev, telegram: e.target.value }))}
+                placeholder="https://t.me/yourchannel"
+                style={{
+                  width: '100%',
+                  marginTop: '8px',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                  border: '1px solid rgba(34, 158, 217, 0.4)',
+                  color: '#FFFFFF',
+                  fontSize: '13.5px',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <span style={{ fontSize: '11px', color: '#7DD3FC', marginTop: '6px', display: 'block' }}>
+                Powers the interactive "Join Our Official Telegram" promo banner on Discover.
+              </span>
+            </div>
+
+            {/* Instagram */}
+            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 800, color: '#E1306C', textTransform: 'uppercase' }}>
+                <Instagram size={15} />
+                <span>Instagram Profile URL</span>
+              </label>
+              <input
+                type="url"
+                value={socials.instagram}
+                onChange={e => setSocials(prev => ({ ...prev, instagram: e.target.value }))}
+                placeholder="https://instagram.com/flopshow"
+                style={{
+                  width: '100%',
+                  marginTop: '8px',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#FFFFFF',
+                  fontSize: '13.5px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* YouTube */}
+            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 800, color: '#EF4444', textTransform: 'uppercase' }}>
+                <Youtube size={15} />
+                <span>YouTube Channel URL</span>
+              </label>
+              <input
+                type="url"
+                value={socials.youtube}
+                onChange={e => setSocials(prev => ({ ...prev, youtube: e.target.value }))}
+                placeholder="https://youtube.com/@flopshow"
+                style={{
+                  width: '100%',
+                  marginTop: '8px',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#FFFFFF',
+                  fontSize: '13.5px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* X / Twitter */}
+            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase' }}>
+                <Twitter size={15} />
+                <span>X / Twitter URL</span>
+              </label>
+              <input
+                type="url"
+                value={socials.twitter}
+                onChange={e => setSocials(prev => ({ ...prev, twitter: e.target.value }))}
+                placeholder="https://x.com/flopshow"
+                style={{
+                  width: '100%',
+                  marginTop: '8px',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#FFFFFF',
+                  fontSize: '13.5px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* Facebook */}
+            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 800, color: '#3B82F6', textTransform: 'uppercase' }}>
+                <Facebook size={15} />
+                <span>Facebook Page URL</span>
+              </label>
+              <input
+                type="url"
+                value={socials.facebook}
+                onChange={e => setSocials(prev => ({ ...prev, facebook: e.target.value }))}
+                placeholder="https://facebook.com/flopshow"
+                style={{
+                  width: '100%',
+                  marginTop: '8px',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#FFFFFF',
+                  fontSize: '13.5px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* LinkedIn */}
+            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 800, color: '#0A66C2', textTransform: 'uppercase' }}>
+                <Linkedin size={15} />
+                <span>LinkedIn Page URL</span>
+              </label>
+              <input
+                type="url"
+                value={socials.linkedin}
+                onChange={e => setSocials(prev => ({ ...prev, linkedin: e.target.value }))}
+                placeholder="https://linkedin.com/company/flopshow"
+                style={{
+                  width: '100%',
+                  marginTop: '8px',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#FFFFFF',
+                  fontSize: '13.5px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
           </div>
         </div>
 

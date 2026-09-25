@@ -53,7 +53,7 @@ export const BrandPromoCard: React.FC = () => {
             marginBottom: '14px'
           }}
         >
-          No noise. Just good stories.
+          Your budget-friendly OTT-platform
         </h3>
 
         {/* Paragraph */}

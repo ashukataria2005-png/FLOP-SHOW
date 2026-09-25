@@ -130,6 +130,9 @@ function pathToTab(pathname: string): { tab: string; param?: string } {
   if (cleanPath === '/admin/settings') {
     return { tab: 'admin-settings' };
   }
+  if (cleanPath === '/admin/socials' || cleanPath === '/admin/social-links') {
+    return { tab: 'admin-socials' };
+  }
   if (cleanPath === '/admin/administrators' || cleanPath === '/admin/team') {
     return { tab: 'admin-administrators' };
   }
@@ -221,6 +224,8 @@ export function tabToPath(tab: string, param?: string): string {
       return '/admin/promos';
     case 'admin-settings':
       return '/admin/settings';
+    case 'admin-socials':
+      return '/admin/socials';
     case 'admin-reset':
       return '/admin/reset';
     case 'admin-administrators':
@@ -387,12 +392,12 @@ const AppContent: React.FC = () => {
           {currentTab === 'admin-transactions' && <AdminTransactionsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-genres' && <AdminGenresPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-promos' && <AdminPromoCodesPage onNavigateTab={handleNavigate} />}
-          {currentTab === 'admin-settings' && <AdminSettingsPage onNavigateTab={handleNavigate} />}
+          {(currentTab === 'admin-settings' || currentTab === 'admin-socials') && <AdminSettingsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-quick-add' && <AdminQuickAddPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-reset' && <AdminResetPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-administrators' && <AdminAdministratorsPage onNavigateTab={handleNavigate} />}
           {currentTab === 'admin-security' && <AdminSecurityPage onNavigateTab={handleNavigate} />}
-          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-top10', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-pricing', 'admin-promos', 'admin-monetization', 'admin-analytics', 'admin-analytics-movie', 'admin-analytics-vip', 'admin-watch-pass', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-settings', 'admin-reset', 'admin-administrators', 'admin-security'].includes(currentTab) && (
+          {!['admin-dashboard', 'admin-content', 'admin-free-content', 'admin-hero', 'admin-top10', 'admin-spotlight', 'admin-ads', 'admin-editor', 'admin-quick-add', 'admin-users', 'admin-payments', 'admin-upi-settings', 'admin-pricing', 'admin-promos', 'admin-monetization', 'admin-analytics', 'admin-analytics-movie', 'admin-analytics-vip', 'admin-watch-pass', 'admin-finance', 'admin-transactions', 'admin-genres', 'admin-settings', 'admin-socials', 'admin-reset', 'admin-administrators', 'admin-security'].includes(currentTab) && (
             <AdminDashboardPage onNavigateTab={handleNavigate} />
           )}
         </AdminLayout>

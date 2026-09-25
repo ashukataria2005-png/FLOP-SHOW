@@ -28,13 +28,11 @@ function byGenre(catalog: ContentItem[], ...genres: string[]): ContentItem[] {
 }
  
 // Fast in-memory cache to ensure instant rendering on tab switch/return
-let cachedHero: ContentItem | null = null;
 let cachedSpotlights: ContentItem[] = [];
 
 export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavigate }) => {
   const { watchProgress, catalog } = useApp();
   const activeCatalog = catalog || [];
-  const [dedicatedHero, setDedicatedHero] = useState<ContentItem | null>(() => cachedHero);
   const [spotlights, setSpotlights] = useState<ContentItem[]>(() => cachedSpotlights);
 
   // Hero Carousel multi-selection IDs persisted in localStorage and synced via events
@@ -47,6 +45,16 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     }
   });
 
+  // Top 10 row position index preference from Admin (0 = top, 1 = after 1st row, etc.)
+  const [top10PositionIndex, setTop10PositionIndex] = useState<number>(() => {
+    try {
+      const val = localStorage.getItem('flopshow_top10_position_index');
+      return val !== null ? parseInt(val, 10) : 1;
+    } catch {
+      return 1;
+    }
+  });
+
   useEffect(() => {
     const handleUpdate = () => {
       try {
@@ -56,21 +64,30 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
         setCarouselIds([]);
       }
     };
+    const handlePosUpdate = (e: any) => {
+      if (typeof e.detail === 'number') {
+        setTop10PositionIndex(e.detail);
+      } else {
+        try {
+          const val = localStorage.getItem('flopshow_top10_position_index');
+          setTop10PositionIndex(val !== null ? parseInt(val, 10) : 1);
+        } catch {}
+      }
+    };
     window.addEventListener('flopshow_hero_carousel_updated', handleUpdate);
+    window.addEventListener('flopshow_top10_position_updated', handlePosUpdate);
     window.addEventListener('storage', handleUpdate);
+    window.addEventListener('storage', handlePosUpdate);
     return () => {
       window.removeEventListener('flopshow_hero_carousel_updated', handleUpdate);
+      window.removeEventListener('flopshow_top10_position_updated', handlePosUpdate);
       window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('storage', handlePosUpdate);
     };
   }, []);
 
   useEffect(() => {
     let mounted = true;
-    api.content.getHero().then(h => {
-      if (h) cachedHero = h;
-      if (mounted) setDedicatedHero(h);
-    }).catch(() => {});
-
     api.content.getSpotlights().then(items => {
       if (mounted) {
         if (items && items.length > 0) {
@@ -96,12 +113,9 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
     return () => { mounted = false; };
   }, [activeCatalog.length]);
 
-  // Home Hero: dedicated hero item set by admin, or first featured item, or premier catalog item
-  const heroItem = activeCatalog.find(item => item.isHero) || dedicatedHero || activeCatalog.find(item => item.isFeatured) || activeCatalog[0] || undefined;
-
-  // Multi-Banner Hero Carousel: ONLY explicitly selected items if any; fallback to default featured items ONLY when 0 items selected
+  // Multi-Banner Hero Carousel: STRICT MANUAL ADMIN SELECTION ONLY
+  // No automatic fallback/auto-fill when admin wants specific curation
   const heroCarouselItems = React.useMemo(() => {
-    // 1. If admin has explicitly selected carousel items, render ONLY those items!
     if (carouselIds.length > 0) {
       const selectedList: ContentItem[] = [];
       const seen = new Set<string>();
@@ -112,42 +126,11 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
           selectedList.push(found);
         }
       }
-      if (selectedList.length > 0) {
-        return selectedList;
-      }
+      return selectedList;
     }
-
-    // 2. Fallback to default featured items ONLY when admin has selected 0 items
-    const fallbackList: ContentItem[] = [];
-    const seen = new Set<string>();
-
-    if (dedicatedHero && !seen.has(dedicatedHero.id)) {
-      seen.add(dedicatedHero.id);
-      fallbackList.push(dedicatedHero);
-    }
-
-    for (const item of activeCatalog) {
-      if (item.isHero && !seen.has(item.id)) {
-        seen.add(item.id);
-        fallbackList.push(item);
-      }
-    }
-
-    for (const item of activeCatalog) {
-      if (fallbackList.length >= 6) break;
-      if (item.isFeatured && !seen.has(item.id)) {
-        seen.add(item.id);
-        fallbackList.push(item);
-      }
-    }
-
-    if (fallbackList.length === 0) {
-      if (heroItem) fallbackList.push(heroItem);
-      else if (activeCatalog.length > 0) fallbackList.push(...activeCatalog.slice(0, 3));
-    }
-
-    return fallbackList;
-  }, [activeCatalog, carouselIds, dedicatedHero, heroItem]);
+    // Return empty list if admin selection is empty (eliminates auto-selection)
+    return [];
+  }, [activeCatalog, carouselIds]);
 
   // ── In-progress: items currently being watched (with completion threshold & deduplication) ───
   const inProgressItems = React.useMemo(() => {
@@ -295,18 +278,6 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
       />
     );
   }
-
-  // ── Top 10 in FlopShow Today Row with Giant Outlined Numbers ────────────────
-  contentRows.push(
-    <Top10Row
-      key="top10-daily-row"
-      catalog={activeCatalog}
-      onSelect={onSelectItem}
-    />
-  );
-
-  // ── Telegram Promo Card elevated directly after immediate Top/Trending rows ──
-  contentRows.push(<TelegramPromoCard key="telegram-channel-promo-card" />);
 
   if (topRated.length > 0) {
     contentRows.push(
@@ -660,6 +631,22 @@ export const DiscoverPage: React.FC<DiscoverPageProps> = ({ onSelectItem, onNavi
       />
     );
   }
+
+  // ── Dynamic Placement of Top 10 Row based on Admin Configured Position ───
+  const safeTop10Index = Math.min(Math.max(0, top10PositionIndex), contentRows.length);
+  contentRows.splice(
+    safeTop10Index,
+    0,
+    <Top10Row key="top10-daily-row" catalog={activeCatalog} onSelect={onSelectItem} />
+  );
+
+  // ── Elevated Telegram Promo Card directly after Top 10 Row ─────────────────
+  const safeTelegramIndex = Math.min(safeTop10Index + 1, contentRows.length);
+  contentRows.splice(
+    safeTelegramIndex,
+    0,
+    <TelegramPromoCard key="telegram-channel-promo-card" />
+  );
 
   // Interleave Spotlights with exact rule:
   // - Spotlight #1 appears after the 3rd normal row (rowIndex === 2)

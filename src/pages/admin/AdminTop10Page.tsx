@@ -9,7 +9,8 @@ import {
   Trash2,
   Plus,
   RotateCcw,
-  X
+  X,
+  Sliders
 } from 'lucide-react';
 
 interface AdminTop10PageProps {
@@ -22,6 +23,26 @@ export const AdminTop10Page: React.FC<AdminTop10PageProps> = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalSearch, setModalSearch] = useState('');
   const [modalTypeFilter, setModalTypeFilter] = useState<'ALL' | 'MOVIE' | 'SERIES'>('ALL');
+
+  // Top 10 homepage vertical position index (0 = very top below Hero, 1 = after 1st row, 2 = after 2nd row, etc.)
+  const [positionIndex, setPositionIndex] = useState<number>(() => {
+    try {
+      const val = localStorage.getItem('flopshow_top10_position_index');
+      return val !== null ? parseInt(val, 10) : 1;
+    } catch {
+      return 1;
+    }
+  });
+
+  const handleUpdatePosition = (newIdx: number) => {
+    setPositionIndex(newIdx);
+    try {
+      localStorage.setItem('flopshow_top10_position_index', String(newIdx));
+      window.dispatchEvent(new CustomEvent('flopshow_top10_position_updated', { detail: newIdx }));
+      window.dispatchEvent(new Event('storage'));
+      showToast(`Top 10 row position updated to Slot #${newIdx + 1} on Homepage`, 'success');
+    } catch (_) {}
+  };
 
   // Load initial Top 10 from localStorage or populate from highest rated
   useEffect(() => {
@@ -231,6 +252,61 @@ export const AdminTop10Page: React.FC<AdminTop10PageProps> = () => {
               <span>Add Title to Top 10</span>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* SECTION: Homepage Placement & Slot Selection */}
+      <div
+        style={{
+          backgroundColor: 'var(--bg-surface, #12121A)',
+          borderRadius: '16px',
+          border: '1px solid rgba(245, 197, 24, 0.3)',
+          padding: '20px 24px',
+          marginBottom: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <Sliders size={18} color="var(--brand-gold, #F5C518)" />
+              <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Homepage Row Placement & Vertical Ordering
+              </h2>
+            </div>
+            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>
+              Control where the "Top 10 in FlopShow Today" row appears on the Discover page relative to other category rows.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '13px', color: '#D1D5DB', fontWeight: 600 }}>Active Slot:</span>
+            <select
+              value={positionIndex}
+              onChange={e => handleUpdatePosition(parseInt(e.target.value, 10))}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid var(--brand-gold, #F5C518)',
+                color: '#FFFFFF',
+                fontSize: '13px',
+                fontWeight: 700,
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <option value={0} style={{ backgroundColor: '#12121A', color: '#FFFFFF' }}>Slot 1: Very Top (Directly under Hero Banner)</option>
+              <option value={1} style={{ backgroundColor: '#12121A', color: '#FFFFFF' }}>Slot 2: After 1st Content Row (Standard Default)</option>
+              <option value={2} style={{ backgroundColor: '#12121A', color: '#FFFFFF' }}>Slot 3: After 2nd Content Row</option>
+              <option value={3} style={{ backgroundColor: '#12121A', color: '#FFFFFF' }}>Slot 4: After 3rd Content Row</option>
+              <option value={4} style={{ backgroundColor: '#12121A', color: '#FFFFFF' }}>Slot 5: After 4th Content Row</option>
+              <option value={5} style={{ backgroundColor: '#12121A', color: '#FFFFFF' }}>Slot 6: Mid-Page (After 5th Content Row)</option>
+              <option value={7} style={{ backgroundColor: '#12121A', color: '#FFFFFF' }}>Slot 8: Lower Page</option>
+            </select>
+          </div>
         </div>
       </div>
 

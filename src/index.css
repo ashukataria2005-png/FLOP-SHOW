@@ -945,4 +945,95 @@ div:has(> table) {
   }
 }
 
+/* ==========================================================================
+   DETAILS MODAL: MORE LIKE THIS (Compact Posters on Mobile)
+   ========================================================================== */
+.details-more-like-this-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .details-more-like-this-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
+}
+
+.details-more-card {
+  background-color: rgba(22, 22, 34, 0.5);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.details-more-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(245, 197, 24, 0.4);
+}
+
+.details-more-poster-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  max-height: 155px;
+  overflow: hidden;
+  background-color: #12121a;
+}
+
+@media (min-width: 640px) {
+  .details-more-poster-wrap {
+    aspect-ratio: 2 / 3;
+    max-height: 240px;
+  }
+}
+
+.details-more-info {
+  padding: 8px 6px;
+}
+
+@media (min-width: 640px) {
+  .details-more-info {
+    padding: 10px 12px;
+  }
+}
+
+.details-more-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin: 0 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .details-more-title {
+    font-size: 13px;
+    font-weight: 800;
+    margin: 0 0 4px;
+  }
+}
+
+.details-more-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #9CA3AF;
+}
+
+@media (min-width: 640px) {
+  .details-more-meta {
+    gap: 8px;
+    font-size: 11.5px;
+  }
+}
+
+
 

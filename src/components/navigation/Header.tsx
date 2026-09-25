@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Logo } from '../common/Logo';
 import { useApp } from '../../context/AppContext';
-import { Search, Compass, Bookmark, Crown, Zap, Gift, Sparkles } from 'lucide-react';
+import { Search, Compass, Bookmark, Crown, Zap, Gift, Sparkles, Menu } from 'lucide-react';
+import { MobileMenu } from './MobileMenu';
 
 interface HeaderProps {
   currentTab: string;
@@ -18,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
     openPlanSelector
   } = useApp();
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const handleHomeNavigation = () => {
     if (currentTab === 'discover') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -28,35 +31,60 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
   };
 
   return (
-    <header
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        backgroundColor: 'rgba(9, 9, 14, 0.88)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
-        height: 'var(--header-height)',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 20px',
-        justifyContent: 'space-between',
-        transition: 'background-color 0.2s ease'
-      }}
-    >
-      {/* Brand Logo */}
-      <Logo size="md" animated onClick={handleHomeNavigation} />
-
-      {/* Desktop Navigation Links */}
-      <nav
+    <>
+      <header
         style={{
-          display: 'none',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          backgroundColor: 'rgba(9, 9, 14, 0.88)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+          height: 'var(--header-height)',
+          display: 'flex',
           alignItems: 'center',
-          gap: '32px'
+          padding: '0 20px',
+          justifyContent: 'space-between',
+          transition: 'background-color 0.2s ease'
         }}
-        className="desktop-nav-links"
       >
+        {/* Left Side: Hamburger (Mobile) + Brand Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="header-mobile-hamburger-btn"
+            aria-label="Open mobile navigation menu"
+            title="Open Menu"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '38px',
+              height: '38px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              color: '#FFFFFF',
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)'
+            }}
+          >
+            <Menu size={20} />
+          </button>
+
+          <Logo size="md" animated onClick={handleHomeNavigation} />
+        </div>
+
+        {/* Desktop Navigation Links */}
+        <nav
+          style={{
+            display: 'none',
+            alignItems: 'center',
+            gap: '32px'
+          }}
+          className="desktop-nav-links"
+        >
         <button
           onClick={handleHomeNavigation}
           style={{
@@ -347,6 +375,9 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
       </div>
 
       <style>{`
+        .header-mobile-hamburger-btn {
+          display: flex !important;
+        }
         .header-mobile-search-btn {
           display: flex !important;
         }
@@ -362,11 +393,23 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
           }
         }
         @media (min-width: 900px) {
+          .header-mobile-hamburger-btn {
+            display: none !important;
+          }
           .desktop-nav-links {
             display: flex !important;
           }
         }
       `}</style>
     </header>
+
+    {/* Mobile Navigation & Community Socials Drawer */}
+    <MobileMenu
+      isOpen={isMobileMenuOpen}
+      onClose={() => setIsMobileMenuOpen(false)}
+      currentTab={currentTab}
+      onNavigate={onNavigate}
+    />
+  </>
   );
 };

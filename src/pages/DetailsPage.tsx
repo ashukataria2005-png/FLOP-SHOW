@@ -830,41 +830,19 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
             </div>
           )}
 
-          {/* TAB 2: MORE LIKE THIS (3-Column Compact Grid) */}
+          {/* TAB 2: MORE LIKE THIS (Compact Posters on Mobile) */}
           {activeTab === 'more-like-this' && (
             <div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-                  gap: '16px'
-                }}
-              >
+              <div className="details-more-like-this-grid">
                 {relatedTitles.map(rec => (
                   <div
                     key={rec.id}
                     onClick={() => onSelectItem(rec)}
-                    style={{
-                      backgroundColor: 'rgba(22, 22, 34, 0.5)',
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      transition: 'transform 0.2s ease, border-color 0.2s ease',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.borderColor = 'rgba(245, 197, 24, 0.4)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                    }}
+                    className="details-more-card"
                   >
-                    <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', overflow: 'hidden' }}>
+                    <div className="details-more-poster-wrap">
                       <img
-                        src={rec.backdropUrl || rec.posterUrl}
+                        src={rec.posterUrl || rec.backdropUrl}
                         alt={rec.title}
                         loading="lazy"
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -872,12 +850,12 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
                       <div
                         style={{
                           position: 'absolute',
-                          top: '8px',
-                          right: '8px',
-                          padding: '2px 6px',
+                          top: '6px',
+                          right: '6px',
+                          padding: '1px 5px',
                           borderRadius: '4px',
                           backgroundColor: 'rgba(10, 10, 15, 0.85)',
-                          fontSize: '11px',
+                          fontSize: '10px',
                           fontWeight: 800,
                           color: 'var(--brand-gold, #F5C518)'
                         }}
@@ -885,23 +863,13 @@ export const DetailsPage: React.FC<DetailsPageProps> = ({ item, onBack, onSelect
                         ★ {rec.rating.toFixed(1)}
                       </div>
                     </div>
-                    <div style={{ padding: '12px' }}>
-                      <h4
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: 800,
-                          color: '#FFFFFF',
-                          margin: '0 0 6px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
+                    <div className="details-more-info">
+                      <h4 className="details-more-title" title={rec.title}>
                         {rec.title}
                       </h4>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: '#9CA3AF' }}>
+                      <div className="details-more-meta">
                         <span style={{ color: '#10B981', fontWeight: 700 }}>
-                          {Math.round(Math.min(99, Math.max(85, rec.rating * 10)))}% Match
+                          {Math.round(Math.min(99, Math.max(85, rec.rating * 10)))}%
                         </span>
                         <span>•</span>
                         <span>{rec.releaseYear}</span>

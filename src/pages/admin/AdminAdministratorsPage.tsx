@@ -26,7 +26,10 @@ import {
   Film,
   Users,
   Settings,
-  DollarSign
+  DollarSign,
+  Flame,
+  Crown,
+  Share2
 } from 'lucide-react';
 
 interface AdminAdministratorsPageProps {
@@ -80,7 +83,42 @@ const MODULE_PERMISSIONS = [
     label: 'Catalog & Media',
     icon: Film,
     color: '#EC4899',
-    description: 'Movies, Series, Episodes, Hero Banner & Spotlight',
+    description: 'Movies, Series, Episodes, Free Content & Quick Add',
+  },
+  {
+    key: 'top10',
+    label: 'Top 10 Row Management',
+    icon: Flame,
+    color: '#F97316',
+    description: 'Top 10 Rankings & Homepage Vertical Slot Placement',
+  },
+  {
+    key: 'hero',
+    label: 'Hero Carousel Management',
+    icon: Crown,
+    color: '#EAB308',
+    description: 'Strict Manual Selection & Ordering of Hero Banner Titles',
+  },
+  {
+    key: 'spotlight',
+    label: 'Cinematic Spotlight Controls',
+    icon: Sparkles,
+    color: '#8B5CF6',
+    description: 'Spotlight Feature Title, Teaser Video & Action Buttons',
+  },
+  {
+    key: 'socials',
+    label: 'Social Links & Telegram Manager',
+    icon: Share2,
+    color: '#0EA5E9',
+    description: 'Telegram Channel & Social Network Community URLs',
+  },
+  {
+    key: 'genres',
+    label: 'Genre & Category Ordering',
+    icon: Tag,
+    color: '#F43F5E',
+    description: 'Content Genre Ordering, Display Names & Visibility',
   },
   {
     key: 'users',
@@ -311,12 +349,17 @@ export const AdminAdministratorsPage: React.FC<AdminAdministratorsPageProps> = (
   };
 
   const filteredAdmins = admins.filter(admin => {
-    const q = searchQuery.toLowerCase();
-    return (
-      admin.name.toLowerCase().includes(q) ||
-      admin.email.toLowerCase().includes(q) ||
-      (admin.is_super_admin ? 'super admin' : 'sub-admin').includes(q)
-    );
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    const nameMatch = admin.name.toLowerCase().includes(q);
+    const emailMatch = admin.email.toLowerCase().includes(q);
+    const roleMatch = (admin.is_super_admin ? 'super admin' : 'sub-admin').includes(q);
+    const permMatch = Array.isArray(admin.permissions) && admin.permissions.some(p => {
+      if (p.toLowerCase().includes(q)) return true;
+      const mod = MODULE_PERMISSIONS.find(m => m.key === p);
+      return Boolean(mod && (mod.label.toLowerCase().includes(q) || mod.description.toLowerCase().includes(q)));
+    });
+    return nameMatch || emailMatch || roleMatch || permMatch;
   });
 
   // Only non-super-admin sub-admins can be selected for deletion (exclude super admin & active self)

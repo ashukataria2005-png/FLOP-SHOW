@@ -18,7 +18,7 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
     try {
       const raw = localStorage.getItem('flopshow_top10_ids');
       if (raw) savedIds = JSON.parse(raw);
-    } catch (_) {}
+    } catch (_) { }
 
     const selected: ContentItem[] = [];
     const seen = new Set<string>();
@@ -124,7 +124,7 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
                 textTransform: 'uppercase'
               }}
             >
-              DAILY RANKINGS
+              {/* DAILY RANKINGS */}
             </div>
             <h2
               style={{
@@ -277,7 +277,7 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
                     }}
                     onError={e => {
                       (e.currentTarget as HTMLImageElement).src =
-                        'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=400&q=80';
+                        '';
                     }}
                   />
 

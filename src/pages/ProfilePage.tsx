@@ -33,13 +33,17 @@ import {
 
 
 
+import { ContentItem } from '../types/content';
+import { formatPassPlanName } from './LibraryPage';
+import { Compass } from 'lucide-react';
+
 interface ProfilePageProps {
   onNavigate: (tab: string, param?: string) => void;
-  initialSection?: 'profile' | 'wallet' | 'subscription' | 'settings' | 'watchpasses';
+  initialSection?: 'profile' | 'wallet' | 'subscription' | 'settings' | 'watchpasses' | 'watchlist';
+  onSelectItem?: (item: ContentItem) => void;
 }
 
-
-export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSection = 'profile' }) => {
+export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSection = 'profile', onSelectItem }) => {
   const {
     user,
     walletBalance,
@@ -57,10 +61,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     refreshSubscriptionStatus,
     purchases,
     catalog,
-    clearSearchHistory
+    clearSearchHistory,
+    myList,
+    toggleMyList
   } = useApp();
 
-  const [activeSection, setActiveSection] = useState<'profile' | 'subscription' | 'settings' | 'watchpasses'>(() => {
+  const [activeSection, setActiveSection] = useState<'profile' | 'watchlist' | 'subscription' | 'settings' | 'watchpasses'>(() => {
     if (initialSection === 'wallet') {
       return 'profile';
     }
@@ -69,6 +75,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     }
     return (initialSection as any) || 'profile';
   });
+
+  const savedItems = (myList || [])
+    .map(id => (catalog || []).find(c => c.id === id))
+    .filter((c): c is ContentItem => c !== undefined);
   const [planCategoryFilter, setPlanCategoryFilter] = useState<'all' | 'watch_pass' | 'vip'>('all');
   const [clearSearchSuccess, setClearSearchSuccess] = useState(false);
 
@@ -245,12 +255,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
     }
     if (userWatchPasses.activePasses.length > 0) {
       const p = userWatchPasses.activePasses[0];
-      const planType = p.plan_type || p.planType;
-      if (planType === '24H') return 'Watch Pass (24 Hours)';
-      if (planType === '3D') return 'Watch Pass (3 Days)';
-      if (planType === '7D') return 'Watch Pass (7 Days)';
-      if (planType === '15D') return 'Watch Pass (15 Days)';
-      return p.title ? `Watch Pass (${p.title})` : 'Watch Pass';
+      return formatPassPlanName(p);
     }
     if (activePurchases.length > 0) {
       const p = activePurchases[0];
@@ -360,6 +365,42 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
               PENDING
             </span>
           ) : null}
+        </button>
+
+        {/* My Saved List / Watchlist Tab */}
+        <button
+          onClick={() => setActiveSection('watchlist')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 18px',
+            borderRadius: '12px',
+            border: activeSection === 'watchlist' ? '1px solid rgba(245, 166, 35, 0.4)' : '1px solid transparent',
+            backgroundColor: activeSection === 'watchlist' ? 'rgba(245, 166, 35, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+            color: activeSection === 'watchlist' ? 'var(--brand-gold, #F5C518)' : 'var(--text-secondary)',
+            fontWeight: activeSection === 'watchlist' ? 700 : 500,
+            fontSize: '14px',
+            cursor: 'pointer',
+            transition: 'all var(--transition-fast)'
+          }}
+        >
+          <Bookmark size={16} />
+          <span>My Saved List / Watchlist</span>
+          {savedItems.length > 0 && (
+            <span
+              style={{
+                padding: '2px 8px',
+                borderRadius: '9999px',
+                backgroundColor: activeSection === 'watchlist' ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.12)',
+                color: activeSection === 'watchlist' ? 'var(--brand-gold, #F5C518)' : '#FFFFFF',
+                fontSize: '11px',
+                fontWeight: 800
+              }}
+            >
+              {savedItems.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -727,6 +768,168 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
         </>
       )}
 
+      {/* SECTION: MY SAVED LIST / WATCHLIST */}
+      {activeSection === 'watchlist' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 4px', letterSpacing: '-0.01em' }}>
+                My Saved List / Watchlist
+              </h2>
+              <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', margin: 0 }}>
+                {savedItems.length} titles saved to watch later.
+              </p>
+            </div>
+            {savedItems.length > 0 && (
+              <button
+                onClick={() => {
+                  savedItems.forEach(it => toggleMyList(it.id));
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  color: '#F87171',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                <Trash2 size={14} />
+                <span>Clear All Saved</span>
+              </button>
+            )}
+          </div>
+
+          {savedItems.length > 0 ? (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+                gap: '16px'
+              }}
+            >
+              {savedItems.map(item => (
+                <div
+                  key={item.id}
+                  style={{
+                    backgroundColor: 'var(--bg-surface)',
+                    borderRadius: '14px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  <div
+                    onClick={() => onSelectItem ? onSelectItem(item) : onNavigate('search', item.title)}
+                    style={{ position: 'relative', width: '100%', aspectRatio: '2/3', cursor: 'pointer', backgroundColor: '#14141E' }}
+                  >
+                    <img
+                      src={item.posterUrl || item.backdropUrl}
+                      alt={item.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <div style={{ position: 'absolute', top: '8px', right: '8px', padding: '2px 6px', borderRadius: '4px', backgroundColor: 'rgba(10, 10, 15, 0.85)', fontSize: '11px', fontWeight: 800, color: 'var(--brand-gold)' }}>
+                      ★ {item.rating.toFixed(1)}
+                    </div>
+                  </div>
+                  <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, justifyContent: 'space-between' }}>
+                    <div>
+                      <h4
+                        onClick={() => onSelectItem ? onSelectItem(item) : onNavigate('search', item.title)}
+                        style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}
+                      >
+                        {item.title}
+                      </h4>
+                      <div style={{ fontSize: '11.5px', color: '#9CA3AF' }}>
+                        {item.releaseYear} • {item.type}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        onClick={() => onSelectItem ? onSelectItem(item) : onNavigate('search', item.title)}
+                        style={{
+                          flex: 1,
+                          padding: '7px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: 'var(--brand-gold)',
+                          color: '#0E0E12',
+                          border: 'none',
+                          fontWeight: 800,
+                          fontSize: '12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Watch
+                      </button>
+                      <button
+                        onClick={() => toggleMyList(item.id)}
+                        title="Remove from saved list"
+                        style={{
+                          padding: '7px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          color: '#9CA3AF',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '70px 20px',
+                backgroundColor: 'rgba(22, 22, 34, 0.35)',
+                borderRadius: '20px',
+                border: '1px dashed rgba(255, 255, 255, 0.12)',
+                maxWidth: '520px',
+                margin: '20px auto'
+              }}
+            >
+              <div
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(245, 197, 24, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px',
+                  color: 'var(--brand-gold)'
+                }}
+              >
+                <Bookmark size={28} />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#FFFFFF', margin: '0 0 8px' }}>
+                Your Saved List is Empty
+              </h3>
+              <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: '0 0 24px' }}>
+                Tap the "+ My list" button on any movie or series across the platform to save titles you want to watch later.
+              </p>
+              <button onClick={() => onNavigate('discover')} className="btn btn-primary btn-md">
+                <Compass size={16} />
+                <span>Explore Titles on Discover</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* SECTION: UNIFIED ACTIVE PASSES & SUBSCRIPTIONS */}
       {(activeSection === 'subscription' || activeSection === 'watchpasses') && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -884,7 +1087,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialSec
 
                   {/* Active Watch Passes */}
                   {userWatchPasses.activePasses.map((p: any, idx: number) => {
-                    const passTitle = p.content_title || p.title || (p.plan_type === '24H' ? 'Watch Pass (24 Hours)' : p.plan_type === '3D' ? 'Watch Pass (3 Days)' : p.plan_type === '7D' ? 'Watch Pass (7 Days)' : p.plan_type === '15D' ? 'Watch Pass (15 Days)' : 'Catalog Watch Pass');
+                    const passTitle = formatPassPlanName(p);
                     const expStr = p.expires_at || p.expiresAt;
                     const startStr = p.created_at || p.createdAt || p.start_date || p.startsAt;
                     return (

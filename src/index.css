@@ -100,13 +100,15 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scroll-behavior: smooth;
-  overflow-x: clip;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 body {
   min-height: 100vh;
   background-color: var(--bg-black);
-  overflow-x: clip;
+  overflow-x: hidden;
+  width: 100%;
   line-height: 1.5;
 }
 
@@ -114,6 +116,8 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 a {
@@ -1034,6 +1038,90 @@ div:has(> table) {
     font-size: 11.5px;
   }
 }
+/* ==========================================================================
+   MEDIA PLAYER FULLSCREEN & MOBILE LANDSCAPE AUTO-ROTATION
+   ========================================================================== */
 
+:fullscreen video,
+:-webkit-full-screen video,
+.media-player-container:fullscreen video,
+.media-player-container:-webkit-full-screen video,
+.media-player-container.is-fullscreen video {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  object-fit: contain;
+}
 
+.media-player-container:fullscreen,
+.media-player-container:-webkit-full-screen,
+.media-player-container.is-fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  background: #000000 !important;
+  inset: 0 !important;
+  position: fixed !important;
+}
 
+/* Landscape Notch & Safe Area Insets for Player Controls */
+@supports (padding: env(safe-area-inset-left)) {
+  .player-controls-safe,
+  .player-controls-top {
+    padding-top: max(16px, env(safe-area-inset-top)) !important;
+    padding-left: max(20px, env(safe-area-inset-left)) !important;
+    padding-right: max(20px, env(safe-area-inset-right)) !important;
+  }
+
+  .player-controls-bottom {
+    padding-bottom: max(24px, env(safe-area-inset-bottom)) !important;
+    padding-left: max(24px, env(safe-area-inset-left)) !important;
+    padding-right: max(24px, env(safe-area-inset-right)) !important;
+  }
+}
+
+/* ==========================================================================
+   UNIVERSAL RESPONSIVE BREAKPOINTS (MOBILE, TABLET, DESKTOP)
+   ========================================================================== */
+
+/* Compact Mobile (320px - 480px) */
+@media (max-width: 480px) {
+  .content-row-track {
+    gap: 10px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .content-card-rail-item {
+    width: clamp(110px, 32vw, 130px) !important;
+    min-width: 110px !important;
+    max-width: 130px !important;
+  }
+
+  .modal-dialog {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    margin-top: auto !important;
+  }
+}
+
+/* Tablets / Foldables (600px - 1024px) */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .modal-dialog {
+    max-width: 680px !important;
+    width: 90% !important;
+  }
+}
+
+/* Desktop & Ultrawide (> 1024px) */
+@media (min-width: 1024px) {
+  .app-container-bounded {
+    max-width: 1320px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}

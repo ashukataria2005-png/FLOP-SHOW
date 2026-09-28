@@ -117,10 +117,11 @@ export const ContentSection: React.FC<ContentSectionProps> = ({
           {items.map(item => (
             <div
               key={item.id}
+              className="content-card-rail-item"
               style={{
                 scrollSnapAlign: 'start',
                 flexShrink: 0,
-                width: 'clamp(150px, 22vw, 190px)'
+                width: 'clamp(140px, 22vw, 190px)'
               }}
             >
               <ContentCard item={item} onSelect={onSelect} />
@@ -141,6 +142,15 @@ export const ContentSection: React.FC<ContentSectionProps> = ({
       <style>{`
         .content-row-track::-webkit-scrollbar {
           display: none;
+        }
+        @media (max-width: 480px) {
+          .content-row-track {
+            gap: 10px !important;
+            padding: 4px 12px 14px !important;
+          }
+          .content-card-rail-item {
+            width: clamp(110px, 32vw, 130px) !important;
+          }
         }
         .section-scroll-arrow {
           display: none;

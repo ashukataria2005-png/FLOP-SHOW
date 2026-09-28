@@ -41,6 +41,8 @@ export const VideoPlayer: React.FC = () => {
   const [volume,              setVolume]              = useState(1);
   const [isMuted,             setIsMuted]             = useState(false);
   const [isFullscreen,        setIsFullscreen]        = useState(false);
+  const [videoFit,            setVideoFit]            = useState<'contain' | 'cover'>('contain');
+  const toggleZoom = () => setVideoFit(prev => prev === 'contain' ? 'cover' : 'contain');
   const [showControls,        setShowControls]        = useState(true);
   const [showEpisodeDrawer,   setShowEpisodeDrawer]   = useState(false);
   const [selectedSeasonIndex, setSelectedSeasonIndex] = useState(0);
@@ -84,6 +86,62 @@ export const VideoPlayer: React.FC = () => {
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Listen to fullscreen changes across all browsers and unlock orientation on exit
+  useEffect(() => {
+    const handleFsChange = () => {
+      const isFs = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isFs);
+      if (!isFs) {
+        if (window.screen?.orientation?.unlock) {
+          try {
+            window.screen.orientation.unlock();
+          } catch {
+            // Graceful fallback
+          }
+        }
+      }
+    };
+
+    const handleVideoEndFullscreen = () => {
+      setIsFullscreen(false);
+      if (window.screen?.orientation?.unlock) {
+        try {
+          window.screen.orientation.unlock();
+        } catch {}
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    document.addEventListener('mozfullscreenchange', handleFsChange);
+    document.addEventListener('MSFullscreenChange', handleFsChange);
+
+    const videoEl = videoRef.current;
+    if (videoEl) {
+      videoEl.addEventListener('webkitendfullscreen', handleVideoEndFullscreen);
+    }
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+      document.removeEventListener('mozfullscreenchange', handleFsChange);
+      document.removeEventListener('MSFullscreenChange', handleFsChange);
+      if (videoEl) {
+        videoEl.removeEventListener('webkitendfullscreen', handleVideoEndFullscreen);
+      }
+      if (window.screen?.orientation?.unlock) {
+        try {
+          window.screen.orientation.unlock();
+        } catch {}
+      }
+    };
   }, []);
 
   // Lock document body scroll while player is active
@@ -256,27 +314,43 @@ export const VideoPlayer: React.FC = () => {
   const toggleFullscreen = async () => {
     if (!containerRef.current) return;
     try {
-      if (!document.fullscreenElement) {
+      const isCurrentlyFs = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+
+      if (!isCurrentlyFs) {
         if (containerRef.current.requestFullscreen) {
-          await containerRef.current.requestFullscreen();
+          await containerRef.current.requestFullscreen({ navigationUI: 'hide' } as any);
         } else if ((containerRef.current as any).webkitRequestFullscreen) {
           await (containerRef.current as any).webkitRequestFullscreen();
+        } else if ((containerRef.current as any).mozRequestFullScreen) {
+          await (containerRef.current as any).mozRequestFullScreen();
+        } else if ((containerRef.current as any).msRequestFullscreen) {
+          await (containerRef.current as any).msRequestFullscreen();
+        } else if (videoRef.current && (videoRef.current as any).webkitEnterFullscreen) {
+          // iOS Safari iPhone container fallback
+          (videoRef.current as any).webkitEnterFullscreen();
         }
         setIsFullscreen(true);
 
         // Native auto-rotation handling where supported (fallback gracefully)
         if (window.screen?.orientation && 'lock' in window.screen.orientation) {
-          try {
-            await (window.screen.orientation as any).lock('landscape');
-          } catch {
+          (window.screen.orientation as any).lock('landscape').catch(() => {
             // Orientation lock may fail if user gesture expired or not supported; ignore gracefully
-          }
+          });
         }
       } else {
         if (document.exitFullscreen) {
           await document.exitFullscreen();
         } else if ((document as any).webkitExitFullscreen) {
           await (document as any).webkitExitFullscreen();
+        } else if ((document as any).mozCancelFullScreen) {
+          await (document as any).mozCancelFullScreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
         }
         setIsFullscreen(false);
 
@@ -289,8 +363,23 @@ export const VideoPlayer: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error('Fullscreen toggle error:', err);
+      console.warn('Fullscreen toggle error:', err);
     }
+  };
+
+  const handleClose = async () => {
+    if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+      try {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if ((document as any).webkitExitFullscreen) await (document as any).webkitExitFullscreen();
+      } catch {}
+    }
+    if (window.screen?.orientation?.unlock) {
+      try {
+        window.screen.orientation.unlock();
+      } catch {}
+    }
+    closePlayer();
   };
 
   // ── Series: find next episode ─────────────────────────────────────────────
@@ -338,6 +427,7 @@ export const VideoPlayer: React.FC = () => {
   return (
     <div
       ref={containerRef}
+      className={`media-player-container ${isFullscreen ? 'is-fullscreen' : ''}`}
       onMouseMove={handleUserActivity}
       onTouchStart={handleUserActivity}
       onClick={handleContainerTap}
@@ -365,8 +455,9 @@ export const VideoPlayer: React.FC = () => {
             position:       'relative',
             width:          '100%',
             maxWidth:       '100vw',
-            maxHeight:      isMobile ? '50vh' : '100vh',
-            aspectRatio:    '16 / 9',
+            height:         isFullscreen ? '100%' : 'auto',
+            maxHeight:      isFullscreen ? '100vh' : (isMobile ? '50vh' : '100vh'),
+            aspectRatio:    isFullscreen ? undefined : '16 / 9',
             display:        'flex',
             alignItems:     'center',
             justifyContent: 'center',
@@ -379,7 +470,12 @@ export const VideoPlayer: React.FC = () => {
             allowFullScreen
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
             referrerPolicy="no-referrer-when-downgrade"
-            style={{ width: '100%', height: '100%', border: 0, borderRadius: '8px' }}
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 0,
+              borderRadius: isFullscreen ? '0px' : '8px'
+            }}
           />
         </div>
       ) : (
@@ -390,8 +486,9 @@ export const VideoPlayer: React.FC = () => {
             position:        'relative',
             width:           '100%',
             maxWidth:        '100vw',
-            maxHeight:       isMobile ? '50vh' : '100vh',
-            aspectRatio:     '16 / 9',
+            height:          isFullscreen ? '100%' : 'auto',
+            maxHeight:       isFullscreen ? '100vh' : (isMobile ? '50vh' : '100vh'),
+            aspectRatio:     isFullscreen ? undefined : '16 / 9',
             backgroundColor: '#000',
             overflow:        'hidden',
             display:         'flex',
@@ -464,7 +561,9 @@ export const VideoPlayer: React.FC = () => {
             style={{
               width:     '100%',
               height:    '100%',
-              objectFit: 'contain',
+              maxWidth:  '100vw',
+              maxHeight: '100vh',
+              objectFit: videoFit,
               display:   'block',
               position:  'relative',
               zIndex:    2,
@@ -487,6 +586,7 @@ export const VideoPlayer: React.FC = () => {
 
       {/* ── Top Header Bar ──────────────────────────────────────────────── */}
       <div
+        className="player-controls-top"
         style={{
           position:       'absolute',
           top: 0, left: 0, right: 0,
@@ -502,7 +602,7 @@ export const VideoPlayer: React.FC = () => {
         }}
       >
         <button
-          onClick={closePlayer}
+          onClick={handleClose}
           style={{
             display:         'flex',
             alignItems:      'center',
@@ -593,6 +693,7 @@ export const VideoPlayer: React.FC = () => {
       {/* ── Bottom Controls Bar ──────────────────────────────────────────── */}
       {!isEmbed && (
         <div
+          className="player-controls-bottom"
           style={{
             position:      'absolute',
             bottom: 0, left: 0, right: 0,
@@ -749,6 +850,29 @@ export const VideoPlayer: React.FC = () => {
 
             {/* Right controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                onClick={toggleZoom}
+                style={{
+                  background: 'none',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  borderRadius: '6px',
+                  color: videoFit === 'cover' ? 'var(--brand-gold)' : '#FFFFFF',
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '34px',
+                  letterSpacing: '0.05em'
+                }}
+                title={videoFit === 'contain' ? 'Zoom to Fill (Cover)' : 'Original Ratio (Fit)'}
+                aria-label="Toggle Video Aspect Ratio"
+              >
+                {videoFit === 'contain' ? 'FIT' : 'FILL'}
+              </button>
+
               <button
                 onClick={toggleFullscreen}
                 style={{

@@ -75,20 +75,45 @@ export function useMediaPlayerState({
     if (!elem) return;
 
     try {
-      if (!document.fullscreenElement) {
+      const isCurrentlyFs = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+
+      if (!isCurrentlyFs) {
         if (elem.requestFullscreen) {
-          await elem.requestFullscreen();
+          await elem.requestFullscreen({ navigationUI: 'hide' } as any);
         } else if ((elem as any).webkitRequestFullscreen) {
           await (elem as any).webkitRequestFullscreen();
+        } else if ((elem as any).mozRequestFullScreen) {
+          await (elem as any).mozRequestFullScreen();
+        } else if ((elem as any).msRequestFullscreen) {
+          await (elem as any).msRequestFullscreen();
         }
         setIsFullscreen(true);
+
+        if (window.screen?.orientation && 'lock' in window.screen.orientation) {
+          (window.screen.orientation as any).lock('landscape').catch(() => {});
+        }
       } else {
         if (document.exitFullscreen) {
           await document.exitFullscreen();
         } else if ((document as any).webkitExitFullscreen) {
           await (document as any).webkitExitFullscreen();
+        } else if ((document as any).mozCancelFullScreen) {
+          await (document as any).mozCancelFullScreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
         }
         setIsFullscreen(false);
+
+        if (window.screen?.orientation && 'unlock' in window.screen.orientation) {
+          try {
+            window.screen.orientation.unlock();
+          } catch {}
+        }
       }
     } catch (err) {
       console.warn('[MediaPlayer] Fullscreen toggle error:', err);
@@ -98,13 +123,33 @@ export function useMediaPlayerState({
   // Track fullscreen change events
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isFs = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isFs);
+      if (!isFs && window.screen?.orientation?.unlock) {
+        try {
+          window.screen.orientation.unlock();
+        } catch {}
+      }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+      if (window.screen?.orientation?.unlock) {
+        try {
+          window.screen.orientation.unlock();
+        } catch {}
+      }
     };
   }, []);
 

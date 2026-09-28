@@ -252,6 +252,7 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
 
                 {/* Poster Card */}
                 <div
+                  className="top10-poster-card"
                   style={{
                     width: 'clamp(135px, 19vw, 180px)',
                     aspectRatio: '2/3',
@@ -364,6 +365,20 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
           -webkit-text-fill-color: transparent;
           -webkit-text-stroke: 2px rgba(255, 255, 255, 0.85);
           filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 10px rgba(0, 0, 0, 0.85));
+        }
+
+        @media (max-width: 480px) {
+          .top10-scroll-track {
+            gap: 10px !important;
+            padding: 8px 12px 18px !important;
+          }
+          .top10-poster-card {
+            width: clamp(110px, 30vw, 130px) !important;
+          }
+          .top10-rank-number {
+            font-size: 76px !important;
+            margin-right: -10px !important;
+          }
         }
 
         @media (min-width: 768px) {

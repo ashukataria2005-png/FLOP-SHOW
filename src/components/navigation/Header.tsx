@@ -384,6 +384,20 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
         .header-plan-badge {
           display: none !important;
         }
+        @media (max-width: 430px) {
+          header {
+            padding: 0 12px !important;
+          }
+          .header-mobile-hamburger-btn {
+            width: 35px !important;
+            height: 35px !important;
+          }
+          .header-mobile-search-btn {
+            min-width: 35px !important;
+            min-height: 35px !important;
+            padding: 6px !important;
+          }
+        }
         @media (min-width: 768px) {
           .header-mobile-search-btn {
             display: none !important;

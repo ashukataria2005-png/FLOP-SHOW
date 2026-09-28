@@ -18,14 +18,14 @@ async function runDryRunTest() {
   const startTime = Date.now();
 
   try {
-    // 1. Run ingestion cycle in dryRun mode with India region and >= 7.2 rating
-    console.log('[Test] Triggering runIngestionCycle({ dryRun: true, minRating: 7.2, region: "IN", maxTitlesPerRun: 15 })...');
+    // 1. Run ingestion cycle in dryRun mode with India region and >= 7.2 rating (batch size: 30)
+    console.log('[Test] Triggering runIngestionCycle({ dryRun: true, minRating: 7.2, region: "IN", maxTitlesPerRun: 30 })...');
     const result = await ingestionService.runIngestionCycle({
       dryRun: true,
       minRating: 7.2,
       minVoteCount: 100, // relaxed threshold for test to ensure candidates
       region: 'IN',
-      maxTitlesPerRun: 15,
+      maxTitlesPerRun: 30,
     });
 
     console.log('\n[Test] Ingestion Cycle Result Summary:');

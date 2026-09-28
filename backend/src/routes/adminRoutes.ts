@@ -480,7 +480,7 @@ adminRouter.post('/ingest-now', requirePermission('catalog'), async (req, res, n
       return;
     }
 
-    const filters = req.body?.filters || {};
+    const filters = { maxTitlesPerRun: 30, ...(req.body?.filters || {}) };
     const result = await ingestionService.runNow(filters);
     res.json({
       success: true,

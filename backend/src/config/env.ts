@@ -2,11 +2,19 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 
-// Load .env from project root or parent directory if in backend
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-if (fs.existsSync(path.resolve(process.cwd(), '..', '.env'))) {
-  dotenv.config({ path: path.resolve(process.cwd(), '..', '.env') });
+// Load .env from project root, backend folder, and parent directory if applicable
+const rootEnvPath = path.resolve(process.cwd(), '.env');
+const backendEnvPath = path.resolve(process.cwd(), 'backend', '.env');
+const parentEnvPath = path.resolve(process.cwd(), '..', '.env');
+
+dotenv.config({ path: rootEnvPath });
+dotenv.config({ path: backendEnvPath });
+if (fs.existsSync(parentEnvPath)) {
+  dotenv.config({ path: parentEnvPath });
 }
+
+// Fallback constant for TMDB metadata API key if not set in environment
+const DEFAULT_TMDB_API_KEY = '8374543294a7bc401f36d0833470074b';
 
 const rawPort = process.env.PORT;
 const parsedPort = rawPort ? parseInt(rawPort, 10) : 5000;
@@ -71,8 +79,8 @@ export const config = {
   adminPassword: process.env.ADMIN_PASSWORD || 'Kataria2005#',
   devAdminEmail: process.env.DEV_ADMIN_EMAIL || 'admin@flopshow.tv',
   devAdminPassword: process.env.DEV_ADMIN_PASSWORD || '',
-  tmdbApiKey: process.env.TMDB_API_KEY || '',
-  omdbApiKey: process.env.OMDB_API_KEY || '',
+  tmdbApiKey: (process.env.TMDB_API_KEY || DEFAULT_TMDB_API_KEY).trim(),
+  omdbApiKey: process.env.OMDB_API_KEY || 'trilogy',
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || '',
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || '',

@@ -48,9 +48,9 @@ async function executeScheduledRun(): Promise<void> {
     return;
   }
 
-  console.log('[MetadataCron] Starting scheduled ingestion run...');
+  console.log('[MetadataCron] Starting scheduled ingestion run (batch size: 30)...');
   try {
-    const result = await ingestionService.runNow();
+    const result = await ingestionService.runNow({ maxTitlesPerRun: 30 });
     console.log(
       `[MetadataCron] Scheduled run complete: ${result.imported} imported, ` +
       `${result.failed} failed, ${result.duplicatesSkipped} duplicates skipped ` +

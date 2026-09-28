@@ -10,8 +10,17 @@ import {
   Plus,
   RotateCcw,
   X,
-  Sliders
+  Sliders,
+  Sparkles,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
+import {
+  isAutoRotationEnabled,
+  setTop10Mode,
+  getDailyTop10,
+  getDaySeed
+} from '../../utils/top10Rotation';
 
 interface AdminTop10PageProps {
   onNavigateTab?: (tab: string, param?: string) => void;
@@ -20,9 +29,26 @@ interface AdminTop10PageProps {
 export const AdminTop10Page: React.FC<AdminTop10PageProps> = () => {
   const { showToast, catalog, refreshCatalog } = useApp();
   const [selectedItems, setSelectedItems] = useState<ContentItem[]>([]);
+  const [rotationMode, setRotationMode] = useState<'auto' | 'manual'>(() =>
+    isAutoRotationEnabled() ? 'auto' : 'manual'
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalSearch, setModalSearch] = useState('');
   const [modalTypeFilter, setModalTypeFilter] = useState<'ALL' | 'MOVIE' | 'SERIES'>('ALL');
+
+  const dailyAutoList = useMemo(() => {
+    return getDailyTop10(catalog);
+  }, [catalog]);
+
+  const handleToggleMode = (newMode: 'auto' | 'manual') => {
+    setRotationMode(newMode);
+    setTop10Mode(newMode);
+    if (newMode === 'auto') {
+      showToast('Auto-Rotate Daily (24 Hours) enabled: Top 10 rotates every midnight based on seeded PRNG.', 'success');
+    } else {
+      showToast('Manual Curation enabled: Top 10 will follow your custom list order.', 'info');
+    }
+  };
 
   // Top 10 homepage vertical position index (0 = very top below Hero, 1 = after 1st row, 2 = after 2nd row, etc.)
   const [positionIndex, setPositionIndex] = useState<number>(() => {
@@ -210,49 +236,179 @@ export const AdminTop10Page: React.FC<AdminTop10PageProps> = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            onClick={handleReset}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '9px 16px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#FFFFFF',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            <RotateCcw size={15} />
-            <span>Reset to Top Rated</span>
-          </button>
+          {rotationMode === 'manual' ? (
+            <>
+              <button
+                onClick={handleReset}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <RotateCcw size={15} />
+                <span>Reset to Top Rated</span>
+              </button>
 
-          {selectedItems.length < 10 && (
-            <button
-              onClick={() => setIsModalOpen(true)}
+              {selectedItems.length < 10 && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '9px 18px',
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--brand-gold, #F5C518)',
+                    border: 'none',
+                    color: '#0E0E12',
+                    fontSize: '13px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 16px rgba(245, 197, 24, 0.25)'
+                  }}
+                >
+                  <Plus size={16} />
+                  <span>Add Title to Top 10</span>
+                </button>
+              )}
+            </>
+          ) : (
+            <div
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '9px 18px',
+                gap: '8px',
+                padding: '8px 16px',
                 borderRadius: '8px',
-                backgroundColor: 'var(--brand-gold, #F5C518)',
-                border: 'none',
-                color: '#0E0E12',
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                color: '#10B981',
                 fontSize: '13px',
-                fontWeight: 800,
-                cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(245, 197, 24, 0.25)'
+                fontWeight: 700
               }}
             >
-              <Plus size={16} />
-              <span>Add Title to Top 10</span>
-            </button>
+              <CheckCircle2 size={16} />
+              <span>24H Auto-Rotation Active</span>
+            </div>
           )}
         </div>
+      </div>
+
+      {/* SECTION: 24-HOUR AUTO-ROTATION VS MANUAL CURATION TOGGLE */}
+      <div
+        style={{
+          backgroundColor: 'var(--bg-surface, #12121A)',
+          borderRadius: '16px',
+          border: rotationMode === 'auto' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(245, 197, 24, 0.35)',
+          padding: '20px 24px',
+          marginBottom: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <Sparkles size={18} color={rotationMode === 'auto' ? '#10B981' : 'var(--brand-gold, #F5C518)'} />
+              <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Top 10 Line-Up System Mode
+              </h2>
+            </div>
+            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>
+              {rotationMode === 'auto'
+                ? 'Automated 24-hour cycle: Catalog rotates deterministically every midnight (00:00) using seeded PRNG across popular titles.'
+                : 'Manual Mode: You have full control to add, order, or remove exact titles for positions 1 to 10.'}
+            </p>
+          </div>
+
+          {/* Mode Switcher Buttons */}
+          <div
+            style={{
+              display: 'inline-flex',
+              padding: '4px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}
+          >
+            <button
+              onClick={() => handleToggleMode('auto')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: rotationMode === 'auto' ? '#10B981' : 'transparent',
+                color: rotationMode === 'auto' ? '#042F2E' : '#9CA3AF',
+                fontWeight: 800,
+                fontSize: '13px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Clock size={15} />
+              <span>Auto-Rotate Daily (24 Hours)</span>
+            </button>
+
+            <button
+              onClick={() => handleToggleMode('manual')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: rotationMode === 'manual' ? 'var(--brand-gold, #F5C518)' : 'transparent',
+                color: rotationMode === 'manual' ? '#0E0E12' : '#9CA3AF',
+                fontWeight: 800,
+                fontSize: '13px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Sliders size={15} />
+              <span>Manual Curation</span>
+            </button>
+          </div>
+        </div>
+
+        {rotationMode === 'auto' && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(16, 185, 129, 0.08)',
+              border: '1px dashed rgba(16, 185, 129, 0.3)',
+              fontSize: '12.5px',
+              color: '#D1FAE5',
+              flexWrap: 'wrap',
+              gap: '8px'
+            }}
+          >
+            <span>
+              📅 <strong>Current Calendar Seed:</strong> {getDaySeed()} (Rotates at 00:00 midnight)
+            </span>
+            <span style={{ color: '#A7F3D0' }}>
+              ✓ All users worldwide receive this synchronized 10-title lineup for 24 hours.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* SECTION: Homepage Placement & Slot Selection */}
@@ -310,9 +466,9 @@ export const AdminTop10Page: React.FC<AdminTop10PageProps> = () => {
         </div>
       </div>
 
-      {/* Ordered List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {selectedItems.map((item, idx) => {
+      {/* Ordered List of Current Top 10 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '28px' }}>
+        {(rotationMode === 'auto' ? dailyAutoList : selectedItems).map((item, idx) => {
           const rank = idx + 1;
           return (
             <div
@@ -376,59 +532,83 @@ export const AdminTop10Page: React.FC<AdminTop10PageProps> = () => {
                     <span>{item.releaseYear}</span>
                     <span>•</span>
                     <span style={{ color: 'var(--brand-gold, #F5C518)', fontWeight: 700 }}>★ {item.rating.toFixed(1)}</span>
+                    {rotationMode === 'auto' && (
+                      <>
+                        <span>•</span>
+                        <span style={{ color: '#10B981', fontWeight: 600, fontSize: '11px' }}>24h PRNG Rotated</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Right: Reorder Up / Down + Delete */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  onClick={() => handleMoveUp(idx)}
-                  disabled={idx === 0}
-                  style={{
-                    padding: '7px 10px',
-                    borderRadius: '6px',
-                    backgroundColor: idx === 0 ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    color: idx === 0 ? '#4B5563' : '#FFFFFF',
-                    cursor: idx === 0 ? 'not-allowed' : 'pointer'
-                  }}
-                  title="Move Up"
-                >
-                  <ChevronUp size={16} />
-                </button>
+              {/* Right: Actions */}
+              {rotationMode === 'manual' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    onClick={() => handleMoveUp(idx)}
+                    disabled={idx === 0}
+                    style={{
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: idx === 0 ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      color: idx === 0 ? '#4B5563' : '#FFFFFF',
+                      cursor: idx === 0 ? 'not-allowed' : 'pointer'
+                    }}
+                    title="Move Up"
+                  >
+                    <ChevronUp size={16} />
+                  </button>
 
-                <button
-                  onClick={() => handleMoveDown(idx)}
-                  disabled={idx === selectedItems.length - 1}
-                  style={{
-                    padding: '7px 10px',
-                    borderRadius: '6px',
-                    backgroundColor: idx === selectedItems.length - 1 ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    color: idx === selectedItems.length - 1 ? '#4B5563' : '#FFFFFF',
-                    cursor: idx === selectedItems.length - 1 ? 'not-allowed' : 'pointer'
-                  }}
-                  title="Move Down"
-                >
-                  <ChevronDown size={16} />
-                </button>
+                  <button
+                    onClick={() => handleMoveDown(idx)}
+                    disabled={idx === selectedItems.length - 1}
+                    style={{
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: idx === selectedItems.length - 1 ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      color: idx === selectedItems.length - 1 ? '#4B5563' : '#FFFFFF',
+                      cursor: idx === selectedItems.length - 1 ? 'not-allowed' : 'pointer'
+                    }}
+                    title="Move Down"
+                  >
+                    <ChevronDown size={16} />
+                  </button>
 
-                <button
-                  onClick={() => handleRemove(idx)}
-                  style={{
-                    padding: '7px 10px',
-                    borderRadius: '6px',
-                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    color: '#EF4444',
-                    cursor: 'pointer'
-                  }}
-                  title="Remove from Top 10"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
+                  <button
+                    onClick={() => handleRemove(idx)}
+                    style={{
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: '#EF4444',
+                      cursor: 'pointer'
+                    }}
+                    title="Remove from Top 10"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: '#10B981',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                      border: '1px solid rgba(16, 185, 129, 0.25)'
+                    }}
+                  >
+                    Locked for 24h
+                  </span>
+                </div>
+              )}
             </div>
           );
         })}

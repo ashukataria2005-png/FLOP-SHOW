@@ -17,8 +17,11 @@ import {
   Minimize,
   AlertCircle,
   Loader2,
-  SkipBack,
-  SkipForward
+  X,
+  Settings,
+  MessageSquare,
+  PictureInPicture,
+  Check
 } from 'lucide-react';
 
 export interface MediaPlayerSource {
@@ -58,9 +61,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   source,
   onClose,
   onNextEpisode,
-  onPrevEpisode,
   hasNextEpisode,
-  hasPrevEpisode
 }) => {
   const { saveWatchProgress } = useApp();
 
@@ -76,14 +77,43 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [videoFit, setVideoFit] = useState<'contain' | 'cover'>('contain');
+  const [videoFit, setVideoFit] = useState<'contain' | 'cover'>('cover');
   const [showControls, setShowControls] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAudioSubs, setShowAudioSubs] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Derived loading state for backwards compatibility
   const isLoading = isInitialLoading || isBuffering;
+
+  // Episode metadata parser: [S2 • E4] Title
+  const episodeMeta = React.useMemo(() => {
+    const sub = source?.subtitle || '';
+    const match = sub.match(/S(\d+)\s*E(\d+)[:\s]*(.*)/i) || sub.match(/Season\s*(\d+)\s*Episode\s*(\d+)[:\s]*(.*)/i);
+    if (match) {
+      const s = match[1];
+      const e = match[2];
+      const name = match[3]?.trim();
+      return {
+        pill: `[S${s} • E${e}]`,
+        title: name ? `${source?.title} – ${name}` : `${source?.title} – S${s} E${e}`
+      };
+    }
+    if (source?.episodeId) {
+      return {
+        pill: '[Episode]',
+        title: sub ? `${source?.title} – ${sub}` : (source?.title || '')
+      };
+    }
+    return {
+      pill: null,
+      title: source?.title || ''
+    };
+  }, [source?.subtitle, source?.title, source?.episodeId]);
 
   // Advertisement Pre-roll State
   const [adConfig, setAdConfig] = useState<AdConfig | null>(null);
@@ -118,6 +148,55 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Auto-Landscape Launch Physics on Mount:
+  // Component mount hote hi container fullscreen trigger ho.
+  // Mobile screen orientation turant landscape me auto-lock ho jaye:
+  // window.screen.orientation.lock('landscape').catch(() => {})
+  // Notch-to-notch horizontal video full-width chalega.
+  // Close hote hi ya '✕' dabane par portrait me restore ho jaye.
+  useEffect(() => {
+    let unmounted = false;
+    const launchAutoLandscape = async () => {
+      try {
+        const elem = containerRef.current || document.documentElement;
+        if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+          if (elem.requestFullscreen) {
+            await elem.requestFullscreen({ navigationUI: 'hide' } as any).catch(() => {});
+          } else if ((elem as any).webkitRequestFullscreen) {
+            await (elem as any).webkitRequestFullscreen();
+          }
+        }
+        if (!unmounted) setIsFullscreen(true);
+      } catch (_) {}
+
+      try {
+        if (window.screen?.orientation && 'lock' in window.screen.orientation) {
+          await (window.screen.orientation as any).lock('landscape').catch(() => {});
+        }
+      } catch (_) {}
+    };
+
+    launchAutoLandscape();
+
+    return () => {
+      unmounted = true;
+      try {
+        if (window.screen?.orientation && 'unlock' in window.screen.orientation) {
+          window.screen.orientation.unlock();
+        }
+      } catch (_) {}
+      try {
+        if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+          if (document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          } else if ((document as any).webkitExitFullscreen) {
+            (document as any).webkitExitFullscreen();
+          }
+        }
+      } catch (_) {}
+    };
   }, []);
 
   // Sync fullscreen state & auto-rotation unlock
@@ -738,6 +817,37 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     }
   };
 
+  const togglePiP = async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (videoRef.current && document.pictureInPictureEnabled) {
+        await videoRef.current.requestPictureInPicture();
+      }
+    } catch (err) {
+      console.warn('[MediaPlayer] PiP notice:', err);
+    }
+  };
+
+  const toggleSubtitles = () => {
+    const nextState = !subtitlesEnabled;
+    setSubtitlesEnabled(nextState);
+    if (videoRef.current?.textTracks) {
+      const tracks = videoRef.current.textTracks;
+      for (let i = 0; i < tracks.length; i++) {
+        tracks[i].mode = nextState ? 'showing' : 'hidden';
+      }
+    }
+  };
+
+  const handleSpeedChange = (rate: number) => {
+    setPlaybackRate(rate);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = rate;
+    }
+    setShowSettings(false);
+  };
+
   const handleClose = async () => {
     if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
       try {
@@ -1044,28 +1154,137 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             ))}
           </video>
 
-          {/* Large Center Play Trigger — only when NOT playing, NOT loading, NO error */}
-          {!isPlaying && !isLoading && !errorMessage && (
+          {/* Exact Center Controls (Left: Rewind -10s, Center: Prominent Large Solid White Play/Pause, Right: Forward +10s) */}
+          {!errorMessage && !isLoading && (
             <div
-              onClick={togglePlay}
               style={{
                 position: 'absolute',
-                width: '80px',
-                height: '80px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--brand-gold, #F5C518)',
-                color: '#0E0E12',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 25,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 35px rgba(245, 197, 24, 0.55)',
-                cursor: 'pointer',
-                zIndex: 10,
-                transition: 'transform 0.15s ease'
+                gap: isMobile ? '28px' : '44px',
+                opacity: (showControls || !isPlaying) ? 1 : 0,
+                pointerEvents: (showControls || !isPlaying) ? 'auto' : 'none',
+                transition: 'opacity 0.25s ease'
               }}
             >
-              <Play size={36} fill="#0E0E12" style={{ marginLeft: '4px' }} />
+              {/* Left: Circular 10-second Rewind button ('-10s') */}
+              <button
+                onClick={(e) => { e.stopPropagation(); skipTime(-10); }}
+                style={{
+                  width: isMobile ? '50px' : '56px',
+                  height: isMobile ? '50px' : '56px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(20, 20, 26, 0.72)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.55)',
+                  transition: 'transform 0.15s ease'
+                }}
+                title="Rewind 10s"
+                aria-label="Rewind 10 seconds"
+              >
+                <RotateCcw size={isMobile ? 20 : 22} strokeWidth={2.2} />
+                <span style={{ fontSize: '10px', fontWeight: 800, marginTop: '-2px', letterSpacing: '-0.02em' }}>-10s</span>
+              </button>
+
+              {/* Center: Prominent large solid white Play / Pause icon */}
+              <button
+                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                style={{
+                  width: isMobile ? '72px' : '88px',
+                  height: isMobile ? '72px' : '88px',
+                  borderRadius: '50%',
+                  backgroundColor: '#FFFFFF',
+                  color: '#0A0A0E',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  border: 'none',
+                  boxShadow: '0 8px 30px rgba(0, 0, 0, 0.7), 0 0 40px rgba(255, 255, 255, 0.35)',
+                  transition: 'transform 0.15s ease'
+                }}
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+              >
+                {isPlaying ? (
+                  <Pause size={isMobile ? 36 : 44} fill="#0A0A0E" stroke="#0A0A0E" />
+                ) : (
+                  <Play size={isMobile ? 36 : 44} fill="#0A0A0E" stroke="#0A0A0E" style={{ marginLeft: '4px' }} />
+                )}
+              </button>
+
+              {/* Right: Circular 10-second Forward button ('+10s') */}
+              <button
+                onClick={(e) => { e.stopPropagation(); skipTime(10); }}
+                style={{
+                  width: isMobile ? '50px' : '56px',
+                  height: isMobile ? '50px' : '56px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(20, 20, 26, 0.72)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.55)',
+                  transition: 'transform 0.15s ease'
+                }}
+                title="Forward 10s"
+                aria-label="Forward 10 seconds"
+              >
+                <RotateCw size={isMobile ? 20 : 22} strokeWidth={2.2} />
+                <span style={{ fontSize: '10px', fontWeight: 800, marginTop: '-2px', letterSpacing: '-0.02em' }}>+10s</span>
+              </button>
             </div>
+          )}
+
+          {/* Mid-Right Floating Pill: ▶ Next EP */}
+          {source.episodeId && hasNextEpisode && onNextEpisode && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onNextEpisode(); }}
+              style={{
+                position: 'absolute',
+                right: isMobile ? '16px' : '32px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 35,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: isMobile ? '8px 16px' : '10px 20px',
+                borderRadius: '9999px',
+                backgroundColor: 'rgba(20, 20, 28, 0.88)',
+                backdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.35)',
+                color: '#FFFFFF',
+                fontSize: '13px',
+                fontWeight: 800,
+                letterSpacing: '0.03em',
+                cursor: 'pointer',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7)',
+                opacity: showControls ? 1 : 0,
+                pointerEvents: showControls ? 'auto' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+              aria-label="Play Next Episode"
+            >
+              <Play size={13} fill="#FFFFFF" />
+              <span>Next EP</span>
+            </button>
           )}
         </>
       )}
@@ -1246,61 +1465,29 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '80px', justifyContent: 'flex-end' }}>
-          {source.episodeId && (
-            <>
-              {onPrevEpisode && (
-                <button
-                  onClick={onPrevEpisode}
-                  disabled={!hasPrevEpisode}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 12px',
-                    borderRadius: '9999px',
-                    backgroundColor: hasPrevEpisode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                    border: 'none',
-                    color: hasPrevEpisode ? '#FFFFFF' : 'rgba(255, 255, 255, 0.3)',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: hasPrevEpisode ? 'pointer' : 'not-allowed',
-                    transition: 'background-color 0.2s'
-                  }}
-                  title={hasPrevEpisode ? 'Previous Episode' : 'First episode in season'}
-                  aria-label="Previous Episode"
-                >
-                  <SkipBack size={14} />
-                  <span>Prev</span>
-                </button>
-              )}
-              {onNextEpisode && (
-                <button
-                  onClick={onNextEpisode}
-                  disabled={!hasNextEpisode}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '6px 14px',
-                    borderRadius: '9999px',
-                    backgroundColor: hasNextEpisode ? 'rgba(245, 166, 35, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                    border: hasNextEpisode ? '1px solid var(--brand-gold, #F5C518)' : 'none',
-                    color: hasNextEpisode ? 'var(--brand-gold, #F5C518)' : 'rgba(255, 255, 255, 0.3)',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    cursor: hasNextEpisode ? 'pointer' : 'not-allowed',
-                    transition: 'all 0.2s'
-                  }}
-                  title={hasNextEpisode ? 'Next Episode' : 'Last episode in season'}
-                  aria-label="Next Episode"
-                >
-                  <span>Next</span>
-                  <SkipForward size={14} />
-                </button>
-              )}
-            </>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '44px', justifyContent: 'flex-end' }}>
+          <button
+            onClick={handleClose}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFFFFF',
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(255, 255, 255, 0.12)',
+              backdropFilter: 'blur(8px)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              flexShrink: 0
+            }}
+            aria-label="Close Player"
+            title="Close"
+          >
+            <X size={22} strokeWidth={2.4} />
+          </button>
         </div>
       </div>
 
@@ -1323,59 +1510,33 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
             pointerEvents: showControls ? 'auto' : 'none'
           }}
         >
-          {/* Seekbar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
-            <span style={{ fontSize: '13px', color: '#FFFFFF', fontWeight: 600, minWidth: '46px' }}>
-              {formatSeconds(currentTime)}
-            </span>
-
+          {/* Full-width sleek red seekbar */}
+          <div style={{ position: 'relative', width: '100%', marginBottom: '14px', cursor: 'pointer' }}>
             <input
               type="range"
               min="0"
               max="100"
+              step="0.1"
               value={duration > 0 ? (currentTime / duration) * 100 : 0}
               onChange={handleSeek}
+              aria-label="Seek Video Timeline"
+              className="player-red-seekbar"
               style={{
-                flex: 1,
-                height: '5px',
-                borderRadius: '9999px',
-                accentColor: 'var(--brand-gold, #F5C518)',
-                cursor: 'pointer'
+                width: '100%',
+                height: '4px',
+                borderRadius: '2px',
+                accentColor: '#E50914',
+                cursor: 'pointer',
+                display: 'block',
+                background: `linear-gradient(to right, #E50914 ${(duration > 0 ? (currentTime / duration) * 100 : 0)}%, rgba(255, 255, 255, 0.28) ${(duration > 0 ? (currentTime / duration) * 100 : 0)}%)`
               }}
             />
-
-            <span style={{ fontSize: '13px', color: 'var(--text-secondary, #9CA3AF)', minWidth: '46px', textAlign: 'right' }}>
-              {formatSeconds(duration)}
-            </span>
           </div>
 
           {/* Controls Row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '16px' }}>
-              {/* Previous Episode button */}
-              {source.episodeId && onPrevEpisode && (
-                <button
-                  onClick={onPrevEpisode}
-                  disabled={!hasPrevEpisode}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: hasPrevEpisode ? '#FFFFFF' : 'rgba(255, 255, 255, 0.25)',
-                    cursor: hasPrevEpisode ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: '44px',
-                    minHeight: '44px',
-                    padding: '4px'
-                  }}
-                  title={hasPrevEpisode ? 'Previous Episode' : 'First episode in season'}
-                  aria-label="Previous Episode"
-                >
-                  <SkipBack size={20} />
-                </button>
-              )}
-
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '16px' }}>
+            {/* Bottom Left: Mini Play/Pause, Volume icon, Time counter: 04:43 / 54:18 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '14px', flexShrink: 0 }}>
               <button
                 onClick={togglePlay}
                 style={{
@@ -1386,96 +1547,36 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  minWidth: '44px',
-                  minHeight: '44px'
+                  minWidth: '36px',
+                  minHeight: '36px',
+                  padding: '4px'
                 }}
                 aria-label={isPlaying ? 'Pause' : 'Play'}
               >
-                {isPlaying ? <Pause size={24} /> : <Play size={24} fill="#FFFFFF" />}
+                {isPlaying ? <Pause size={20} fill="#FFFFFF" /> : <Play size={20} fill="#FFFFFF" />}
               </button>
 
-              {/* Next Episode button */}
-              {source.episodeId && onNextEpisode && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
-                  onClick={onNextEpisode}
-                  disabled={!hasNextEpisode}
+                  onClick={toggleMute}
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: hasNextEpisode ? '#FFFFFF' : 'rgba(255, 255, 255, 0.25)',
-                    cursor: hasNextEpisode ? 'pointer' : 'not-allowed',
+                    color: '#FFFFFF',
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    minWidth: '44px',
-                    minHeight: '44px',
+                    minWidth: '36px',
+                    minHeight: '36px',
                     padding: '4px'
                   }}
-                  title={hasNextEpisode ? 'Next Episode' : 'Last episode in season'}
-                  aria-label="Next Episode"
+                  aria-label={isMuted ? 'Unmute' : 'Mute'}
                 >
-                  <SkipForward size={20} />
+                  {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
                 </button>
-              )}
 
-              <button
-                onClick={() => skipTime(-10)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-secondary, #9CA3AF)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minWidth: '44px',
-                  minHeight: '44px'
-                }}
-                title="Rewind 10s"
-                aria-label="Rewind 10 seconds"
-              >
-                <RotateCcw size={20} />
-              </button>
-
-              <button
-                onClick={() => skipTime(10)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-secondary, #9CA3AF)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minWidth: '44px',
-                  minHeight: '44px'
-                }}
-                title="Forward 10s"
-                aria-label="Forward 10 seconds"
-              >
-                <RotateCw size={20} />
-              </button>
-
-              {/* Volume: Hidden on mobile (< 768px), handled by physical hardware keys */}
-              {!isMobile && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
-                  <button
-                    onClick={toggleMute}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#FFFFFF',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      minWidth: '44px',
-                      minHeight: '44px'
-                    }}
-                    aria-label={isMuted ? 'Unmute' : 'Mute'}
-                  >
-                    {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                  </button>
+                {!isMobile && (
                   <input
                     type="range"
                     min="0"
@@ -1483,64 +1584,104 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
                     step="0.05"
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
-                    style={{ width: '70px', height: '4px', accentColor: 'var(--brand-gold, #F5C518)', cursor: 'pointer' }}
+                    style={{ width: '64px', height: '3px', accentColor: '#E50914', cursor: 'pointer' }}
                     aria-label="Volume"
                   />
-                </div>
-              )}
+                )}
+              </div>
+
+              <span
+                style={{
+                  fontSize: isMobile ? '12px' : '13px',
+                  color: '#FFFFFF',
+                  fontWeight: 600,
+                  fontFamily: 'monospace, sans-serif',
+                  letterSpacing: '0.02em',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {formatSeconds(currentTime)} / {formatSeconds(duration)}
+              </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {source.episodeId && hasNextEpisode && onNextEpisode && (
-                <button
-                  onClick={onNextEpisode}
+            {/* Bottom Center: Season/Episode pill: [S2 • E4] followed by episode title: The Gentlemen – The Bigger... */}
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                overflow: 'hidden',
+                padding: '0 8px',
+                textAlign: 'center'
+              }}
+            >
+              {episodeMeta.pill && (
+                <span
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 14px',
-                    borderRadius: 'var(--radius-pill)',
-                    backgroundColor: 'rgba(245, 166, 35, 0.15)',
-                    border: '1px solid var(--brand-gold, #F5C518)',
-                    color: 'var(--brand-gold, #F5C518)',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    minHeight: '44px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    padding: '3px 8px',
+                    borderRadius: '5px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+                    color: '#FFFFFF',
+                    letterSpacing: '0.04em',
+                    flexShrink: 0
                   }}
-                  aria-label="Next Episode"
                 >
-                  <span>Next Episode</span>
-                  <SkipForward size={14} />
-                </button>
+                  {episodeMeta.pill}
+                </span>
               )}
+              <span
+                style={{
+                  fontSize: isMobile ? '12px' : '13.5px',
+                  fontWeight: 600,
+                  color: '#FFFFFF',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: isMobile ? '160px' : '400px'
+                }}
+                title={episodeMeta.title}
+              >
+                {episodeMeta.title}
+              </span>
+            </div>
 
+            {/* Bottom Right Action Icons: Audio/Subtitles dialog icon, Picture-in-Picture (PiP), Closed Captions (CC pill), Settings gear icon */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: isMobile ? '10px' : '16px',
+                position: 'relative',
+                flexShrink: 0
+              }}
+            >
+              {/* Audio & Subtitles Dialog Icon */}
               <button
-                onClick={toggleZoom}
+                onClick={(e) => { e.stopPropagation(); setShowAudioSubs(prev => !prev); setShowSettings(false); }}
                 style={{
                   background: 'none',
-                  border: '1px solid rgba(255, 255, 255, 0.25)',
-                  borderRadius: '6px',
-                  color: videoFit === 'cover' ? 'var(--brand-gold, #F5C518)' : '#FFFFFF',
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  fontWeight: 700,
+                  border: 'none',
+                  color: showAudioSubs ? '#E50914' : '#FFFFFF',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  minHeight: '34px',
-                  letterSpacing: '0.05em'
+                  padding: '6px',
+                  transition: 'color 0.15s ease'
                 }}
-                title={videoFit === 'contain' ? 'Zoom to Fill (Cover)' : 'Original Ratio (Fit)'}
-                aria-label="Toggle Video Aspect Ratio"
+                title="Audio & Subtitles"
+                aria-label="Audio and Subtitles"
               >
-                {videoFit === 'contain' ? 'FIT' : 'FILL'}
+                <MessageSquare size={20} />
               </button>
 
+              {/* Picture-in-Picture (PiP) */}
               <button
-                onClick={toggleFullscreen}
+                onClick={(e) => { e.stopPropagation(); togglePiP(); }}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -1549,13 +1690,225 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  minWidth: '44px',
-                  minHeight: '44px'
+                  padding: '6px'
                 }}
+                title="Picture-in-Picture"
+                aria-label="Picture-in-Picture"
+              >
+                <PictureInPicture size={20} />
+              </button>
+
+              {/* Closed Captions (CC pill) */}
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleSubtitles(); }}
+                style={{
+                  background: subtitlesEnabled ? 'rgba(229, 9, 20, 0.25)' : 'rgba(255, 255, 255, 0.1)',
+                  border: subtitlesEnabled ? '1.5px solid #E50914' : '1px solid rgba(255, 255, 255, 0.25)',
+                  color: subtitlesEnabled ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)',
+                  borderRadius: '5px',
+                  padding: '2px 7px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease'
+                }}
+                title={subtitlesEnabled ? 'Captions Enabled' : 'Captions Disabled'}
+                aria-label="Toggle Closed Captions"
+              >
+                CC
+              </button>
+
+              {/* Aspect Ratio Fill/Fit */}
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleZoom(); }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  borderRadius: '5px',
+                  color: videoFit === 'cover' ? '#E50914' : '#FFFFFF',
+                  padding: '2px 7px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title={videoFit === 'contain' ? 'Zoom to Fill (Cover)' : 'Original Ratio (Fit)'}
+                aria-label="Toggle Video Aspect Ratio"
+              >
+                {videoFit === 'contain' ? 'FIT' : 'FILL'}
+              </button>
+
+              {/* Settings Gear Icon */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowSettings(prev => !prev); setShowAudioSubs(false); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: showSettings ? '#E50914' : '#FFFFFF',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '6px',
+                  transition: 'color 0.15s ease'
+                }}
+                title="Settings"
+                aria-label="Player Settings"
+              >
+                <Settings size={20} />
+              </button>
+
+              {/* Fullscreen Toggle */}
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '6px'
+                }}
+                title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
                 aria-label="Toggle Fullscreen"
               >
                 {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
               </button>
+
+              {/* Audio & Subtitles Popup Card */}
+              {showAudioSubs && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    bottom: '50px',
+                    right: '50px',
+                    width: '260px',
+                    backgroundColor: 'rgba(18, 18, 24, 0.96)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.85)',
+                    zIndex: 60,
+                    color: '#FFFFFF',
+                    fontSize: '13px'
+                  }}
+                >
+                  <div style={{ fontWeight: 800, marginBottom: '8px', color: '#E50914', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.06em' }}>
+                    Audio & Subtitles
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '4px' }}>Audio Track</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderRadius: '6px', backgroundColor: 'rgba(255,255,255,0.08)' }}>
+                      <span>Original (English 5.1)</span>
+                      <Check size={14} color="#E50914" />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '4px' }}>Subtitles</div>
+                    <div
+                      onClick={toggleSubtitles}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderRadius: '6px', backgroundColor: 'rgba(255,255,255,0.08)', cursor: 'pointer' }}
+                    >
+                      <span>{subtitlesEnabled ? 'English [CC]' : 'Off'}</span>
+                      {subtitlesEnabled && <Check size={14} color="#E50914" />}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Settings Popup Card */}
+              {showSettings && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    bottom: '50px',
+                    right: '0px',
+                    width: '240px',
+                    backgroundColor: 'rgba(18, 18, 24, 0.96)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.85)',
+                    zIndex: 60,
+                    color: '#FFFFFF',
+                    fontSize: '13px'
+                  }}
+                >
+                  <div style={{ fontWeight: 800, marginBottom: '10px', color: '#E50914', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.06em' }}>
+                    Playback Settings
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '6px' }}>Playback Speed</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
+                      {[0.75, 1, 1.25, 1.5].map((rate) => (
+                        <button
+                          key={rate}
+                          onClick={() => handleSpeedChange(rate)}
+                          style={{
+                            padding: '5px 0',
+                            borderRadius: '6px',
+                            border: 'none',
+                            backgroundColor: playbackRate === rate ? '#E50914' : 'rgba(255,255,255,0.08)',
+                            color: '#FFFFFF',
+                            fontWeight: 700,
+                            fontSize: '11px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {rate}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginBottom: '6px' }}>Screen Aspect Ratio</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      <button
+                        onClick={() => { setVideoFit('cover'); setShowSettings(false); }}
+                        style={{
+                          padding: '6px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: videoFit === 'cover' ? '#E50914' : 'rgba(255,255,255,0.08)',
+                          color: '#FFFFFF',
+                          fontWeight: 700,
+                          fontSize: '11px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Fill (Cover)
+                      </button>
+                      <button
+                        onClick={() => { setVideoFit('contain'); setShowSettings(false); }}
+                        style={{
+                          padding: '6px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: videoFit === 'contain' ? '#E50914' : 'rgba(255,255,255,0.08)',
+                          color: '#FFFFFF',
+                          fontWeight: 700,
+                          fontSize: '11px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Fit Ratio
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

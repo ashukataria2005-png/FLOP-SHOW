@@ -6,17 +6,19 @@ import { parseEmbedUrl } from '../../utils/mediaUrl';
 import {
   Play,
   Pause,
-  ArrowLeft,
   RotateCcw,
   RotateCw,
   Volume2,
   VolumeX,
   Maximize,
   Minimize,
-  SkipForward,
   ListVideo,
   X,
   AlertTriangle,
+  Settings,
+  MessageSquare,
+  PictureInPicture,
+  Check
 } from 'lucide-react';
 import { AdPreroll, AdConfig } from './AdPreroll';
 import { api } from '../../services/api';
@@ -31,46 +33,33 @@ export const VideoPlayer: React.FC = () => {
     saveWatchProgress,
   } = useApp();
 
-  const videoRef          = useRef<HTMLVideoElement>(null);
-  const containerRef      = useRef<HTMLDivElement>(null);
-  const controlsTimerRef  = useRef<number | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const controlsTimerRef = useRef<number | null>(null);
 
-  const [isPlaying,           setIsPlaying]           = useState(false);
-  const [currentTime,         setCurrentTime]         = useState(0);
-  const [duration,            setDuration]            = useState(0);
-  const [volume,              setVolume]              = useState(1);
-  const [isMuted,             setIsMuted]             = useState(false);
-  const [isFullscreen,        setIsFullscreen]        = useState(false);
-  const [videoFit,            setVideoFit]            = useState<'contain' | 'cover'>('contain');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  // Default videoFit to 'cover' for notch-to-notch horizontal full-width display
+  const [videoFit, setVideoFit] = useState<'contain' | 'cover'>('cover');
   const toggleZoom = () => setVideoFit(prev => prev === 'contain' ? 'cover' : 'contain');
-  const [showControls,        setShowControls]        = useState(true);
-  const [showEpisodeDrawer,   setShowEpisodeDrawer]   = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [showEpisodeDrawer, setShowEpisodeDrawer] = useState(false);
   const [selectedSeasonIndex, setSelectedSeasonIndex] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAudioSubs, setShowAudioSubs] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
+
   // Advertisement Pre-roll State
-  const [adConfig,            setAdConfig]            = useState<AdConfig | null>(null);
-  const [adFinished,          setAdFinished]          = useState(false);
-  const [adChecking,          setAdChecking]          = useState(true);
+  const [adConfig, setAdConfig] = useState<AdConfig | null>(null);
+  const [adFinished, setAdFinished] = useState(false);
+  const [adChecking, setAdChecking] = useState(true);
   /** Set when the video element fires an error or produces no decoded frames */
-  const [codecError,          setCodecError]          = useState(false);
-
-  if (!activePlayerContent) return null;
-
-  const isSeries = activePlayerContent.type === 'series';
-  const currentVideoSrc = isSeries
-    ? (activeEpisode?.videoUrl || activePlayerContent.seasons?.[0]?.episodes[0]?.videoUrl)
-    : activePlayerContent.videoUrl;
-
-  const embedInfo = parseEmbedUrl(currentVideoSrc || '');
-  const isEmbed   = embedInfo.isEmbed;
-
-  // ── Restore watch-progress on mount / content change ─────────────────────
-  useEffect(() => {
-    setCodecError(false);           // reset error when source changes
-    const existing = getProgress(activePlayerContent.id);
-    if (existing && existing.currentTime > 5 && videoRef.current) {
-      videoRef.current.currentTime = existing.currentTime;
-    }
-  }, [activePlayerContent.id, activeEpisode?.id]);
+  const [codecError, setCodecError] = useState(false);
 
   // Track mobile viewport (< 768px)
   const [isMobile, setIsMobile] = useState<boolean>(() => {
@@ -88,6 +77,51 @@ export const VideoPlayer: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // ── Auto-Landscape Launch Physics on Mount ──────────────────────────────
+  useEffect(() => {
+    let unmounted = false;
+
+    const launchAutoLandscape = async () => {
+      try {
+        const elem = containerRef.current || document.documentElement;
+        if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+          if (elem.requestFullscreen) {
+            await elem.requestFullscreen({ navigationUI: 'hide' } as any).catch(() => {});
+          } else if ((elem as any).webkitRequestFullscreen) {
+            await (elem as any).webkitRequestFullscreen();
+          }
+        }
+        if (!unmounted) setIsFullscreen(true);
+      } catch (_) {}
+
+      try {
+        if (window.screen?.orientation && 'lock' in window.screen.orientation) {
+          await (window.screen.orientation as any).lock('landscape').catch(() => {});
+        }
+      } catch (_) {}
+    };
+
+    launchAutoLandscape();
+
+    return () => {
+      unmounted = true;
+      try {
+        if (window.screen?.orientation && 'unlock' in window.screen.orientation) {
+          window.screen.orientation.unlock();
+        }
+      } catch (_) {}
+      try {
+        if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+          if (document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          } else if ((document as any).webkitExitFullscreen) {
+            (document as any).webkitExitFullscreen();
+          }
+        }
+      } catch (_) {}
+    };
+  }, []);
+
   // Listen to fullscreen changes across all browsers and unlock orientation on exit
   useEffect(() => {
     const handleFsChange = () => {
@@ -98,14 +132,10 @@ export const VideoPlayer: React.FC = () => {
         (document as any).msFullscreenElement
       );
       setIsFullscreen(isFs);
-      if (!isFs) {
-        if (window.screen?.orientation?.unlock) {
-          try {
-            window.screen.orientation.unlock();
-          } catch {
-            // Graceful fallback
-          }
-        }
+      if (!isFs && window.screen?.orientation?.unlock) {
+        try {
+          window.screen.orientation.unlock();
+        } catch {}
       }
     };
 
@@ -135,11 +165,6 @@ export const VideoPlayer: React.FC = () => {
       document.removeEventListener('MSFullscreenChange', handleFsChange);
       if (videoEl) {
         videoEl.removeEventListener('webkitendfullscreen', handleVideoEndFullscreen);
-      }
-      if (window.screen?.orientation?.unlock) {
-        try {
-          window.screen.orientation.unlock();
-        } catch {}
       }
     };
   }, []);
@@ -177,37 +202,47 @@ export const VideoPlayer: React.FC = () => {
     return () => { active = false; };
   }, [activePlayerContent?.id, activeEpisode?.id]);
 
-  // Sync fullscreen state & orientation unlock on exit
+  // ── Restore watch-progress on mount / content change ─────────────────────
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isFs = Boolean(document.fullscreenElement);
-      setIsFullscreen(isFs);
-      if (!isFs && window.screen?.orientation && 'unlock' in window.screen.orientation) {
-        try {
-          window.screen.orientation.unlock();
-        } catch {
-          // Gracefully ignore
-        }
-      }
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-    };
-  }, []);
+    if (!activePlayerContent) return;
+    setCodecError(false);
+    const existing = getProgress(activePlayerContent.id);
+    if (existing && existing.currentTime > 5 && videoRef.current) {
+      videoRef.current.currentTime = existing.currentTime;
+    }
+  }, [activePlayerContent?.id, activeEpisode?.id, getProgress]);
+
+  if (!activePlayerContent) return null;
+
+  const isSeries = activePlayerContent.type === 'series';
+  const currentVideoSrc = isSeries
+    ? (activeEpisode?.videoUrl || activePlayerContent.seasons?.[0]?.episodes[0]?.videoUrl)
+    : activePlayerContent.videoUrl;
+
+  const embedInfo = parseEmbedUrl(currentVideoSrc || '');
+  const isEmbed = embedInfo.isEmbed;
+
+  // Episode metadata parser
+  const episodeMeta = {
+    pill: isSeries && activeEpisode ? `[S${activeEpisode.seasonNumber} • E${activeEpisode.episodeNumber}]` : null,
+    title: isSeries && activeEpisode
+      ? `${activePlayerContent.title} – ${activeEpisode.title || `Episode ${activeEpisode.episodeNumber}`}`
+      : activePlayerContent.title,
+  };
 
   // ── Controls idle-hide (3 seconds of inactivity) ─────────────────────────
   const handleUserActivity = () => {
     setShowControls(true);
     if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
     controlsTimerRef.current = window.setTimeout(() => {
-      if (isPlaying) setShowControls(false);
-    }, 3000);
+      if (isPlaying) {
+        setShowControls(false);
+        setShowSettings(false);
+        setShowAudioSubs(false);
+      }
+    }, 3500);
   };
 
-  // Single tap on container/video toggles or re-displays controls
   const handleContainerTap = (e: React.MouseEvent | React.TouchEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('input') || target.closest('a')) return;
@@ -217,9 +252,11 @@ export const VideoPlayer: React.FC = () => {
       if (controlsTimerRef.current) window.clearTimeout(controlsTimerRef.current);
       controlsTimerRef.current = window.setTimeout(() => {
         if (isPlaying) setShowControls(false);
-      }, 3000);
+      }, 3500);
     } else if (isPlaying) {
       setShowControls(false);
+      setShowSettings(false);
+      setShowAudioSubs(false);
     }
   };
 
@@ -243,40 +280,33 @@ export const VideoPlayer: React.FC = () => {
     setCurrentTime(cur);
     setDuration(dur);
     saveWatchProgress({
-      contentId:     activePlayerContent.id,
-      contentType:   activePlayerContent.type,
-      title:         activePlayerContent.title,
-      posterUrl:     activePlayerContent.posterUrl,
-      percent:       Math.round((cur / dur) * 100),
-      currentTime:   cur,
-      duration:      dur,
-      episodeId:     activeEpisode?.id,
-      seasonNumber:  activeEpisode?.seasonNumber,
+      contentId: activePlayerContent.id,
+      contentType: activePlayerContent.type,
+      title: activePlayerContent.title,
+      posterUrl: activePlayerContent.posterUrl,
+      percent: Math.round((cur / dur) * 100),
+      currentTime: cur,
+      duration: dur,
+      episodeId: activeEpisode?.id,
+      seasonNumber: activeEpisode?.seasonNumber,
       episodeNumber: activeEpisode?.episodeNumber,
     });
   };
 
-  // ── Metadata loaded ───────────────────────────────────────────────────────
   const handleLoadedMetadata = () => {
     if (!videoRef.current) return;
     setDuration(videoRef.current.duration);
-
-    // videoWidth === 0 means the browser received an audio track only —
-    // the video codec (typically HEVC/x265) could not be decoded natively.
     if (videoRef.current.videoWidth === 0) {
       setCodecError(true);
       return;
     }
-
     videoRef.current.play()
       .then(() => setIsPlaying(true))
       .catch(() => setIsPlaying(false));
   };
 
-  // ── Video element error ───────────────────────────────────────────────────
   const handleVideoError = () => setCodecError(true);
 
-  // ── Seek ──────────────────────────────────────────────────────────────────
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!videoRef.current) return;
     const seekTo = (parseFloat(e.target.value) / 100) * duration;
@@ -284,7 +314,6 @@ export const VideoPlayer: React.FC = () => {
     setCurrentTime(seekTo);
   };
 
-  // ── Skip ──────────────────────────────────────────────────────────────────
   const skipTime = (seconds: number) => {
     if (!videoRef.current) return;
     videoRef.current.currentTime = Math.max(
@@ -293,7 +322,6 @@ export const VideoPlayer: React.FC = () => {
     );
   };
 
-  // ── Mute / Volume ─────────────────────────────────────────────────────────
   const toggleMute = () => {
     if (!videoRef.current) return;
     const newMuted = !isMuted;
@@ -305,12 +333,32 @@ export const VideoPlayer: React.FC = () => {
     if (!videoRef.current) return;
     const val = parseFloat(e.target.value);
     videoRef.current.volume = val;
-    videoRef.current.muted  = val === 0;
+    videoRef.current.muted = val === 0;
     setVolume(val);
     setIsMuted(val === 0);
   };
 
-  // ── Fullscreen with auto-rotation handling ────────────────────────────────
+  const handleSpeedChange = (speed: number) => {
+    setPlaybackRate(speed);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = speed;
+    }
+    setShowSettings(false);
+  };
+
+  const togglePiP = async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (videoRef.current && document.pictureInPictureEnabled) {
+        await videoRef.current.requestPictureInPicture();
+      }
+    } catch (err) {
+      console.warn('PiP error:', err);
+    }
+  };
+
+  // Fullscreen with auto-rotation handling
   const toggleFullscreen = async () => {
     if (!containerRef.current) return;
     try {
@@ -326,40 +374,24 @@ export const VideoPlayer: React.FC = () => {
           await containerRef.current.requestFullscreen({ navigationUI: 'hide' } as any);
         } else if ((containerRef.current as any).webkitRequestFullscreen) {
           await (containerRef.current as any).webkitRequestFullscreen();
-        } else if ((containerRef.current as any).mozRequestFullScreen) {
-          await (containerRef.current as any).mozRequestFullScreen();
-        } else if ((containerRef.current as any).msRequestFullscreen) {
-          await (containerRef.current as any).msRequestFullscreen();
         } else if (videoRef.current && (videoRef.current as any).webkitEnterFullscreen) {
-          // iOS Safari iPhone container fallback
           (videoRef.current as any).webkitEnterFullscreen();
         }
         setIsFullscreen(true);
-
-        // Native auto-rotation handling where supported (fallback gracefully)
         if (window.screen?.orientation && 'lock' in window.screen.orientation) {
-          (window.screen.orientation as any).lock('landscape').catch(() => {
-            // Orientation lock may fail if user gesture expired or not supported; ignore gracefully
-          });
+          (window.screen.orientation as any).lock('landscape').catch(() => {});
         }
       } else {
         if (document.exitFullscreen) {
           await document.exitFullscreen();
         } else if ((document as any).webkitExitFullscreen) {
           await (document as any).webkitExitFullscreen();
-        } else if ((document as any).mozCancelFullScreen) {
-          await (document as any).mozCancelFullScreen();
-        } else if ((document as any).msExitFullscreen) {
-          await (document as any).msExitFullscreen();
         }
         setIsFullscreen(false);
-
-        if (window.screen?.orientation && 'unlock' in window.screen.orientation) {
+        if (window.screen?.orientation?.unlock) {
           try {
             window.screen.orientation.unlock();
-          } catch {
-            // Gracefully ignore
-          }
+          } catch {}
         }
       }
     } catch (err) {
@@ -382,7 +414,7 @@ export const VideoPlayer: React.FC = () => {
     closePlayer();
   };
 
-  // ── Series: find next episode ─────────────────────────────────────────────
+  // Series: find next episode
   const findNextEpisode = (): Episode | null => {
     if (!isSeries || !activePlayerContent.seasons || !activeEpisode) return null;
     const season = activePlayerContent.seasons.find(
@@ -410,9 +442,6 @@ export const VideoPlayer: React.FC = () => {
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────────────
   // Render native advertisement pre-roll before main playback
   if (!adFinished && adConfig && adConfig.enabled && adConfig.mediaUrl && !adChecking) {
     return (
@@ -432,36 +461,34 @@ export const VideoPlayer: React.FC = () => {
       onTouchStart={handleUserActivity}
       onClick={handleContainerTap}
       style={{
-        position:        'fixed',
-        inset:           0,
-        zIndex:          2000,
+        position: 'fixed',
+        inset: 0,
+        zIndex: 2000,
         backgroundColor: '#000',
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'center',
-        userSelect:      'none',
-        overflow:        'hidden',
-        width:           '100%',
-        maxWidth:        '100vw',
-        height:          '100%',
-        maxHeight:       '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        userSelect: 'none',
+        overflow: 'hidden',
+        width: '100vw',
+        maxWidth: '100vw',
+        height: '100vh',
+        maxHeight: '100vh',
       }}
     >
-      {/* ── Iframe for embed / Streamtape sources ─────────────────────── */}
+      {/* ── Video wrapper ──────────────────────────── */}
       {isEmbed ? (
         <div
-          className="aspect-video w-full max-w-full"
           style={{
-            position:       'relative',
-            width:          '100%',
-            maxWidth:       '100vw',
-            height:         isFullscreen ? '100%' : 'auto',
-            maxHeight:      isFullscreen ? '100vh' : (isMobile ? '50vh' : '100vh'),
-            aspectRatio:    isFullscreen ? undefined : '16 / 9',
-            display:        'flex',
-            alignItems:     'center',
+            position: 'relative',
+            width: '100%',
+            maxWidth: '100vw',
+            height: '100%',
+            maxHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'center',
-            overflow:       'hidden',
+            overflow: 'hidden',
           }}
         >
           <iframe
@@ -474,26 +501,22 @@ export const VideoPlayer: React.FC = () => {
               width: '100%',
               height: '100%',
               border: 0,
-              borderRadius: isFullscreen ? '0px' : '8px'
             }}
           />
         </div>
       ) : (
-        /* ── 16:9 responsive video wrapper ──────────────────────────── */
         <div
-          className="aspect-video w-full max-w-full"
           style={{
-            position:        'relative',
-            width:           '100%',
-            maxWidth:        '100vw',
-            height:          isFullscreen ? '100%' : 'auto',
-            maxHeight:       isFullscreen ? '100vh' : (isMobile ? '50vh' : '100vh'),
-            aspectRatio:     isFullscreen ? undefined : '16 / 9',
+            position: 'relative',
+            width: '100%',
+            maxWidth: '100vw',
+            height: '100%',
+            maxHeight: '100vh',
             backgroundColor: '#000',
-            overflow:        'hidden',
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           {/* Poster — visible until playback starts */}
@@ -502,12 +525,12 @@ export const VideoPlayer: React.FC = () => {
               src={activePlayerContent.posterUrl}
               alt="poster"
               style={{
-                position:      'absolute',
-                inset:         0,
-                width:         '100%',
-                height:        '100%',
-                objectFit:     'cover',
-                zIndex:        1,
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                zIndex: 1,
                 pointerEvents: 'none',
               }}
             />
@@ -517,60 +540,55 @@ export const VideoPlayer: React.FC = () => {
           {codecError && (
             <div
               style={{
-                position:        'absolute',
-                inset:           0,
-                zIndex:          10,
-                display:         'flex',
-                flexDirection:   'column',
-                alignItems:      'center',
-                justifyContent:  'center',
+                position: 'absolute',
+                inset: 0,
+                zIndex: 10,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
                 backgroundColor: 'rgba(0, 0, 0, 0.88)',
-                padding:         '28px',
-                gap:             '16px',
-                textAlign:       'center',
+                padding: '28px',
+                gap: '16px',
+                textAlign: 'center',
               }}
             >
-              <AlertTriangle
-                size={48}
-                color="#F5A623"
-                strokeWidth={1.5}
-              />
+              <AlertTriangle size={48} color="#F5A623" strokeWidth={1.5} />
               <p style={{ fontSize: '17px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
                 Codec not supported
               </p>
               <p
                 style={{
-                  fontSize:   '14px',
-                  color:      'rgba(255,255,255,0.65)',
-                  margin:     0,
+                  fontSize: '14px',
+                  color: 'rgba(255,255,255,0.65)',
+                  margin: 0,
                   lineHeight: 1.6,
-                  maxWidth:   '360px',
+                  maxWidth: '360px',
                 }}
               >
                 This browser requires <strong style={{ color: '#fff' }}>H.264 (MP4)</strong> video.
-                HEVC / x265 files cannot be decoded directly. Please use Chrome, Edge, or Safari
-                on a supported device.
+                HEVC / x265 files cannot be decoded directly.
               </p>
             </div>
           )}
 
-          {/* Native HTML5 video */}
+          {/* Native HTML5 video with cover notch-to-notch fit */}
           <video
             ref={videoRef}
             src={currentVideoSrc}
             style={{
-              width:     '100%',
-              height:    '100%',
-              maxWidth:  '100vw',
+              width: '100%',
+              height: '100%',
+              maxWidth: '100vw',
               maxHeight: '100vh',
               objectFit: videoFit,
-              display:   'block',
-              position:  'relative',
-              zIndex:    2,
+              display: 'block',
+              position: 'relative',
+              zIndex: 2,
             }}
             preload="metadata"
             playsInline
-            // @ts-ignore — non-standard webkit attr for iOS Safari inline playback
+            // @ts-ignore
             webkit-playsinline="true"
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={handleLoadedMetadata}
@@ -584,256 +602,304 @@ export const VideoPlayer: React.FC = () => {
         </div>
       )}
 
-      {/* ── Top Header Bar ──────────────────────────────────────────────── */}
-      <div
-        className="player-controls-top"
+      {/* ── TOP-RIGHT CLEAN MINIMALIST '✕' CLOSE ICON ──────────────────── */}
+      <button
+        onClick={handleClose}
         style={{
-          position:       'absolute',
-          top: 0, left: 0, right: 0,
-          padding:        isMobile ? '12px 14px' : '20px 24px',
-          background:     'linear-gradient(180deg, rgba(0,0,0,0.85) 0%, transparent 100%)',
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'space-between',
-          zIndex:         20,
-          opacity:        (showControls || isEmbed) ? 1 : 0,
-          transition:     'opacity 0.3s ease',
-          pointerEvents:  (showControls || isEmbed) ? 'auto' : 'none',
+          position: 'absolute',
+          top: isMobile ? '16px' : '28px',
+          right: isMobile ? '16px' : '28px',
+          zIndex: 35,
+          color: '#FFFFFF',
+          background: 'rgba(0, 0, 0, 0.45)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          borderRadius: '50%',
+          width: '42px',
+          height: '42px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          backdropFilter: 'blur(10px)',
+          opacity: showControls ? 1 : 0,
+          pointerEvents: showControls ? 'auto' : 'none',
+          transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
+        title="Close Player"
+        aria-label="Close Player"
       >
+        <X size={22} strokeWidth={2.2} />
+      </button>
+
+      {/* Top Episode drawer toggle button if series */}
+      {isSeries && (
         <button
-          onClick={handleClose}
+          onClick={() => setShowEpisodeDrawer(true)}
           style={{
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
-            gap:             '8px',
-            color:           '#FFF',
-            fontSize:        '15px',
-            fontWeight:      600,
-            padding:         '8px 14px',
-            minWidth:        '44px',
-            minHeight:       '44px',
-            borderRadius:    '9999px',
-            border:          'none',
-            backgroundColor: 'rgba(255,255,255,0.1)',
-            backdropFilter:  'blur(8px)',
-            cursor:          'pointer',
-            transition:      'background-color 0.2s',
+            position: 'absolute',
+            top: isMobile ? '16px' : '28px',
+            right: isMobile ? '68px' : '82px',
+            zIndex: 35,
+            color: '#FFFFFF',
+            background: 'rgba(0, 0, 0, 0.45)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '9999px',
+            padding: '8px 14px',
+            height: '42px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '13px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            backdropFilter: 'blur(10px)',
+            opacity: showControls ? 1 : 0,
+            pointerEvents: showControls ? 'auto' : 'none',
+            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
-          aria-label="Back to browse"
+          aria-label="Episodes list"
         >
-          <ArrowLeft size={18} />
-          {!isMobile && <span>Back to browse</span>}
+          <ListVideo size={18} />
+          <span>Episodes</span>
         </button>
+      )}
 
-        <div style={{ textAlign: 'center', flex: 1, padding: '0 12px', minWidth: 0 }}>
-          <h3 style={{ fontSize: isMobile ? '14px' : '16px', fontWeight: 700, color: '#FFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>
-            {activePlayerContent.title}
-          </h3>
-          {isSeries && activeEpisode && (
-            <span style={{ fontSize: isMobile ? '11px' : '13px', color: 'var(--brand-gold)', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              S{activeEpisode.seasonNumber}:E{activeEpisode.episodeNumber} • {activeEpisode.title}
-            </span>
-          )}
-        </div>
-
-        {isSeries && (
-          <button
-            onClick={() => setShowEpisodeDrawer(true)}
-            style={{
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'center',
-              gap:             '6px',
-              color:           'var(--brand-gold)',
-              fontSize:        '13px',
-              fontWeight:      700,
-              padding:         '8px 14px',
-              minWidth:        '44px',
-              minHeight:       '44px',
-              borderRadius:    '9999px',
-              backgroundColor: 'rgba(245,166,35,0.15)',
-              border:          '1px solid rgba(245,166,35,0.4)',
-              cursor:          'pointer',
-            }}
-            aria-label="Episodes"
-          >
-            <ListVideo size={18} />
-            <span>Episodes</span>
-          </button>
-        )}
-      </div>
-
-      {/* ── Centre big play button ───────────────────────────────────────── */}
-      {!isEmbed && !isPlaying && !codecError && (
+      {/* ── CENTER CONTROLS: -10s, PROMINENT SOLID PLAY/PAUSE, +10s ───────── */}
+      {!isEmbed && !codecError && (
         <div
-          onClick={togglePlay}
           style={{
-            position:        'absolute',
-            width:           isMobile ? '64px' : '80px',
-            height:          isMobile ? '64px' : '80px',
-            borderRadius:    '50%',
-            backgroundColor: 'var(--brand-gold)',
-            color:           '#0E0E12',
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
-            boxShadow:       '0 0 30px rgba(245,166,35,0.5)',
-            cursor:          'pointer',
-            zIndex:          5,
-            transition:      'transform 0.15s ease',
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: isMobile ? '28px' : '48px',
+            zIndex: 30,
+            opacity: showControls ? 1 : 0,
+            pointerEvents: showControls ? 'auto' : 'none',
+            transition: 'opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
-          aria-label="Play video"
         >
-          <Play size={isMobile ? 28 : 36} fill="#0E0E12" style={{ marginLeft: '3px' }} />
+          {/* -10s Rewind */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              skipTime(-10);
+            }}
+            style={{
+              position: 'relative',
+              width: isMobile ? '52px' : '64px',
+              height: isMobile ? '52px' : '64px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(15, 15, 20, 0.55)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#FFFFFF',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)',
+              transition: 'transform 0.15s ease, background-color 0.2s',
+            }}
+            title="Rewind 10 seconds"
+            aria-label="Rewind 10 seconds"
+          >
+            <RotateCcw size={isMobile ? 22 : 26} strokeWidth={2.2} />
+            <span style={{ fontSize: '9px', fontWeight: 800, marginTop: '-2px', letterSpacing: '-0.02em' }}>10</span>
+          </button>
+
+          {/* Large Solid White Play / Pause */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePlay();
+            }}
+            style={{
+              width: isMobile ? '72px' : '92px',
+              height: isMobile ? '72px' : '92px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(25, 25, 30, 0.65)',
+              border: '2px solid rgba(255, 255, 255, 0.22)',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              backdropFilter: 'blur(12px)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.55)',
+              transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s',
+            }}
+            title={isPlaying ? 'Pause' : 'Play'}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+          >
+            {isPlaying ? (
+              <Pause size={isMobile ? 36 : 46} fill="#FFFFFF" color="#FFFFFF" strokeWidth={1} />
+            ) : (
+              <Play size={isMobile ? 36 : 46} fill="#FFFFFF" color="#FFFFFF" strokeWidth={1} style={{ marginLeft: '4px' }} />
+            )}
+          </button>
+
+          {/* +10s Forward */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              skipTime(10);
+            }}
+            style={{
+              position: 'relative',
+              width: isMobile ? '52px' : '64px',
+              height: isMobile ? '52px' : '64px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(15, 15, 20, 0.55)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#FFFFFF',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)',
+              transition: 'transform 0.15s ease, background-color 0.2s',
+            }}
+            title="Forward 10 seconds"
+            aria-label="Forward 10 seconds"
+          >
+            <RotateCw size={isMobile ? 22 : 26} strokeWidth={2.2} />
+            <span style={{ fontSize: '9px', fontWeight: 800, marginTop: '-2px', letterSpacing: '-0.02em' }}>10</span>
+          </button>
         </div>
       )}
 
-      {/* ── Bottom Controls Bar ──────────────────────────────────────────── */}
+      {/* ── MID-RIGHT FLOATING PILL: ▶ Next EP ───────────────────────────── */}
+      {isSeries && nextEp && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSwitchEpisode(nextEp);
+          }}
+          style={{
+            position: 'absolute',
+            right: isMobile ? '16px' : '32px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 32,
+            backgroundColor: 'rgba(20, 20, 26, 0.85)',
+            border: '1px solid rgba(255, 255, 255, 0.18)',
+            color: '#FFFFFF',
+            borderRadius: '9999px',
+            padding: isMobile ? '8px 14px' : '10px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: isMobile ? '12px' : '13px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            backdropFilter: 'blur(12px)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+            opacity: showControls ? 1 : 0,
+            pointerEvents: showControls ? 'auto' : 'none',
+            transition: 'opacity 0.25s ease, transform 0.2s ease, background-color 0.2s',
+          }}
+          title={`Next: ${nextEp.title}`}
+          aria-label="Next Episode"
+        >
+          <Play size={14} fill="#FFFFFF" color="#FFFFFF" />
+          <span>Next EP</span>
+        </button>
+      )}
+
+      {/* ── BOTTOM CONTROLS BAR: FULL-WIDTH SLEEK RED SEEKBAR & EXACT NETFLIX-STYLE BAR ── */}
       {!isEmbed && (
         <div
           className="player-controls-bottom"
+          onClick={(e) => e.stopPropagation()}
           style={{
-            position:      'absolute',
-            bottom: 0, left: 0, right: 0,
-            padding:       isMobile ? '12px 14px 18px' : '24px 28px 30px',
-            background:    'linear-gradient(0deg, rgba(0,0,0,0.92) 0%, transparent 100%)',
-            zIndex:        10,
-            opacity:       showControls ? 1 : 0,
-            transition:    'opacity 0.3s ease',
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: isMobile ? '10px 16px 20px' : '16px 32px 28px',
+            background: 'linear-gradient(0deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 65%, transparent 100%)',
+            zIndex: 25,
+            opacity: showControls ? 1 : 0,
             pointerEvents: showControls ? 'auto' : 'none',
+            transition: 'opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
           }}
         >
-          {/* Seekbar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-            <span style={{ fontSize: '12px', color: '#FFF', fontWeight: 600, minWidth: '42px' }}>
-              {formatSeconds(currentTime)}
-            </span>
+          {/* Full-width sleek red seekbar */}
+          <div style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
             <input
               type="range"
               min="0"
               max="100"
+              step="0.1"
               value={duration > 0 ? (currentTime / duration) * 100 : 0}
               onChange={handleSeek}
               style={{
-                flex:         1,
-                height:       '6px',
+                width: '100%',
+                height: '4px',
+                accentColor: '#E50914',
+                cursor: 'pointer',
                 borderRadius: '9999px',
-                accentColor:  'var(--brand-gold)',
-                cursor:       'pointer',
+                outline: 'none',
               }}
               aria-label="Seek timeline"
             />
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', minWidth: '42px', textAlign: 'right' }}>
-              {formatSeconds(duration)}
-            </span>
           </div>
 
-          {/* Action row with touch-friendly 44x44px hitboxes */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            {/* Left controls */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '14px' }}>
+          {/* Action Row */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+            }}
+          >
+            {/* Bottom Left: Mini Play/Pause, Volume, Time counter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '10px' : '16px' }}>
               <button
                 onClick={togglePlay}
                 style={{
-                  color:          '#FFF',
-                  minWidth:       '44px',
-                  minHeight:      '44px',
-                  display:        'flex',
-                  alignItems:     'center',
+                  color: '#FFFFFF',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'center',
-                  background:     'none',
-                  border:         'none',
-                  cursor:         'pointer',
+                  padding: '4px',
                 }}
                 aria-label={isPlaying ? 'Pause' : 'Play'}
               >
-                {isPlaying ? <Pause size={24} /> : <Play size={24} fill="#FFF" />}
+                {isPlaying ? <Pause size={20} fill="#FFF" /> : <Play size={20} fill="#FFF" />}
               </button>
 
-              <button
-                onClick={() => skipTime(-10)}
-                style={{
-                  color:          'var(--text-secondary)',
-                  minWidth:       '44px',
-                  minHeight:      '44px',
-                  display:        'flex',
-                  alignItems:     'center',
-                  justifyContent: 'center',
-                  background:     'none',
-                  border:         'none',
-                  cursor:         'pointer',
-                }}
-                title="Rewind 10s"
-                aria-label="Rewind 10 seconds"
-              >
-                <RotateCcw size={20} />
-              </button>
-
-              <button
-                onClick={() => skipTime(10)}
-                style={{
-                  color:          'var(--text-secondary)',
-                  minWidth:       '44px',
-                  minHeight:      '44px',
-                  display:        'flex',
-                  alignItems:     'center',
-                  justifyContent: 'center',
-                  background:     'none',
-                  border:         'none',
-                  cursor:         'pointer',
-                }}
-                title="Forward 10s"
-                aria-label="Forward 10 seconds"
-              >
-                <RotateCw size={20} />
-              </button>
-
-              {nextEp && (
+              {/* Volume */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
-                  onClick={() => handleSwitchEpisode(nextEp)}
+                  onClick={toggleMute}
                   style={{
-                    display:        'flex',
-                    alignItems:     'center',
+                    color: '#FFFFFF',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
                     justifyContent: 'center',
-                    gap:            '6px',
-                    color:          'var(--brand-gold)',
-                    fontSize:       '12px',
-                    fontWeight:     700,
-                    minHeight:      '44px',
-                    padding:        '0 10px',
-                    background:     'none',
-                    border:         'none',
-                    cursor:         'pointer',
+                    padding: '4px',
                   }}
-                  aria-label="Next Episode"
+                  aria-label={isMuted ? 'Unmute' : 'Mute'}
                 >
-                  <SkipForward size={18} />
-                  {!isMobile && <span>Next Episode</span>}
+                  {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
                 </button>
-              )}
-
-              {/* Volume: Hidden on mobile (< 768px), handled by physical hardware keys */}
-              {!isMobile && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '6px' }}>
-                  <button
-                    onClick={toggleMute}
-                    style={{
-                      color:          '#FFF',
-                      minWidth:       '44px',
-                      minHeight:      '44px',
-                      display:        'flex',
-                      alignItems:     'center',
-                      justifyContent: 'center',
-                      background:     'none',
-                      border:         'none',
-                      cursor:         'pointer',
-                    }}
-                    aria-label={isMuted ? 'Unmute' : 'Mute'}
-                  >
-                    {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                  </button>
+                {!isMobile && (
                   <input
                     type="range"
                     min="0"
@@ -841,31 +907,141 @@ export const VideoPlayer: React.FC = () => {
                     step="0.05"
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
-                    style={{ width: '70px', height: '4px', accentColor: 'var(--brand-gold)', cursor: 'pointer' }}
-                    aria-label="Volume"
+                    style={{ width: '64px', height: '4px', accentColor: '#E50914', cursor: 'pointer' }}
+                    aria-label="Volume slider"
                   />
-                </div>
-              )}
+                )}
+              </div>
+
+              {/* Time counter: 04:43 / 54:18 */}
+              <span style={{ fontSize: isMobile ? '12px' : '13px', color: 'rgba(255, 255, 255, 0.85)', fontWeight: 600, letterSpacing: '0.02em' }}>
+                {formatSeconds(currentTime)} / {formatSeconds(duration)}
+              </span>
             </div>
 
-            {/* Right controls */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Bottom Center: Season/Episode pill: [S2 • E4] The Gentlemen – The Bigger... */}
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '0 12px',
+                minWidth: 0,
+                overflow: 'hidden',
+              }}
+            >
+              {episodeMeta.pill && (
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    color: '#FFFFFF',
+                    fontSize: isMobile ? '11px' : '12px',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  {episodeMeta.pill}
+                </span>
+              )}
+              <span
+                style={{
+                  fontSize: isMobile ? '12px' : '14px',
+                  fontWeight: 600,
+                  color: '#FFFFFF',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  opacity: 0.9,
+                }}
+              >
+                {episodeMeta.title}
+              </span>
+            </div>
+
+            {/* Bottom Right: Audio/Subtitles, PiP, CC, Settings, Fullscreen */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '18px', flexShrink: 0 }}>
+              {/* Audio/Subtitles Dialog Icon */}
               <button
-                onClick={toggleZoom}
+                onClick={() => {
+                  setShowAudioSubs(prev => !prev);
+                  setShowSettings(false);
+                }}
                 style={{
                   background: 'none',
-                  border: '1px solid rgba(255, 255, 255, 0.25)',
-                  borderRadius: '6px',
-                  color: videoFit === 'cover' ? 'var(--brand-gold)' : '#FFFFFF',
-                  padding: '4px 8px',
+                  border: 'none',
+                  color: showAudioSubs ? '#E50914' : '#FFFFFF',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Audio & Subtitles"
+                aria-label="Audio & Subtitles"
+              >
+                <MessageSquare size={19} />
+              </button>
+
+              {/* PiP */}
+              <button
+                onClick={togglePiP}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Picture-in-Picture"
+                aria-label="Picture-in-Picture"
+              >
+                <PictureInPicture size={19} />
+              </button>
+
+              {/* CC Pill */}
+              <button
+                onClick={() => setSubtitlesEnabled(prev => !prev)}
+                style={{
+                  background: subtitlesEnabled ? 'rgba(229, 9, 20, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                  border: `1px solid ${subtitlesEnabled ? '#E50914' : 'rgba(255, 255, 255, 0.3)'}`,
+                  color: subtitlesEnabled ? '#E50914' : '#FFFFFF',
+                  borderRadius: '4px',
+                  padding: '2px 6px',
                   fontSize: '11px',
-                  fontWeight: 700,
+                  fontWeight: 800,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  minHeight: '34px',
-                  letterSpacing: '0.05em'
+                  letterSpacing: '0.05em',
+                }}
+                title="Toggle Subtitles"
+                aria-label="Closed Captions"
+              >
+                CC
+              </button>
+
+              {/* Aspect Ratio Fill/Fit */}
+              <button
+                onClick={toggleZoom}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  borderRadius: '4px',
+                  color: videoFit === 'cover' ? '#E50914' : '#FFFFFF',
+                  padding: '2px 6px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
                 }}
                 title={videoFit === 'contain' ? 'Zoom to Fill (Cover)' : 'Original Ratio (Fit)'}
                 aria-label="Toggle Video Aspect Ratio"
@@ -873,19 +1049,42 @@ export const VideoPlayer: React.FC = () => {
                 {videoFit === 'contain' ? 'FIT' : 'FILL'}
               </button>
 
+              {/* Settings Gear */}
+              <button
+                onClick={() => {
+                  setShowSettings(prev => !prev);
+                  setShowAudioSubs(false);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: showSettings ? '#E50914' : '#FFFFFF',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Playback Settings"
+                aria-label="Playback Settings"
+              >
+                <Settings size={19} />
+              </button>
+
+              {/* Fullscreen */}
               <button
                 onClick={toggleFullscreen}
                 style={{
-                  color:          '#FFF',
-                  minWidth:       '44px',
-                  minHeight:      '44px',
-                  display:        'flex',
-                  alignItems:     'center',
+                  background: 'none',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'center',
-                  background:     'none',
-                  border:         'none',
-                  cursor:         'pointer',
                 }}
+                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
                 aria-label="Toggle Fullscreen"
               >
                 {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
@@ -895,37 +1094,148 @@ export const VideoPlayer: React.FC = () => {
         </div>
       )}
 
+      {/* ── Settings Dropdown Popup ────────────────────────────────────────── */}
+      {showSettings && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            bottom: '70px',
+            right: '24px',
+            width: '210px',
+            backgroundColor: 'rgba(20, 20, 26, 0.95)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '10px',
+            padding: '12px',
+            zIndex: 40,
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.7)',
+          }}
+        >
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>
+            Playback Speed
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
+              <button
+                key={speed}
+                onClick={() => handleSpeedChange(speed)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 10px',
+                  background: playbackRate === speed ? 'rgba(229, 9, 20, 0.2)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: playbackRate === speed ? '#E50914' : '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: playbackRate === speed ? 700 : 500,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span>{speed === 1 ? 'Normal (1x)' : `${speed}x`}</span>
+                {playbackRate === speed && <Check size={14} color="#E50914" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Audio & Subtitles Dropdown Popup ─────────────────────────────────── */}
+      {showAudioSubs && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            bottom: '70px',
+            right: '60px',
+            width: '260px',
+            backgroundColor: 'rgba(20, 20, 26, 0.95)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '10px',
+            padding: '14px',
+            zIndex: 40,
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.7)',
+          }}
+        >
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.05em' }}>
+            Audio & Subtitles
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
+              <span style={{ fontSize: '13px', color: '#FFF' }}>Original Audio</span>
+              <Check size={14} color="#E50914" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
+              <span style={{ fontSize: '13px', color: '#FFF' }}>English Subtitles</span>
+              <button
+                onClick={() => setSubtitlesEnabled(prev => !prev)}
+                style={{
+                  background: subtitlesEnabled ? '#E50914' : 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  width: '36px',
+                  height: '20px',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'background 0.2s',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '2px',
+                    left: subtitlesEnabled ? '18px' : '2px',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FFFFFF',
+                    transition: 'left 0.2s',
+                  }}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Series Episode Drawer ────────────────────────────────────────── */}
       {isSeries && showEpisodeDrawer && activePlayerContent.seasons && (
         <div
+          onClick={(e) => e.stopPropagation()}
           style={{
-            position:        'absolute',
-            top: 0, bottom: 0, right: 0,
-            width:           'clamp(300px, 85vw, 420px)',
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            right: 0,
+            width: 'clamp(300px, 85vw, 420px)',
             backgroundColor: 'rgba(14,14,20,0.96)',
-            backdropFilter:  'blur(20px)',
-            borderLeft:      '1px solid rgba(255,255,255,0.1)',
-            zIndex:          100,
-            display:         'flex',
-            flexDirection:   'column',
-            padding:         '24px 20px',
-            animation:       'fadeIn 0.2s ease-out',
+            backdropFilter: 'blur(20px)',
+            borderLeft: '1px solid rgba(255,255,255,0.1)',
+            zIndex: 100,
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '24px 20px',
+            animation: 'fadeIn 0.2s ease-out',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFF' }}>Select Episode</h3>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#FFF', margin: 0 }}>Select Episode</h3>
             <button
               onClick={() => setShowEpisodeDrawer(false)}
               style={{
-                color:          'var(--text-secondary)',
-                minWidth:       '44px',
-                minHeight:      '44px',
-                display:        'flex',
-                alignItems:     'center',
+                color: 'var(--text-secondary)',
+                minWidth: '44px',
+                minHeight: '44px',
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
-                background:     'none',
-                border:         'none',
-                cursor:         'pointer',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
               }}
               aria-label="Close episode drawer"
             >
@@ -941,16 +1251,16 @@ export const VideoPlayer: React.FC = () => {
                   key={season.seasonNumber}
                   onClick={() => setSelectedSeasonIndex(idx)}
                   style={{
-                    flex:            '1 0 auto',
-                    minHeight:       '44px',
-                    padding:         '8px 14px',
-                    borderRadius:    '8px',
-                    fontSize:        '13px',
-                    fontWeight:      700,
-                    border:          'none',
-                    backgroundColor: selectedSeasonIndex === idx ? 'var(--brand-gold)' : 'rgba(255,255,255,0.08)',
-                    color:           selectedSeasonIndex === idx ? '#0E0E12' : '#FFF',
-                    cursor:          'pointer',
+                    flex: '1 0 auto',
+                    minHeight: '40px',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    border: 'none',
+                    backgroundColor: selectedSeasonIndex === idx ? '#E50914' : 'rgba(255,255,255,0.08)',
+                    color: '#FFF',
+                    cursor: 'pointer',
                   }}
                 >
                   Season {season.seasonNumber}
@@ -959,7 +1269,7 @@ export const VideoPlayer: React.FC = () => {
             </div>
           )}
 
-          {/* Episode list with Hotstar-style watch progress bar */}
+          {/* Episode list */}
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {activePlayerContent.seasons[selectedSeasonIndex]?.episodes.map(ep => {
               const isSelected = activeEpisode?.id === ep.id;
@@ -979,17 +1289,17 @@ export const VideoPlayer: React.FC = () => {
                   key={ep.id}
                   onClick={() => handleSwitchEpisode(ep)}
                   style={{
-                    display:         'flex',
-                    gap:             '12px',
-                    padding:         '10px',
-                    borderRadius:    '12px',
-                    backgroundColor: isSelected ? 'rgba(245,166,35,0.12)' : 'rgba(255,255,255,0.04)',
-                    border:          `1px solid ${isSelected ? 'var(--brand-gold)' : 'rgba(255,255,255,0.06)'}`,
-                    cursor:          'pointer',
-                    alignItems:      'center',
+                    display: 'flex',
+                    gap: '12px',
+                    padding: '10px',
+                    borderRadius: '12px',
+                    backgroundColor: isSelected ? 'rgba(229, 9, 20, 0.15)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${isSelected ? '#E50914' : 'rgba(255,255,255,0.06)'}`,
+                    cursor: 'pointer',
+                    alignItems: 'center',
                   }}
                 >
-                  {/* Thumbnail with Hotstar-style bottom progress bar */}
+                  {/* Thumbnail with progress bar */}
                   <div style={{ position: 'relative', width: '80px', height: '48px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0, backgroundColor: '#181824' }}>
                     <img
                       src={ep.thumbnailUrl}
@@ -999,22 +1309,22 @@ export const VideoPlayer: React.FC = () => {
                     {hasProgress && (
                       <div
                         style={{
-                          position:        'absolute',
-                          bottom:          0,
-                          left:            0,
-                          right:           0,
-                          height:          '3px',
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: '3px',
                           backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                          overflow:        'hidden',
-                          zIndex:          3,
+                          overflow: 'hidden',
+                          zIndex: 3,
                         }}
                       >
                         <div
                           style={{
-                            width:           `${barFillPercent}%`,
-                            height:          '100%',
-                            backgroundColor: 'var(--brand-gold)',
-                            transition:      'width 0.3s ease',
+                            width: `${barFillPercent}%`,
+                            height: '100%',
+                            backgroundColor: '#E50914',
+                            transition: 'width 0.3s ease',
                           }}
                         />
                       </div>
@@ -1022,7 +1332,7 @@ export const VideoPlayer: React.FC = () => {
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--brand-gold)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#E50914' }}>
                       EPISODE {ep.episodeNumber}
                     </div>
                     <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1039,4 +1349,3 @@ export const VideoPlayer: React.FC = () => {
     </div>
   );
 };
-

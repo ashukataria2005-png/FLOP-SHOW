@@ -120,6 +120,52 @@ export function useMediaPlayerState({
     }
   }, []);
 
+  // Auto-Landscape Launch Physics on mount:
+  // Component mount hote hi container fullscreen trigger ho aur mobile screen orientation turant landscape me auto-lock ho jaye.
+  // Player close/unmount par screen orientation auto-unlock hokar normal portrait me restore ho jaye.
+  useEffect(() => {
+    let unmounted = false;
+    const launchAutoLandscape = async () => {
+      try {
+        const elem = containerRef.current || document.documentElement;
+        if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+          if (elem.requestFullscreen) {
+            await elem.requestFullscreen({ navigationUI: 'hide' } as any).catch(() => {});
+          } else if ((elem as any).webkitRequestFullscreen) {
+            await (elem as any).webkitRequestFullscreen();
+          }
+        }
+        if (!unmounted) setIsFullscreen(true);
+      } catch (_) {}
+
+      try {
+        if (window.screen?.orientation && 'lock' in window.screen.orientation) {
+          await (window.screen.orientation as any).lock('landscape').catch(() => {});
+        }
+      } catch (_) {}
+    };
+
+    launchAutoLandscape();
+
+    return () => {
+      unmounted = true;
+      try {
+        if (window.screen?.orientation && 'unlock' in window.screen.orientation) {
+          window.screen.orientation.unlock();
+        }
+      } catch (_) {}
+      try {
+        if (document.fullscreenElement || (document as any).webkitFullscreenElement) {
+          if (document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          } else if ((document as any).webkitExitFullscreen) {
+            (document as any).webkitExitFullscreen();
+          }
+        }
+      } catch (_) {}
+    };
+  }, []);
+
   // Track fullscreen change events
   useEffect(() => {
     const handleFullscreenChange = () => {

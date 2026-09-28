@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 import { ContentItem } from '../../types/content';
+import { getResolvedTop10 } from '../../utils/top10Rotation';
 
 interface Top10RowProps {
   catalog: ContentItem[];
@@ -11,44 +12,23 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const [updateTick, setUpdateTick] = useState(0);
 
-  // Compute curated or computed Top 10 items
-  const top10Items = React.useMemo(() => {
-    let savedIds: string[] = [];
-    try {
-      const raw = localStorage.getItem('flopshow_top10_ids');
-      if (raw) savedIds = JSON.parse(raw);
-    } catch (_) { }
+  // Listen to admin or daily update changes
+  useEffect(() => {
+    const handleUpdate = () => setUpdateTick(t => t + 1);
+    window.addEventListener('flopshow_top10_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('flopshow_top10_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
 
-    const selected: ContentItem[] = [];
-    const seen = new Set<string>();
-
-    // 1. Fill from custom admin saved IDs in specified order
-    if (Array.isArray(savedIds) && savedIds.length > 0) {
-      for (const id of savedIds) {
-        const found = catalog.find(c => c.id === id);
-        if (found && !seen.has(found.id)) {
-          seen.add(found.id);
-          selected.push(found);
-        }
-      }
-    }
-
-    // 2. If fewer than 10, fill from highest rating / popular items
-    if (selected.length < 10) {
-      const remainingCandidates = [...catalog]
-        .filter(c => !seen.has(c.id))
-        .sort((a, b) => (b.rating || 0) - (a.rating || 0));
-
-      for (const cand of remainingCandidates) {
-        if (selected.length >= 10) break;
-        seen.add(cand.id);
-        selected.push(cand);
-      }
-    }
-
-    return selected.slice(0, 10);
-  }, [catalog]);
+  // Compute 24-hour deterministic daily lineup or admin manual curated items
+  const { items: top10Items } = React.useMemo(() => {
+    return getResolvedTop10(catalog);
+  }, [catalog, updateTick]);
 
   const updateScrollState = () => {
     if (!scrollRef.current) return;
@@ -346,7 +326,7 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
           height: 0 !important;
         }
 
-        /* Scaled, prominent rank numbers with high-contrast gradient/stroke */
+        /* Scaled, prominent rank numbers with refined dark charcoal / matte black styling */
         .top10-rank-number {
           font-size: 100px;
           line-height: 0.85;
@@ -360,11 +340,12 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
           display: flex;
           align-items: flex-end;
           justify-content: flex-end;
-          background: linear-gradient(180deg, #FFFFFF 0%, #E2E8F0 50%, #94A3B8 100%);
+          color: #121214;
+          background: #121214;
           -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          -webkit-text-stroke: 2px rgba(255, 255, 255, 0.85);
-          filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 10px rgba(0, 0, 0, 0.85));
+          -webkit-text-fill-color: #121214;
+          -webkit-text-stroke: 1.5px rgba(90, 90, 100, 0.6);
+          filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.75));
         }
 
         @media (max-width: 480px) {
@@ -378,6 +359,7 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
           .top10-rank-number {
             font-size: 76px !important;
             margin-right: -10px !important;
+            -webkit-text-stroke: 1.2px rgba(90, 90, 100, 0.6);
           }
         }
 
@@ -386,7 +368,7 @@ export const Top10Row: React.FC<Top10RowProps> = ({ catalog, onSelect }) => {
             font-size: 140px;
             line-height: 0.82;
             margin-right: -16px;
-            -webkit-text-stroke: 2.5px rgba(255, 255, 255, 0.9);
+            -webkit-text-stroke: 1.5px rgba(90, 90, 100, 0.6);
           }
         }
       `}</style>

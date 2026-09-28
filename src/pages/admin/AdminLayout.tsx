@@ -98,6 +98,7 @@ const navGroups: NavGroup[] = [
       { id: 'admin-content', label: 'Catalog & Media', icon: Film, permission: 'catalog' },
       { id: 'admin-free-content', label: 'Free Content Manager', icon: Gift, permission: 'catalog' },
       { id: 'admin-quick-add', label: 'Quick Add / Auto Import', icon: Sparkles, permission: 'catalog' },
+      { id: 'admin-ingestion', label: 'Auto Metadata Ingestion', icon: RotateCcw, permission: 'catalog' },
       { id: 'admin-genres', label: 'Genres & Categories', icon: Tag, permission: 'genres' }
     ]
   },

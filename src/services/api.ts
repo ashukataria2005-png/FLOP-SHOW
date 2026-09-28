@@ -1477,6 +1477,45 @@ export const api = {
       });
     },
 
+    // ------------------------------------------------------------------------
+    // AUTOMATED METADATA INGESTION ENGINE
+    // ------------------------------------------------------------------------
+    async triggerIngestion(filters?: any): Promise<{ success: boolean; result: any; message?: string }> {
+      return request<{ success: boolean; result: any; message?: string }>('/admin/ingest-now', {
+        method: 'POST',
+        body: JSON.stringify({ filters: filters || {} })
+      });
+    },
+
+    async getIngestionStatus(): Promise<{ success: boolean; status: any; scheduler?: any }> {
+      return request<{ success: boolean; status: any; scheduler?: any }>('/admin/ingestion-status');
+    },
+
+    async toggleIngestionCron(enabled?: boolean): Promise<{ success: boolean; enabled?: boolean; message?: string }> {
+      return request<{ success: boolean; enabled?: boolean; message?: string }>('/admin/ingestion-cron-toggle', {
+        method: 'POST',
+        body: JSON.stringify({ enabled })
+      });
+    },
+
+    ingestion: {
+      async trigger(filters?: any) {
+        return request<{ success: boolean; result: any; message?: string }>('/admin/ingest-now', {
+          method: 'POST',
+          body: JSON.stringify({ filters: filters || {} })
+        });
+      },
+      async getStatus() {
+        return request<{ success: boolean; status: any; scheduler?: any }>('/admin/ingestion-status');
+      },
+      async toggleCron(enabled?: boolean) {
+        return request<{ success: boolean; enabled?: boolean; message?: string }>('/admin/ingestion-cron-toggle', {
+          method: 'POST',
+          body: JSON.stringify({ enabled })
+        });
+      }
+    },
+
     subAdmins: {
       async list() {
         return request<{

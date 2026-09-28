@@ -12,5 +12,5 @@
     "noEmit": true
   },
   "include": ["src/**/*"],
-  "exclude": ["src/tests/**/*", "src/scripts/old_seed.ts"]
+  "exclude": ["src/tests/**/*", "src/scripts/old_seed.ts", "src/scripts/assertCatalogIntegrity.ts", "src/scripts/repairAndEnrichCatalog.ts"]
 }

@@ -16,6 +16,8 @@ import { userRepository } from '../repositories/userRepository.js';
 import { promoService } from '../services/promoService.js';
 import { ALL_ADMIN_PERMISSIONS, isSuperAdminUser } from '../services/authService.js';
 import { getAdapter } from '../db/adapter.js';
+import { ingestionService } from '../services/ingestionService.js';
+import { metadataCron } from '../jobs/metadataCron.js';
 
 export const adminRouter = Router();
 
@@ -458,6 +460,97 @@ adminRouter.post('/auto-import/import', requirePermission('catalog'), async (req
       message: `"${result.title}" imported successfully to FLOPSHOW catalog.`,
       result,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ----------------------------------------------------------------------------
+// 3C. AUTOMATED METADATA INGESTION ENGINE
+// ----------------------------------------------------------------------------
+
+/** Manual trigger: run ingestion now */
+adminRouter.post('/ingest-now', requirePermission('catalog'), async (req, res, next) => {
+  try {
+    if (ingestionService.isRunning()) {
+      res.status(409).json({
+        success: false,
+        error: { code: 'INGESTION_IN_PROGRESS', message: 'An ingestion run is already in progress.' }
+      });
+      return;
+    }
+
+    const filters = req.body?.filters || {};
+    const result = await ingestionService.runNow(filters);
+    res.json({
+      success: true,
+      message: `Ingestion complete: ${result.imported} titles imported.`,
+      result,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Get ingestion status (last run info, enabled state, scheduler state) */
+const handleGetIngestionStatus = async (_req: any, res: any, next: any) => {
+  try {
+    const status = await ingestionService.getStatus();
+    const schedulerInfo = metadataCron.getInfo();
+    res.json({
+      success: true,
+      status,
+      scheduler: schedulerInfo,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+adminRouter.get('/ingestion/status', requirePermission('catalog'), handleGetIngestionStatus);
+adminRouter.get('/ingestion-status', requirePermission('catalog'), handleGetIngestionStatus);
+
+/** Toggle auto-ingestion on/off */
+const handleToggleIngestion = async (req: any, res: any, next: any) => {
+  try {
+    const { enabled } = req.body;
+    const newState = enabled !== undefined ? Boolean(enabled) : !(await ingestionService.isEnabled());
+    await ingestionService.setEnabled(newState);
+
+    // Restart scheduler to pick up new state
+    if (newState) {
+      await metadataCron.restart();
+    } else {
+      metadataCron.stop();
+    }
+
+    res.json({
+      success: true,
+      enabled: newState,
+      message: newState ? 'Auto-ingestion enabled. Scheduler started.' : 'Auto-ingestion disabled. Scheduler stopped.',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+adminRouter.post('/ingestion/toggle', requirePermission('catalog'), handleToggleIngestion);
+adminRouter.post('/ingestion-cron-toggle', requirePermission('catalog'), handleToggleIngestion);
+
+/** Start / stop scheduler explicitly */
+adminRouter.post('/ingestion/scheduler/:action', requirePermission('catalog'), async (req, res, next) => {
+  try {
+    const action = req.params.action;
+    if (action === 'start') {
+      await metadataCron.start();
+      res.json({ success: true, message: 'Scheduler started.', scheduler: metadataCron.getInfo() });
+    } else if (action === 'stop') {
+      metadataCron.stop();
+      res.json({ success: true, message: 'Scheduler stopped.', scheduler: metadataCron.getInfo() });
+    } else if (action === 'restart') {
+      await metadataCron.restart();
+      res.json({ success: true, message: 'Scheduler restarted.', scheduler: metadataCron.getInfo() });
+    } else {
+      res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Invalid action. Use start, stop, or restart.' } });
+    }
   } catch (err) {
     next(err);
   }

@@ -3,6 +3,7 @@ import { runMigrationsAsync } from './db/migrator.js';
 import { seedDatabase } from './db/seed.js';
 import { config } from './config/env.js';
 import { telegramService } from './services/telegramService.js';
+import { metadataCron } from './jobs/metadataCron.js';
 
 async function start() {
   try {
@@ -35,11 +36,17 @@ async function start() {
       telegramService.autoRegisterWebhook().catch(tgErr => {
         console.warn('[Telegram Bot] Auto webhook registration warning:', tgErr?.message || tgErr);
       });
+
+      // Auto-start Metadata Ingestion Cron Scheduler (every 6 hours)
+      metadataCron.start().catch(cronErr => {
+        console.warn('[MetadataCron] Auto-start warning:', (cronErr as Error)?.message || cronErr);
+      });
     });
 
     // Graceful shutdown
     const handleShutdown = () => {
       console.log('Shutting down FLOPSHOW Backend...');
+      metadataCron.stop();
       server.close(() => {
         console.log('Server closed.');
         process.exit(0);
